@@ -1,0 +1,10 @@
+{
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": true
+    },
+    "eslint.validate": ["javascript"],
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true
+  }
