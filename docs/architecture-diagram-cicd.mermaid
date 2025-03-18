@@ -1,0 +1,59 @@
+---
+config:
+  look: classic
+---
+graph TD
+    User[End User] --> UserTier{Account Type}
+    UserTier -->|Web3| DirectInteraction[Direct Contract Interaction]
+    UserTier -->|Free/Premium API Key| GaslessInteraction[Gasless Transaction]
+    DirectInteraction --> Blockchain[(Blockchain)]
+    GaslessInteraction --> APIGateway[API Gateway]
+    APIGateway --> Auth{API Key Authentication}
+    Auth -->|Valid Free Tier| RateLimitF[Rate Limit: 50/day, 5/min]
+    Auth -->|Valid Premium Tier| RateLimitP[Rate Limit: 1000/day, 30/min]
+    Auth -->|Invalid| Reject[Reject Request]
+    RateLimitF --> RelayLambda[Relay Lambda]
+    RateLimitP --> RelayLambda
+    RelayLambda --> ForwarderContract[Trusted Forwarder Contract]
+    ForwarderContract --> Blockchain
+    APIGateway --> SignupLambda[Signup Lambda]
+    APIGateway --> PremiumLambda[Premium Lambda]
+    APIGateway --> CheckoutLambda[Checkout Lambda]
+    SignupLambda --> DynamoDB[(DynamoDB)]
+    PremiumLambda --> DynamoDB
+    CheckoutLambda --> DynamoDB
+    RelayLambda -.-> CloudWatch
+    CheckoutLambda --> Stripe[Stripe Payment Gateway]
+    Stripe -->|Webhook| PremiumLambda
+    Blockchain --> TotemContracts[TotemBound Smart Contracts]
+    subgraph CI/CD Pipeline
+        GitHub[GitHub Repositories] --> Actions[GitHub Actions]
+        Actions --> Build[Build & Test]
+        Build --> Package[Package Lambda Functions]
+        Package --> S3Deploy[Deploy to S3 Bucket]
+        S3Deploy -->|Lambda Artifacts| S3Artifacts[(S3 Artifacts Bucket)]
+        S3Deploy -->|CloudFormation Templates| S3Templates[(S3 Templates)]
+        S3Artifacts --> CloudFormation[CloudFormation]
+        S3Templates --> CloudFormation
+        CloudFormation -->|Provisions/Updates| APIGateway
+        CloudFormation -->|Provisions/Updates| LambdaFunctions[Lambda Functions]
+        CloudFormation -->|Provisions/Updates| DynamoDB
+        CloudWatch
+    end
+    subgraph Application Hosting
+        FrontendRepo[Frontend Repository] --> FrontendBuild[Build dApp]
+        FrontendBuild --> FrontendDeploy[Deploy to S3]
+        FrontendDeploy --> S3Website[S3 Static Website]
+        S3Website --> CloudFront[CloudFront Distribution]
+        CloudFront --> EndUser[End User Browser]
+    end
+    classDef aws fill:#FF9900,stroke:#232F3E,color:white;
+    classDef blockchain fill:#3641E0,stroke:#0D1133,color:white;
+    classDef payment fill:#6772E5,stroke:#32325D,color:white;
+    classDef user fill:#36B37E,stroke:#006644,color:white;
+    classDef ci fill:#2684FF,stroke:#0052CC,color:white;
+    class APIGateway,RelayLambda,SignupLambda,PremiumLambda,CheckoutLambda,DynamoDB,CloudWatch,S3Artifacts,S3Templates,CloudFormation,LambdaFunctions,S3Website,CloudFront aws;
+    class Blockchain,ForwarderContract,TotemContracts blockchain;
+    class Stripe payment;
+    class User,UserTier,DirectInteraction,GaslessInteraction,EndUser user;
+    class GitHub,Actions,Build,Package,S3Deploy,FrontendRepo,FrontendBuild,FrontendDeploy ci;

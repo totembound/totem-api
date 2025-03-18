@@ -1,0 +1,63 @@
+---
+config:
+  look: classic
+---
+graph TD
+    %% User accessing the application
+    User[End User Browser] --> CloudFront[CloudFront CDN]
+    CloudFront --> S3Hosting[S3 Website Hosting]
+    S3Hosting --> dApp[TotemBound dApp]
+    
+    %% User path branching based on tier
+    dApp --> UserTier{Account Type}
+    UserTier -->|Web3| DirectInteraction[Direct Contract Interaction]
+    UserTier -->|Free/Premium API Key| GaslessInteraction[Gasless Transaction]
+    
+    %% Web3 path - direct blockchain interaction
+    DirectInteraction --> Blockchain[(Blockchain)]
+    
+    %% Gasless path through API Gateway
+    GaslessInteraction --> APIGateway[API Gateway]
+    
+    %% API Gateway routes
+    APIGateway --> RelayAPI[Relay API]
+    APIGateway --> SignupAPI[Signup API]
+    APIGateway --> CheckoutAPI[Checkout API]
+    APIGateway --> PremiumAPI[Premium API]
+    
+    %% Email flow for API keys
+    SignupAPI --> SES[Amazon SES]
+    PremiumAPI --> SES
+    SES -->|Sends API Key| UserEmail[User Email Inbox]
+    
+    %% Payment processing with Stripe
+    CheckoutAPI --> Stripe[Stripe Payment]
+    Stripe -->|Webhooks| PremiumAPI
+    
+    %% Trusted Forwarder for gasless transactions
+    RelayAPI --> ForwarderContract[Trusted Forwarder Contract]
+    ForwarderContract --> Blockchain
+    
+    %% Smart contracts
+    Blockchain --> GameContract[Game Contract]
+    Blockchain --> NFTContract[NFT Contract]
+    Blockchain --> TokenContract[Token Contract]
+    Blockchain --> RewardsContract[Rewards Contract]
+
+    %% Data storage
+    SignupAPI --> DynamoDB[(DynamoDB)]
+    PremiumAPI --> DynamoDB
+    RelayAPI -.->|Transaction Logs| CloudWatch
+    RelayAPI <--> SecretsManager[Secrets Manager]
+
+    %% Define styles
+    classDef aws fill:#FF9900,stroke:#232F3E,color:white;
+    classDef blockchain fill:#3641E0,stroke:#0D1133,color:white;
+    classDef payment fill:#6772E5,stroke:#32325D,color:white;
+    classDef user fill:#36B37E,stroke:#006644,color:white;
+    
+    %% Apply styles
+    class CloudFront,CloudWatch,S3Hosting,SecretsManager,APIGateway,RelayAPI,SignupAPI,PremiumAPI,CheckoutAPI,DynamoDB,SES aws;
+    class Blockchain,ForwarderContract,GameContract,NFTContract,TokenContract,RewardsContract blockchain;
+    class Stripe payment;
+    class User,dApp,UserTier,DirectInteraction,GaslessInteraction,UserEmail user;
