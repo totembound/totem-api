@@ -55,7 +55,7 @@ async function initializeProvider() {
     const privateKeyPath = process.env.FORWARDER_PRIVATE_KEY_PARAM;
     const privateKey = await getParameter(privateKeyPath);
 
-    provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+    provider = new ethers.JsonRpcProvider(rpcURl);
     wallet = new ethers.Wallet(privateKey, provider);
     forwarderContract = new ethers.Contract(contractAddresses.forwarder, FORWARDER_ABI, wallet);
 
