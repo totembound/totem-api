@@ -1,0 +1,271 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TotemBound API - Core Infrastructure'
+
+Mappings:
+  EnvironmentMap:
+    staging:
+      Region: us-west-2
+      ResourcePrefix: totemboundci
+      S3Bucket: totemboundci-releases
+      UsersTableName: totemboundci-users
+      TransactionsTableName: totemboundci-transactions
+      LambdaRoleName: totemboundci-lambda-role
+    prod:
+      Region: us-east-1
+      ResourcePrefix: totembound
+      S3Bucket: totembound-releases
+      UsersTableName: totembound-users
+      TransactionsTableName: totembound-transactions
+      LambdaRoleName: totembound-lambda-role
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues:
+      - staging
+      - prod
+    Description: Deployment environment
+
+Conditions:
+  IsProdEnvironment: !Equals [!Ref Environment, "prod"]
+
+Resources:
+  # Use existing S3 bucket for Lambda Deployment Artifacts
+  # Note: We reference existing buckets rather than creating them
+  # The bucket names are mapped based on environment:
+  # - staging: totemboundci-releases in us-west-2
+  # - prod: totembound-releases in us-east-1
+
+  # DynamoDB Table for User Management
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]
+      # Region is automatically determined by where the CloudFormation stack is deployed
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: walletAddress
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: wallet-index
+          KeySchema:
+            - AttributeName: walletAddress
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  # Transaction Table for Transaction History
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !FindInMap [EnvironmentMap, !Ref Environment, TransactionsTableName]
+      # Region is automatically determined by where the CloudFormation stack is deployed
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: txId
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: txId
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: user-time-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !FindInMap [EnvironmentMap, !Ref Environment, LambdaRoleName]
+      # Region is automatically determined by where the CloudFormation stack is deployed
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - !Sub "lambda.${AWS::Region}.amazonaws.com"
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource: 
+                  - !GetAtt UsersTable.Arn
+                  - !Sub "${UsersTable.Arn}/index/*"
+                  - !GetAtt TransactionsTable.Arn
+                  - !Sub "${TransactionsTable.Arn}/index/*"
+        - PolicyName: ApiGatewayManagement
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                  - apigateway:POST
+                  - apigateway:PUT
+                  - apigateway:DELETE
+                Resource: !Sub "arn:aws:apigateway:${AWS::Region}::/apikeys/*"
+              - Effect: Allow
+                Action:
+                  - apigateway:GET
+                  - apigateway:POST
+                  - apigateway:PUT
+                  - apigateway:DELETE
+                Resource: !Sub "arn:aws:apigateway:${AWS::Region}::/usageplans/*"
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: 
+                 Fn::Join:
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - Fn::FindInMap: [EnvironmentMap, !Ref Environment, S3Bucket]
+                    - "/*"
+        - PolicyName: SESAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: '*'
+        - PolicyName: ParameterStoreAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub 
+                    - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Prefix}/*"
+                    - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+
+  # API Key and Usage Plans, map after API stage is deployed
+  FreeTierApiUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: "totembound-free-tier"
+      Description: Free tier usage plan with limited requests
+      Throttle:
+        BurstLimit: 10
+        RateLimit: 5
+      Quota:
+        Limit: 100
+        Period: DAY
+  
+  PremiumTierApiUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: "totembound-premium-tier"
+      Description: Premium tier usage plan with higher limits
+      Throttle:
+        BurstLimit: 50
+        RateLimit: 30
+      Quota:
+        Limit: 1000
+        Period: DAY
+
+Outputs:
+  UsersTableName:
+    Description: Name of the DynamoDB users table
+    Value: !Ref UsersTable
+    Export:
+      Name: !Sub "${AWS::StackName}-UsersTableName"
+
+  TransactionsTableName:
+    Description: Name of the DynamoDB transactions table
+    Value: !Ref TransactionsTable
+    Export:
+      Name: !Sub "${AWS::StackName}-TransactionsTableName"
+
+  LambdaExecutionRoleArn:
+    Description: ARN of the Lambda execution role
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaExecutionRoleArn"
+
+  LambdaArtifactsBucketName:
+    Description: Name of the S3 bucket for Lambda artifacts
+    Value: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaArtifactsBucketName"
+      
+  AWSRegion:
+    Description: AWS Region for this environment
+    Value: !FindInMap [EnvironmentMap, !Ref Environment, Region]
+    Export:
+      Name: !Sub "${AWS::StackName}-AWSRegion"
+      
+  ResourcePrefix:
+    Description: Prefix used for resource naming (totembound/totemboundci)
+    Value: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+    Export:
+      Name: !Sub "${AWS::StackName}-ResourcePrefix"
+
+  FreeTierUsagePlanId:
+    Description: ID of the Free Tier usage plan
+    Value: !Ref FreeTierApiUsagePlan
+    Export:
+      Name: !Sub "${AWS::StackName}-FreeTierUsagePlanId"
+      
+  PremiumTierUsagePlanId:
+    Description: ID of the Premium Tier usage plan
+    Value: !Ref PremiumTierApiUsagePlan
+    Export:
+      Name: !Sub "${AWS::StackName}-PremiumTierUsagePlanId"
