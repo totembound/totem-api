@@ -18,7 +18,8 @@ exports.handler = async (event, context) => {
         stripeSignature,
         process.env.STRIPE_WEBHOOK_SECRET
       );
-    } catch (err) {
+    }
+    catch (err) {
       console.error('Stripe signature verification failed:', err);
       return {
         statusCode: 400,
@@ -41,7 +42,8 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({ received: true })
         };
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error processing webhook:', error);
     return {
       statusCode: 500,
@@ -281,17 +283,17 @@ function sendPremiumEmail(email, apiKey, isUpgrade) {
       Body: {
         Html: {
           Data: `
-                        <h1>${upgradeText}</h1>
-                        <p>Thank you for subscribing to our premium service. Here is your new Premium API key:</p>
-                        <p><strong>${apiKey}</strong></p>
-                        <p>Please update your API key in the user settings to enjoy premium benefits:</p>
-                        <ul>
-                        <li>Higher rate limits</li>
-                        <li>Priority transaction processing</li>
-                        <li>Access to exclusive game features</li>
-                        </ul>
-                        <p>Happy gaming!</p>
-                    `
+              <h1>${upgradeText}</h1>
+              <p>Thank you for subscribing to our premium service. Here is your new Premium API key:</p>
+              <p><strong>${apiKey}</strong></p>
+              <p>Please update your API key in the user settings to enjoy premium benefits:</p>
+              <ul>
+              <li>Higher rate limits</li>
+              <li>Priority transaction processing</li>
+              <li>Access to exclusive game features</li>
+              </ul>
+              <p>Happy gaming!</p>
+          `
         }
       }
     }
@@ -313,14 +315,14 @@ function sendDowngradeEmail(email, apiKey) {
       Body: {
         Html: {
           Data: `
-                        <h1>Your Premium Subscription Has Ended</h1>
-                        <p>Your TotemBound account has been reverted to the Free tier.</p>
-                        <p>Here is your new Free tier API key:</p>
-                        <p><strong>${apiKey}</strong></p>
-                        <p>Please update your API key in the user settings to continue using gasless transactions.</p>
-                        <p>If you'd like to upgrade again, visit your account page anytime.</p>
-                        <p>Thank you for using TotemBound!</p>
-                    `
+              <h1>Your Premium Subscription Has Ended</h1>
+              <p>Your TotemBound account has been reverted to the Free tier.</p>
+              <p>Here is your new Free tier API key:</p>
+              <p><strong>${apiKey}</strong></p>
+              <p>Please update your API key in the user settings to continue using gasless transactions.</p>
+              <p>If you'd like to upgrade again, visit your account page anytime.</p>
+              <p>Thank you for using TotemBound!</p>
+          `
         }
       }
     }

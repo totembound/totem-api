@@ -78,7 +78,8 @@ exports.parseEvent = event => {
   if (event.body) {
     try {
       body = JSON.parse(event.body);
-    } catch (e) {
+    }
+    catch (e) {
       console.warn('Failed to parse event body');
     }
   }

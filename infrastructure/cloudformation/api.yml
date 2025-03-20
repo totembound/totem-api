@@ -1,0 +1,710 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TotemBound API - Gateway and Lambda Functions'
+
+Mappings:
+  EnvironmentMap:
+    staging:
+      Region: us-west-2
+      ResourcePrefix: totemboundci
+      S3Bucket: totemboundci-releases
+      UsersTableName: totemboundci-users
+      TransactionsTableName: totemboundci-transactions
+      CorsOrigin: https://totembound-test.net
+      ApiDomain: api.totembound-test.net
+      StripeSuccessUrl: https://totembound-test.net/accounts/success
+      StripeCancelUrl: https://totembound-test.net/accounts/premium
+      StripePriceId: price_premium_monthly_test
+      Region: us-west-2
+    prod:
+      Region: us-east-1
+      ResourcePrefix: totembound
+      S3Bucket: totembound-releases
+      UsersTableName: totembound-users
+      TransactionsTableName: totembound-transactions
+      CorsOrigin: https://totembound.com
+      ApiDomain: api.totembound.com
+      StripeSuccessUrl: https://totembound.com/accounts/success
+      StripeCancelUrl: https://totembound.com/accounts/premium
+      StripePriceId: price_premium_monthly
+      Region: us-east-1
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues:
+      - staging
+      - prod
+    Description: Deployment environment
+  
+  AppVersion:
+    Type: String
+    Description: Version of the artifacts to deploy
+    Default: latest
+    
+  CustomCorsOrigin:
+    Type: String
+    Description: Override CORS origin (for local development)
+    Default: ""
+  
+  CorsOrigin:
+    Type: String
+    Default: '*'
+    Description: CORS origin for API Gateway
+  
+  ForwarderAddress:
+    Type: String
+    Description: Address of the TotemTrustedForwarder contract
+  
+  GameAddress:
+    Type: String
+    Description: Address of the TotemGame contract
+  
+  NftAddress:
+    Type: String
+    Description: Address of the TotemNFT contract
+  
+  TokenAddress:
+    Type: String
+    Description: Address of the TotemToken contract
+  
+  RewardsAddress:
+    Type: String
+    Description: Address of the TotemRewards contract
+  
+  StripeSuccessUrl:
+    Type: String
+    Description: URL to redirect users after successful payment
+    Default: ""
+  
+  StripeCancelUrl:
+    Type: String
+    Description: URL to redirect users after cancelled payment
+    Default: ""
+  
+  StripePriceId:
+    Type: String
+    Description: Stripe price ID for premium subscription
+    Default: ""
+  
+  FromEmail:
+    Type: String
+    Description: Email address to send notifications from
+    Default: no-reply@totembound.com
+  
+  MaxGasPrice:
+    Type: String
+    Description: Maximum gas price for relay transactions (gwei)
+    Default: '50'
+  
+  MinWalletBalance:
+    Type: String
+    Description: Minimum wallet balance to maintain (ETH)
+    Default: '0.1'
+
+  ForwarderPrivateKeySecretName:
+    Type: String
+    Description: Name of the Secrets Manager secret containing the forwarder private key
+    
+  StripeSecretKeyName:
+    Type: String
+    Description: Name of the Secrets Manager secret containing the Stripe API key
+    
+  StripeWebhookSecretName:
+    Type: String
+    Description: Name of the Secrets Manager secret containing the Stripe webhook secret
+
+  RpcEndpointUrlName:
+    Type: String
+    Description: RPC Blockchain Endpoint Url
+
+Conditions:
+  UseCustomCors: !Not [!Equals [!Ref CustomCorsOrigin, ""]]
+  UseCustomStripeSuccessUrl: !Not [!Equals [!Ref StripeSuccessUrl, ""]]
+  UseCustomStripeCancelUrl: !Not [!Equals [!Ref StripeCancelUrl, ""]]
+  UseCustomStripePriceId: !Not [!Equals [!Ref StripePriceId, ""]]
+  IsProdEnvironment: !Equals [!Ref Environment, "prod"]
+
+Resources:
+  # Lambda Function for gasless transation
+  RelayLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: 
+        Fn::Join:
+          - ""
+          - - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ResourcePrefix]
+            - "-relay"
+      Handler: relay/index.handler
+      Role: {"Fn::ImportValue": "totembound-core-stack-LambdaExecutionRoleArn"}
+      Runtime: nodejs18.x
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          CORS_ORIGIN: !If 
+          - UseCustomCors
+          - !Ref CustomCorsOrigin
+          - !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+          FORWARDER_RPC_URL_PARAM: !Ref RpcEndpointUrlName
+          FORWARDER_PRIVATE_KEY_PARAM: !Ref ForwarderPrivateKeySecretName
+          FORWARDER_ADDRESS: !Ref ForwarderAddress
+          GAME_ADDRESS: !Ref GameAddress
+          NFT_ADDRESS: !Ref NftAddress
+          TOKEN_ADDRESS: !Ref TokenAddress
+          REWARDS_ADDRESS: !Ref RewardsAddress
+          MAX_GAS_PRICE: !Ref MaxGasPrice
+          MIN_WALLET_BALANCE: !Ref MinWalletBalance
+          USERS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]
+          TRANSACTIONS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, TransactionsTableName]
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/relay/relay-lambda-${AppVersion}.zip"
+
+  # Lambda Function for API Key Signup
+  SignupLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - ""
+          - - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ResourcePrefix]
+            - "-signup"
+      Handler: signup/index.handler
+      Role: {"Fn::ImportValue": "totembound-core-stack-LambdaExecutionRoleArn"}
+      Runtime: nodejs18.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          CORS_ORIGIN: !If 
+          - UseCustomCors
+          - !Ref CustomCorsOrigin
+          - !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+          USERS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]
+          EMAIL_FROM: !Ref FromEmail
+          PAYMENT_URL: 
+            Fn::Join:
+            - ""
+            - - "https://"
+              - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ApiDomain]
+              - "/v1/checkout"
+          FREE_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-FreeTierUsagePlanId"}
+          PREMIUM_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-PremiumTierUsagePlanId"}
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/signup/signup-lambda-${AppVersion}.zip"
+  
+  # Lambda Function for Premium Processing
+  PremiumLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - ""
+          - - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ResourcePrefix]
+            - "-premium"
+      Handler: premium/index.handler
+      Role: {"Fn::ImportValue": "totembound-core-stack-LambdaExecutionRoleArn"}
+      Runtime: nodejs18.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          CORS_ORIGIN: !If 
+          - UseCustomCors
+          - !Ref CustomCorsOrigin
+          - !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+          USERS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]
+          EMAIL_FROM: !Ref FromEmail
+          STRIPE_SECRET_KEY_PARAM: !Ref StripeSecretKeyName
+          STRIPE_WEBHOOK_SECRET_PARAM: !Ref StripeWebhookSecretName
+          FREE_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-FreeTierUsagePlanId"}
+          PREMIUM_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-PremiumTierUsagePlanId"}
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/premium/premium-lambda-${AppVersion}.zip"
+  
+  # Lambda Function for Checkout Creation
+  CheckoutLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - ""
+          - - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ResourcePrefix]
+            - "-checkout"
+      Handler: checkout/index.handler
+      Role: {"Fn::ImportValue": "totembound-core-stack-LambdaExecutionRoleArn"}
+      Runtime: nodejs18.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          CORS_ORIGIN: !If 
+          - UseCustomCors
+          - !Ref CustomCorsOrigin
+          - !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+          USERS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]
+          STRIPE_SECRET_KEY_PARAM: !Ref StripeSecretKeyName
+          STRIPE_PRICE_ID: !If 
+            - UseCustomStripePriceId
+            - !Ref StripePriceId
+            - !FindInMap [EnvironmentMap, !Ref Environment, StripePriceId]
+          STRIPE_SUCCESS_URL: !If 
+            - UseCustomStripeSuccessUrl
+            - !Ref StripeSuccessUrl
+            - !FindInMap [EnvironmentMap, !Ref Environment, StripeSuccessUrl]
+          STRIPE_CANCEL_URL: !If 
+            - UseCustomStripeCancelUrl
+            - !Ref StripeCancelUrl
+            - !FindInMap [EnvironmentMap, !Ref Environment, StripeCancelUrl]
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/checkout/checkout-lambda-${AppVersion}.zip"
+  
+  # API Gateway
+  TotemBoundApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: "totembound-api"
+      Description: TotemBound Gasless Transaction API
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+  # Add the EmptyResponse model as a separate resource
+  EmptyResponseModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ContentType: application/json
+      Name: EmptyResponse
+      Schema: 
+        type: object
+        title: Empty Response
+  
+  # Response models for CORS
+  CorsResponseModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ContentType: application/json
+      Name: CorsResponse
+      Schema:
+        '$schema': http://json-schema.org/draft-04/schema#
+        title: CorsResponse
+        type: object
+        properties:
+          message:
+            type: string
+  
+  # API Gateway Resources
+  ApiResourceRelay:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: relay
+  
+  ApiResourceHealth:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: health
+  
+  ApiResourceSignup:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: signup
+  
+  ApiResourceCheckout:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: create-checkout
+  
+  ApiResourceWebhook:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: webhook
+  
+  # API Methods - RELAY
+  RelayPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceRelay
+      HttpMethod: POST
+      AuthorizationType: NONE
+      ApiKeyRequired: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RelayLambdaFunction.Arn}/invocations"
+  
+  RelayOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceRelay
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+              method.response.header.Cache-Control: "'public, max-age=86400'"
+              method.response.header.Access-Control-Allow-Origin: !If 
+              - UseCustomCors
+              - !Sub "'${CustomCorsOrigin}'"
+              - Fn::Join:
+                - ""
+                - - "'"
+                  - Fn::FindInMap: [EnvironmentMap, !Ref Environment, CorsOrigin]
+                  - "'"
+            ResponseTemplates:
+              application/json: '{"message": "CORS preflight success"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref CorsResponseModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+            method.response.header.Cache-Control: true
+  # API Methods - HEALTH
+  HealthGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceHealth
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseTemplates:
+              application/json: '{"status":"healthy"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyResponseModel
+  
+  HealthOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceHealth
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+              method.response.header.Cache-Control: "'public, max-age=86400'"
+              method.response.header.Access-Control-Allow-Origin: !If 
+              - UseCustomCors
+              - !Sub "'${CustomCorsOrigin}'"
+              - Fn::Join:
+                - ""
+                - - "'"
+                  - Fn::FindInMap: [EnvironmentMap, !Ref Environment, CorsOrigin]
+                  - "'"
+            ResponseTemplates:
+              application/json: '{"message": "CORS preflight success"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref CorsResponseModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+            method.response.header.Cache-Control: true
+  
+  # API Methods - SIGNUP
+  SignupPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceSignup
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SignupLambdaFunction.Arn}/invocations"
+  
+  SignupOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceSignup
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+              method.response.header.Cache-Control: "'public, max-age=86400'"
+              method.response.header.Access-Control-Allow-Origin: !If 
+              - UseCustomCors
+              - !Sub "'${CustomCorsOrigin}'"
+              - Fn::Join:
+                - ""
+                - - "'"
+                  - Fn::FindInMap: [EnvironmentMap, !Ref Environment, CorsOrigin]
+                  - "'"
+            ResponseTemplates:
+              application/json: '{"message": "CORS preflight success"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref CorsResponseModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+            method.response.header.Cache-Control: true
+
+  # API Methods - CHECKOUT
+  CheckoutPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceCheckout
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CheckoutLambdaFunction.Arn}/invocations"
+  
+  CheckoutOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceCheckout
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+              method.response.header.Cache-Control: "'public, max-age=86400'"
+              method.response.header.Access-Control-Allow-Origin: !If 
+              - UseCustomCors
+              - !Sub "'${CustomCorsOrigin}'"
+              - Fn::Join:
+                - ""
+                - - "'"
+                  - Fn::FindInMap: [EnvironmentMap, !Ref Environment, CorsOrigin]
+                  - "'"
+            ResponseTemplates:
+              application/json: '{"message": "CORS preflight success"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref CorsResponseModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+            method.response.header.Cache-Control: true
+  
+  # API Methods - WEBHOOK
+  WebhookPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceWebhook
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${PremiumLambdaFunction.Arn}/invocations"
+  
+  WebhookOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceWebhook
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,stripe-signature'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: !Sub "'${CorsOrigin}'"
+            ResponseTemplates:
+              application/json: '{"message": "CORS preflight success"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref CorsResponseModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+  
+  # API Deployment & Stage
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - RelayPostMethod
+      - RelayOptionsMethod
+      - HealthGetMethod
+      - HealthOptionsMethod
+      - SignupPostMethod
+      - SignupOptionsMethod
+      - CheckoutPostMethod
+      - CheckoutOptionsMethod
+      - WebhookPostMethod
+      - WebhookOptionsMethod
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      Description: !Sub "Deployment for ${Environment} (${AppVersion})"
+  
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      DeploymentId: !Ref ApiDeployment
+      StageName: "v1"
+      Description: 
+        Fn::Join:
+          - ""
+          - - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ResourcePrefix]
+            - " API Stage"
+      Variables:
+        lambdaVersion: !Ref AppVersion
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: true
+          DataTraceEnabled: true
+          LoggingLevel: INFO
+  
+  # Lambda Permissions
+  RelayLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref RelayLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TotemBoundApi}/*"
+  
+  SignupLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SignupLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TotemBoundApi}/*"
+  
+  PremiumLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref PremiumLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TotemBoundApi}/*"
+  
+  CheckoutLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref CheckoutLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TotemBoundApi}/*"
+
+Outputs:
+  ApiGatewayUrl:
+    Description: URL of the API Gateway endpoint
+    Value: !If 
+      - IsProdEnvironment
+      - 'https://api.totembound.com/v1'
+      - 'https://api.totembound-test.net/v1'
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiGatewayUrl"
+  
+  ApiGatewayId:
+    Description: ID of the API Gateway
+    Value: !Ref TotemBoundApi
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiGatewayId"
+
+  RelayLambdaArn:
+    Description: ARN of the Relay Lambda function
+    Value: !GetAtt RelayLambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-RelayLambdaArn"
+      
+  SignupLambdaArn:
+    Description: ARN of the Signup Lambda function
+    Value: !GetAtt SignupLambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-SignupLambdaArn"
+      
+  PremiumLambdaArn:
+    Description: ARN of the Premium Lambda function
+    Value: !GetAtt PremiumLambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-PremiumLambdaArn"
+      
+  CheckoutLambdaArn:
+    Description: ARN of the Checkout Lambda function
+    Value: !GetAtt CheckoutLambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-CheckoutLambdaArn"

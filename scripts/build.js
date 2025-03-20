@@ -13,7 +13,7 @@ const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout'];
 const SOURCE_DIR = path.join(__dirname, '..', 'src');
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const COMMON_DIR = path.join(SOURCE_DIR, 'common');
-const CONTRACTS_DIR = path.join(__dirname, '..', 'contracts');
+const CONTRACTS_DIR = path.join(SOURCE_DIR, 'contracts');
 
 // Ensure dist directory exists
 if (!fs.existsSync(DIST_DIR)) {
@@ -50,6 +50,7 @@ function buildFunction(functionName) {
 
   const functionSrc = path.join(SOURCE_DIR, functionName);
   const functionDist = path.join(DIST_DIR, functionName);
+  const functionSrcDist = path.join(functionDist, functionName);
 
   // Ensure function directory exists
   if (!fs.existsSync(functionSrc)) {
@@ -60,27 +61,28 @@ function buildFunction(functionName) {
   // Create function dist directory
   if (!fs.existsSync(functionDist)) {
     fs.mkdirSync(functionDist, { recursive: true });
+    fs.mkdirSync(functionSrcDist, { recursive: true });
   }
 
   // Copy function source files
-  copyDir(functionSrc, functionDist);
+  copyDir(functionSrc, functionSrcDist);
   console.log(chalk.green(`  ✓ Copied ${functionName} source files`));
 
-  // Copy common utilities
-  const functionCommonDir = path.join(functionDist, 'common');
-  if (!fs.existsSync(functionCommonDir)) {
-    fs.mkdirSync(functionCommonDir, { recursive: true });
+  // Copy common directory at the same level as in source
+  const commonDist = path.join(functionDist, 'common');
+  if (!fs.existsSync(commonDist)) {
+    fs.mkdirSync(commonDist, { recursive: true });
+    copyDir(COMMON_DIR, commonDist);
+    console.log(chalk.green(`  ✓ Copied common utilities`));
   }
-  copyDir(COMMON_DIR, functionCommonDir);
-  console.log(chalk.green(`  ✓ Copied common utilities`));
-
+  
   // Copy contract ABIs if this is the relay function
-  if (functionName === 'relay' && fs.existsSync(CONTRACTS_DIR)) {
-    const functionContractsDir = path.join(functionDist, 'contracts');
-    if (!fs.existsSync(functionContractsDir)) {
-      fs.mkdirSync(functionContractsDir, { recursive: true });
+  if (functionName === 'relay') {
+    const contractsDist = path.join(functionDist, 'contracts');
+    if (!fs.existsSync(contractsDist)) {
+      fs.mkdirSync(contractsDist, { recursive: true });
     }
-    copyDir(CONTRACTS_DIR, functionContractsDir);
+    copyDir(CONTRACTS_DIR, contractsDist);
     console.log(chalk.green(`  ✓ Copied contract ABIs`));
   }
 

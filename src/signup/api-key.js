@@ -126,7 +126,8 @@ exports.updateUserApiKey = async (userId, tier) => {
         ]
       });
       await apiGatewayClient.send(updateCommand);
-    } catch (error) {
+    }
+    catch (error) {
       console.warn('Failed to deactivate old API key:', error);
       // Continue anyway - creating a new key is more important
     }
@@ -162,7 +163,8 @@ exports.verifyApiKey = async apiKey => {
     if (!user || !user.isActive) return null;
 
     return user;
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error verifying API key:', error);
     return null;
   }
@@ -218,7 +220,8 @@ exports.getApiKeyUsage = async apiKeyId => {
       keyId: apiKeyId,
       usage: usage.items
     };
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error getting API key usage:', error);
     return { error: error.message };
   }

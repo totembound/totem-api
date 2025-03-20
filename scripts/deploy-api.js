@@ -18,19 +18,20 @@ const chalk = require('chalk');
 // Configuration
 const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout'];
 const PACKAGE_DIR = path.join(__dirname, '..', 'packages');
-const CF_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'main.yml');
+const CF_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'api.yml');
+const prefix = 'totembound';
 
 // Get environment from command line args
 const environment = process.argv[2];
 if (!environment) {
   console.error(chalk.red('Error: Environment is required'));
   console.log(chalk.cyan('Usage: node scripts/deploy.js [environment]'));
-  console.log(chalk.cyan('Available environments: dev, staging, prod'));
+  console.log(chalk.cyan('Available environments: staging, prod'));
   process.exit(1);
 }
 
 // Validate environment
-const validEnvironments = ['dev', 'staging', 'prod'];
+const validEnvironments = ['staging', 'prod'];
 if (!validEnvironments.includes(environment)) {
   console.error(chalk.red(`Error: Invalid environment: ${environment}`));
   console.log(chalk.cyan(`Available environments: ${validEnvironments.join(', ')}`));
@@ -41,13 +42,17 @@ if (!validEnvironments.includes(environment)) {
 const packageJson = require('../package.json');
 const VERSION = process.env.VERSION || packageJson.version;
 
-// AWS clients
-const s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
-const cfClient = new CloudFormationClient({ region: process.env.AWS_REGION || 'us-east-1' });
-const lambdaClient = new LambdaClient({ region: process.env.AWS_REGION || 'us-east-1' });
+// Set bucket name based on environment
+const S3_BUCKET = environment === 'prod' ? 'totembound-releases' : 'totemboundci-releases';
+console.log(chalk.blue(`Using S3 bucket: ${S3_BUCKET}`));
 
-// S3 bucket for deployment artifacts
-const S3_BUCKET = process.env.S3_BUCKET || 'totem-releases';
+const AWS_REGION = environment === 'prod' ? 'us-east-1' : 'us-west-2';
+console.log(chalk.blue(`Using AWS region: ${AWS_REGION}`));
+
+// AWS clients
+const s3Client = new S3Client({ region: process.env.AWS_REGION || AWS_REGION });
+const cfClient = new CloudFormationClient({ region: process.env.AWS_REGION || AWS_REGION });
+const lambdaClient = new LambdaClient({ region: process.env.AWS_REGION || AWS_REGION });
 
 /**
  * Upload a file to S3
@@ -88,12 +93,12 @@ async function deployPackagesToS3() {
       return false;
     }
 
-    const s3Key = `${environment}/lambda/${zipFileName}`;
+    const s3Key = `totem-api/${functionName}/${zipFileName}`;
     const result = await uploadToS3(zipFilePath, s3Key);
 
     if (result) {
       // Also upload as "latest" version
-      const latestKey = `${environment}/lambda/${functionName}-lambda-latest.zip`;
+      const latestKey = `totem-api/${functionName}/${functionName}-lambda-latest.zip`;
       await uploadToS3(zipFilePath, latestKey);
     }
 
@@ -122,12 +127,12 @@ async function uploadCloudFormationTemplate() {
     return false;
   }
 
-  const templateKey = `${environment}/cloudformation/main-${VERSION}.yml`;
+  const templateKey = `totem-api/cloudformation/api-${VERSION}.yml`;
   const result = await uploadToS3(CF_TEMPLATE_PATH, templateKey);
 
   if (result) {
     // Also upload as "latest" version
-    const latestKey = `${environment}/cloudformation/main-latest.yml`;
+    const latestKey = `totem-api/cloudformation/api-latest.yml`;
     await uploadToS3(CF_TEMPLATE_PATH, latestKey);
   }
 
@@ -156,15 +161,27 @@ async function stackExists(stackName) {
 async function deployCloudFormationStack() {
   console.log(chalk.bold(`\n🚀 Deploying CloudFormation stack...\n`));
 
-  const stackName = `totembound-api-${environment}`;
-  const exists = await stackExists(stackName);
+  // Determine which template to deploy (api-components or core-infrastructure)
+  const stackName = `${prefix}-api-stack`;
+  const templateFileName = `api-${VERSION}.yml`;
 
-  // Get CloudFormation template URL from S3
-  const templateUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${environment}/cloudformation/main-${VERSION}.yml`;
+  // Get S3 path for the template
+  const templateKey = `totem-api/cloudformation/${templateFileName}`;
+  const templateUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${templateKey}`;
+
+  console.log(chalk.cyan(`Using template: ${templateFileName}`));
+  console.log(chalk.cyan(`Stack name: ${stackName}`));
+
+  const exists = await stackExists(stackName);
 
   // Read environment-specific parameters
   let parameters = [];
-  const paramFilePath = path.join(__dirname, '..', `cloudformation-params-${environment}.json`);
+  const paramFilePath = path.join(
+    __dirname,
+    '..',
+    'infrastructure',
+    `params-api-${environment}.json`
+  );
 
   if (fs.existsSync(paramFilePath)) {
     try {
@@ -185,13 +202,6 @@ async function deployCloudFormationStack() {
       {
         ParameterKey: 'Environment',
         ParameterValue: environment
-      },
-      {
-        ParameterKey: 'CorsOrigin',
-        ParameterValue:
-          environment === 'prod'
-            ? 'https://app.totembound.com'
-            : `https://${environment}.totembound.com`
       }
     ];
   }
@@ -205,7 +215,7 @@ async function deployCloudFormationStack() {
         StackName: stackName,
         TemplateURL: templateUrl,
         Parameters: parameters,
-        Capabilities: ['CAPABILITY_IAM']
+        Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
       });
 
       await cfClient.send(command);
@@ -218,7 +228,7 @@ async function deployCloudFormationStack() {
         StackName: stackName,
         TemplateURL: templateUrl,
         Parameters: parameters,
-        Capabilities: ['CAPABILITY_IAM']
+        Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
       });
 
       await cfClient.send(command);
@@ -237,11 +247,11 @@ async function deployCloudFormationStack() {
  */
 async function updateLambdaFunctions() {
   console.log(chalk.bold(`\n🔄 Updating Lambda functions...\n`));
-
+  
   // Get Lambda function names from environment variables or use convention
   const functionNames = LAMBDA_FUNCTIONS.map(
     func =>
-      process.env[`${func.toUpperCase()}_FUNCTION_NAME`] || `totembound-${func}-${environment}`
+      process.env[`${func.toUpperCase()}_FUNCTION_NAME`] || `${prefix}-${func}`
   );
 
   const updatePromises = LAMBDA_FUNCTIONS.map(async (functionName, index) => {
@@ -252,7 +262,7 @@ async function updateLambdaFunctions() {
       const command = new UpdateFunctionCodeCommand({
         FunctionName: lambdaName,
         S3Bucket: S3_BUCKET,
-        S3Key: `${environment}/lambda/${functionName}-lambda-${VERSION}.zip`
+        S3Key: `totem-api/${functionName}/${functionName}-lambda-${VERSION}.zip`
       });
 
       await lambdaClient.send(command);

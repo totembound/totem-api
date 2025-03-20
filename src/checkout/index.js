@@ -106,7 +106,8 @@ exports.handler = async (event, context) => {
         sessionUrl: session.url
       })
     };
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error creating checkout session:', error);
 
     return {
