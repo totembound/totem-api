@@ -1,5 +1,35 @@
 const { ethers } = require('ethers');
+const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
 const FORWARDER_ABI = require('../contracts/TotemTrustedForwarder.abi.json');
+
+const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
+
+// Parameter cache to avoid repeated calls
+const paramCache = {};
+
+// Function to get secure parameters from Parameter Store
+async function getParameter(paramName) {
+  // Use cache if available
+  if (paramCache[paramName]) {
+    return paramCache[paramName];
+  }
+  
+  try {
+    const command = new GetParameterCommand({
+      Name: paramName,
+      WithDecryption: true
+    });
+    
+    const response = await ssmClient.send(command);
+    
+    // Cache the value
+    paramCache[paramName] = response.Parameter.Value;
+    return response.Parameter.Value;
+  } catch (error) {
+    console.error(`Error retrieving parameter ${paramName}:`, error);
+    throw error;
+  }
+}
 
 // Initialize provider and wallet outside the handler for connection reuse
 let provider;
@@ -18,10 +48,15 @@ const contractAddresses = {
 // Initialize provider function (called once on cold start)
 async function initializeProvider() {
   try {
-    console.log('Initializing provider with RPC URL:', process.env.RPC_URL);
+    const rpcURl = process.env.RPC_URL || await getParameter(process.env.FORWARDER_RPC_URL_PARAM);
+    console.log('Initializing provider with RPC URL:', rpcURl);
+
+    // Get the private key from Parameter Store
+    const privateKeyPath = process.env.FORWARDER_PRIVATE_KEY_PARAM;
+    const privateKey = await getParameter(privateKeyPath);
 
     provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
-    wallet = new ethers.Wallet(process.env.FORWARDER_PRIVATE_KEY, provider);
+    wallet = new ethers.Wallet(privateKey, provider);
     forwarderContract = new ethers.Contract(contractAddresses.forwarder, FORWARDER_ABI, wallet);
 
     const balance = await wallet.provider.getBalance(wallet.address);
@@ -32,7 +67,8 @@ async function initializeProvider() {
     }
 
     return { provider, wallet, forwarderContract };
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to initialize provider:', error);
     throw error;
   }
@@ -61,7 +97,7 @@ exports.handler = async (event, context) => {
   }
 
   // Health check
-  if (event.path === '/health' && event.httpMethod === 'GET') {
+  if (event.resource === '/health' && event.httpMethod === 'GET') {
     return {
       statusCode: 200,
       headers,
@@ -76,7 +112,8 @@ exports.handler = async (event, context) => {
       provider = initialized.provider;
       wallet = initialized.wallet;
       forwarderContract = initialized.forwarderContract;
-    } catch (error) {
+    }
+    catch (error) {
       return {
         statusCode: 500,
         headers,
@@ -92,7 +129,8 @@ exports.handler = async (event, context) => {
   let body;
   try {
     body = JSON.parse(event.body);
-  } catch (error) {
+  }
+  catch (error) {
     return {
       statusCode: 400,
       headers,
@@ -211,7 +249,8 @@ exports.handler = async (event, context) => {
         txHash: tx.hash
       })
     };
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Relay error:', error);
     return {
       statusCode: 500,

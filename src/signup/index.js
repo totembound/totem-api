@@ -33,7 +33,8 @@ exports.handler = async (event, context) => {
     let body;
     try {
       body = JSON.parse(event.body);
-    } catch (parseError) {
+    }
+    catch (parseError) {
       // Handle malformed JSON specifically
       return formatResponse(
         400,
@@ -101,7 +102,8 @@ exports.handler = async (event, context) => {
         },
         process.env.CORS_ORIGIN
       );
-    } else {
+    }
+    else {
       // For Free tier, create and send API key immediately
       const user = await createUserWithApiKey(normalizedEmail, normalizedWallet, 'free');
 
@@ -118,7 +120,8 @@ exports.handler = async (event, context) => {
         process.env.CORS_ORIGIN
       );
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error processing signup:', error);
 
     return formatResponse(
