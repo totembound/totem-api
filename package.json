@@ -1,6 +1,6 @@
 {
     "name": "totem-api",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "description": "TotemBound API for gasless transaction relay and user management",
     "main": "index.js",
     "scripts": {
