@@ -66,6 +66,24 @@ exports.getUserByApiKey = async apiKey => {
 };
 
 /**
+ * Get a user by Stripe customer ID
+ * @param {string} customerId - Stripe customer ID
+ * @returns {Promise<object|null>} - User object or null
+ */
+exports.getUserByStripeCustomerId = async customerId => {
+  const params = {
+    TableName: process.env.USERS_TABLE,
+    FilterExpression: 'stripeCustomerId = :customerId',
+    ExpressionAttributeValues: {
+      ':customerId': customerId
+    }
+  };
+
+  const result = await documentClient.send(new ScanCommand(params));
+  return result.Items.length > 0 ? result.Items[0] : null;
+};
+
+/**
  * Create a new user
  * @param {object} user - User object
  * @returns {Promise<object>} - Created user
