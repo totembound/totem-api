@@ -15,6 +15,9 @@ const DIST_DIR = path.join(__dirname, '..', 'dist');
 const COMMON_DIR = path.join(SOURCE_DIR, 'common');
 const CONTRACTS_DIR = path.join(SOURCE_DIR, 'contracts');
 
+// Files to skip during copy
+const SKIP_FILES = ['.env', '.env.local', '.env.development', '.env.production'];
+
 // Ensure dist directory exists
 if (!fs.existsSync(DIST_DIR)) {
   fs.mkdirSync(DIST_DIR);
@@ -34,6 +37,12 @@ function copyDir(src, dest) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
 
+    // Skip .env files
+    if (!entry.isDirectory() && SKIP_FILES.includes(entry.name)) {
+      console.log(chalk.yellow(`  ↷ Skipping ${entry.name}`));
+      continue;
+    }
+    
     if (entry.isDirectory()) {
       copyDir(srcPath, destPath);
     } else {
