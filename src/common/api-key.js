@@ -8,8 +8,8 @@ const {
   GetUsagePlanKeysCommand,
   GetUsageCommand
 } = require('@aws-sdk/client-api-gateway');
-const { getUserByEmail, getUserByWallet, createUser, updateUser, getUserById, getUserByApiKey } = require('../common/db');
-const { normalizeAddress, generateApiKey } = require('../common/utils');
+const { getUserByEmail, getUserByWallet, createUser, updateUser, getUserById, getUserByApiKey } = require('./db');
+const { normalizeAddress, generateApiKey } = require('./utils');
 
 // Initialize API Gateway client
 const apiGatewayClient = new APIGatewayClient({ region: process.env.AWS_REGION || 'us-east-1' });
@@ -36,7 +36,8 @@ exports.createApiKey = async (email, walletAddress, tier = 'free') => {
   const createKeyParams = {
     name: `${email}-${keyName}`,
     description: `API key for ${email} (${walletAddress})`,
-    enabled: true
+    enabled: true,
+    value: generateApiKey(prefix)
   };
 
   const createKeyCommand = new CreateApiKeyCommand(createKeyParams);

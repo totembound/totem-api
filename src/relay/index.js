@@ -1,35 +1,6 @@
 const { ethers } = require('ethers');
-const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
 const FORWARDER_ABI = require('../contracts/TotemTrustedForwarder.abi.json');
-
-const ssmClient = new SSMClient({ region: process.env.AWS_REGION });
-
-// Parameter cache to avoid repeated calls
-const paramCache = {};
-
-// Function to get secure parameters from Parameter Store
-async function getParameter(paramName) {
-  // Use cache if available
-  if (paramCache[paramName]) {
-    return paramCache[paramName];
-  }
-  
-  try {
-    const command = new GetParameterCommand({
-      Name: paramName,
-      WithDecryption: true
-    });
-    
-    const response = await ssmClient.send(command);
-    
-    // Cache the value
-    paramCache[paramName] = response.Parameter.Value;
-    return response.Parameter.Value;
-  } catch (error) {
-    console.error(`Error retrieving parameter ${paramName}:`, error);
-    throw error;
-  }
-}
+const { getParameter } = require('../common/params');
 
 // Initialize provider and wallet outside the handler for connection reuse
 let provider;
@@ -53,7 +24,7 @@ async function initializeProvider() {
 
     // Get the private key from Parameter Store
     const privateKeyPath = process.env.FORWARDER_PRIVATE_KEY_PARAM;
-    const privateKey = await getParameter(privateKeyPath);
+    const privateKey =  process.env.FORWARDER_PRIVATE_KEY || await getParameter(privateKeyPath);
 
     provider = new ethers.JsonRpcProvider(rpcURl);
     wallet = new ethers.Wallet(privateKey, provider);

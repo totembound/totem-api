@@ -1,9 +1,11 @@
-const AWS = require('aws-sdk');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const dynamoDB = new AWS.DynamoDB.DocumentClient();
-const apigateway = new AWS.APIGateway();
-const SES = new AWS.SES({ region: 'us-east-1' });
-const { v4: uuidv4 } = require('uuid');
+const { createUserWithApiKey, updateUserApiKey } = require('../common/api-key');
+const { sendPremiumEmail, sendDowngradeEmail } = require('../common/email');
+const {
+  getUserByEmail,
+  getUserByStripeCustomerId,
+  updateUser
+} = require('../common/db');
 
 // Handle Stripe webhook events for Premium tier subscription
 exports.handler = async (event, context) => {
@@ -18,8 +20,7 @@ exports.handler = async (event, context) => {
         stripeSignature,
         process.env.STRIPE_WEBHOOK_SECRET
       );
-    }
-    catch (err) {
+    } catch (err) {
       console.error('Stripe signature verification failed:', err);
       return {
         statusCode: 400,
@@ -42,8 +43,7 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({ received: true })
         };
     }
-  }
-  catch (error) {
+  } catch (error) {
     console.error('Error processing webhook:', error);
     return {
       statusCode: 500,
@@ -82,66 +82,36 @@ async function handleCheckoutComplete(session) {
       };
     }
 
-    // Deactivate old API key
-    await apigateway
-      .updateApiKey({
-        apiKey: existingUser.apiKeyId,
-        patchOperations: [
-          {
-            op: 'replace',
-            path: '/enabled',
-            value: 'false'
-          }
-        ]
-      })
-      .promise();
+    // Update API key to premium tier using helper
+    const updatedUser = await updateUserApiKey(existingUser.userId, 'premium');
 
-    // Create new premium API key
-    const apiKey = await createAPIKey(email, walletAddress, 'PREMIUM_TIER');
-
-    // Update user in DynamoDB
-    await dynamoDB
-      .update({
-        TableName: process.env.USERS_TABLE,
-        Key: { userId: existingUser.userId },
-        UpdateExpression:
-          'set tier = :tier, apiKeyId = :keyId, apiKey = :key, stripeCustomerId = :stripeId, updatedAt = :updatedAt',
-        ExpressionAttributeValues: {
-          ':tier': 'premium',
-          ':keyId': apiKey.id,
-          ':key': apiKey.value,
-          ':stripeId': session.customer,
-          ':updatedAt': new Date().toISOString()
-        }
-      })
-      .promise();
+    // Update Stripe customer ID
+    await updateUser(existingUser.userId, {
+      stripeCustomerId: session.customer
+    });
 
     // Send upgrade email
-    await sendPremiumEmail(email, apiKey.value, true);
+    await sendPremiumEmail(email, updatedUser.apiKey, true);
   } else {
-    // Create new premium user
-    const apiKey = await createAPIKey(email, walletAddress, 'PREMIUM_TIER');
+    // Create new premium user with API key
+    try {
+      const user = await createUserWithApiKey(email, walletAddress, 'premium');
 
-    // Store user in DynamoDB
-    await dynamoDB
-      .put({
-        TableName: process.env.USERS_TABLE,
-        Item: {
-          userId: uuidv4(),
-          email: email.toLowerCase(),
-          walletAddress: walletAddress.toLowerCase(),
-          apiKeyId: apiKey.id,
-          apiKey: apiKey.value,
-          tier: 'premium',
-          stripeCustomerId: session.customer,
-          createdAt: new Date().toISOString(),
-          isActive: true
-        }
-      })
-      .promise();
+      // Add Stripe customer ID
+      await updateUser(user.userId, {
+        stripeCustomerId: session.customer
+      });
 
-    // Send welcome email
-    await sendPremiumEmail(email, apiKey.value, false);
+      // Send welcome email
+      await sendPremiumEmail(email, user.apiKey, false);
+    }
+    catch (error) {
+      console.error('Error creating premium user:', error);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to create premium user', message: error.message })
+      };
+    }
   }
 
   return {
@@ -177,156 +147,14 @@ async function handleSubscriptionDeleted(subscription) {
     })
     .promise();
 
-  // Create new free tier API key
-  const apiKey = await createAPIKey(user.email, user.walletAddress, 'FREE_TIER');
-
-  // Update user in DynamoDB
-  await dynamoDB
-    .update({
-      TableName: process.env.USERS_TABLE,
-      Key: { userId: user.userId },
-      UpdateExpression:
-        'set tier = :tier, apiKeyId = :keyId, apiKey = :key, updatedAt = :updatedAt',
-      ExpressionAttributeValues: {
-        ':tier': 'free',
-        ':keyId': apiKey.id,
-        ':key': apiKey.value,
-        ':updatedAt': new Date().toISOString()
-      }
-    })
-    .promise();
+  // Downgrade user to free tier using helper
+  const updatedUser = await updateUserApiKey(user.userId, 'free');
 
   // Send downgrade email
-  await sendDowngradeEmail(user.email, apiKey.value);
+  await sendDowngradeEmail(user.email, updatedUser.apiKey);
 
   return {
     statusCode: 200,
     body: JSON.stringify({ received: true })
   };
-}
-
-// Helper functions
-async function getUserByEmail(email) {
-  const params = {
-    TableName: process.env.USERS_TABLE,
-    FilterExpression: 'email = :email',
-    ExpressionAttributeValues: {
-      ':email': email.toLowerCase()
-    }
-  };
-
-  const result = await dynamoDB.scan(params).promise();
-  return result.Items.length > 0 ? result.Items[0] : null;
-}
-
-async function getUserByStripeCustomerId(customerId) {
-  const params = {
-    TableName: process.env.USERS_TABLE,
-    FilterExpression: 'stripeCustomerId = :customerId',
-    ExpressionAttributeValues: {
-      ':customerId': customerId
-    }
-  };
-
-  const result = await dynamoDB.scan(params).promise();
-  return result.Items.length > 0 ? result.Items[0] : null;
-}
-
-async function createAPIKey(email, walletAddress, usagePlanId) {
-  // Prefix determines tier (free_ or premium_)
-  const prefix = usagePlanId === 'PREMIUM_TIER' ? 'premium_' : 'free_';
-  const keyName = `${prefix}${uuidv4().substring(0, 8)}`;
-
-  // Create key in API Gateway
-  const createKeyParams = {
-    name: `${email}-${keyName}`,
-    description: `API key for ${email} (${walletAddress})`,
-    enabled: true
-  };
-
-  const keyResult = await apigateway.createApiKey(createKeyParams).promise();
-
-  // Associate key with usage plan
-  const usagePlanParams = {
-    keyId: keyResult.id,
-    keyType: 'API_KEY',
-    usagePlanId: usagePlanId
-  };
-
-  await apigateway.createUsagePlanKey(usagePlanParams).promise();
-
-  return {
-    id: keyResult.id,
-    value: keyResult.value
-  };
-}
-
-// Email templates
-function sendPremiumEmail(email, apiKey, isUpgrade) {
-  const subject = isUpgrade
-    ? 'Your TotemBound Account Has Been Upgraded to Premium!'
-    : 'Welcome to TotemBound Premium!';
-
-  const upgradeText = isUpgrade
-    ? 'Your account has been successfully upgraded to Premium tier.'
-    : 'Welcome to TotemBound Premium!';
-
-  const params = {
-    Source: process.env.EMAIL_FROM,
-    Destination: {
-      ToAddresses: [email]
-    },
-    Message: {
-      Subject: {
-        Data: subject
-      },
-      Body: {
-        Html: {
-          Data: `
-              <h1>${upgradeText}</h1>
-              <p>Thank you for subscribing to our premium service. Here is your new Premium API key:</p>
-              <p><strong>${apiKey}</strong></p>
-              <p>Please update your API key in the user settings to enjoy premium benefits:</p>
-              <ul>
-              <li>Higher rate limits</li>
-              <li>Priority transaction processing</li>
-              <li>Access to exclusive game features</li>
-              </ul>
-              <p>Happy gaming!</p>
-          `
-        }
-      }
-    }
-  };
-
-  return SES.sendEmail(params).promise();
-}
-
-function sendDowngradeEmail(email, apiKey) {
-  const params = {
-    Source: process.env.EMAIL_FROM,
-    Destination: {
-      ToAddresses: [email]
-    },
-    Message: {
-      Subject: {
-        Data: 'Your TotemBound Premium Subscription Has Ended'
-      },
-      Body: {
-        Html: {
-          Data: `
-              <h1>Your Premium Subscription Has Ended</h1>
-              <p>Your TotemBound account has been reverted to the Free tier.</p>
-              <p>Here is your new Free tier API key:</p>
-              <p><strong>${apiKey}</strong></p>
-              <p>Please update your API key in the user settings to continue using gasless transactions.</p>
-              <p>If you'd like to upgrade again, visit your account page anytime.</p>
-              <p>Thank you for using TotemBound!</p>
-          `
-        }
-      }
-    }
-  };
-
-  return SES.sendEmail(params).promise();
 }

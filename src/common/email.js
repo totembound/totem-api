@@ -1,7 +1,13 @@
-const AWS = require('aws-sdk');
-const SES = new AWS.SES({ region: process.env.AWS_REGION || 'us-east-1' });
+const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 const fs = require('fs');
 const path = require('path');
+const defaultAppUrl = 'https://totembound.com';
+const defaultEmailFrom = 'no-reply@totembound.com';
+
+// Initialize SES client
+const sesClient = new SESClient({ 
+  region: process.env.AWS_REGION || 'us-east-1' 
+});
 
 /**
  * Load email template and replace placeholders
@@ -48,11 +54,11 @@ exports.sendWelcomeEmail = async (email, apiKey) => {
   const htmlContent = loadTemplate('welcome', {
     apiKey,
     date: new Date().toLocaleDateString(),
-    appUrl: process.env.APP_URL || 'https://app.totembound.com'
+    appUrl: process.env.APP_URL || defaultAppUrl
   });
 
   const params = {
-    Source: process.env.EMAIL_FROM || 'no-reply@totembound.com',
+    Source: process.env.EMAIL_FROM || defaultEmailFrom,
     Destination: {
       ToAddresses: [email]
     },
@@ -72,7 +78,8 @@ exports.sendWelcomeEmail = async (email, apiKey) => {
   };
 
   try {
-    const result = await SES.sendEmail(params).promise();
+    const command = new SendEmailCommand(params);
+    const result = await sesClient.send(command);
     console.log(`Welcome email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
@@ -94,17 +101,25 @@ exports.sendPremiumEmail = async (email, apiKey, isUpgrade = false) => {
     ? 'Your TotemBound Account Has Been Upgraded to Premium!'
     : 'Welcome to TotemBound Premium!';
 
-  const templateName = isUpgrade ? 'premium-upgrade' : 'premium-welcome';
+  const upgradeText = isUpgrade
+    ? 'Your account has been successfully upgraded to Premium tier.'
+    : 'Welcome to TotemBound Premium!';
 
-  // Load and process template
-  const htmlContent = loadTemplate(templateName, {
-    apiKey,
-    date: new Date().toLocaleDateString(),
-    appUrl: process.env.APP_URL || 'https://app.totembound.com'
-  });
+  const htmlContent = `
+    <h1>${upgradeText}</h1>
+    <p>Thank you for subscribing to our premium service. Here is your new Premium API key:</p>
+    <p><strong>${apiKey}</strong></p>
+    <p>Please update your API key in the user settings to enjoy premium benefits:</p>
+    <ul>
+    <li>Higher rate limits</li>
+    <li>Priority transaction processing</li>
+    <li>Access to exclusive game features</li>
+    </ul>
+    <p>Happy gaming!</p>
+  `;
 
   const params = {
-    Source: process.env.EMAIL_FROM || 'no-reply@totembound.com',
+    Source: process.env.EMAIL_FROM || defaultEmailFrom,
     Destination: {
       ToAddresses: [email]
     },
@@ -124,7 +139,8 @@ exports.sendPremiumEmail = async (email, apiKey, isUpgrade = false) => {
   };
 
   try {
-    const result = await SES.sendEmail(params).promise();
+    const command = new SendEmailCommand(params);
+    const result = await sesClient.send(command);
     console.log(`Premium email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
@@ -141,15 +157,18 @@ exports.sendPremiumEmail = async (email, apiKey, isUpgrade = false) => {
  * @returns {Promise} - SES send email response
  */
 exports.sendDowngradeEmail = async (email, apiKey) => {
-  // Load and process template
-  const htmlContent = loadTemplate('downgrade', {
-    apiKey,
-    date: new Date().toLocaleDateString(),
-    appUrl: process.env.APP_URL || 'https://app.totembound.com'
-  });
+  const htmlContent = `
+    <h1>Your Premium Subscription Has Ended</h1>
+    <p>Your TotemBound account has been reverted to the Free tier.</p>
+    <p>Here is your new Free tier API key:</p>
+    <p><strong>${apiKey}</strong></p>
+    <p>Please update your API key in the user settings to continue using gasless transactions.</p>
+    <p>If you'd like to upgrade again, visit your account page anytime.</p>
+    <p>Thank you for using TotemBound!</p>
+  `;
 
   const params = {
-    Source: process.env.EMAIL_FROM || 'no-reply@totembound.com',
+    Source: process.env.EMAIL_FROM || defaultEmailFrom,
     Destination: {
       ToAddresses: [email]
     },
@@ -169,7 +188,8 @@ exports.sendDowngradeEmail = async (email, apiKey) => {
   };
 
   try {
-    const result = await SES.sendEmail(params).promise();
+    const command = new SendEmailCommand(params);
+    const result = await sesClient.send(command);;
     console.log(`Downgrade email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }

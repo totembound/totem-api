@@ -153,14 +153,14 @@ Resources:
                   - apigateway:POST
                   - apigateway:PUT
                   - apigateway:DELETE
-                Resource: !Sub "arn:aws:apigateway:${AWS::Region}::/apikeys/*"
-              - Effect: Allow
-                Action:
-                  - apigateway:GET
-                  - apigateway:POST
-                  - apigateway:PUT
-                  - apigateway:DELETE
-                Resource: !Sub "arn:aws:apigateway:${AWS::Region}::/usageplans/*"
+                  - apigateway:PATCH
+                Resource:
+                - !Sub "arn:aws:apigateway:${AWS::Region}::/apikeys"
+                - !Sub "arn:aws:apigateway:${AWS::Region}::/apikeys/*"
+                - !Sub "arn:aws:apigateway:${AWS::Region}::/usageplans"
+                - !Sub "arn:aws:apigateway:${AWS::Region}::/usageplans/*"
+                - !Sub "arn:aws:apigateway:${AWS::Region}::/usageplans/*/keys"
+                - !Sub "arn:aws:apigateway:${AWS::Region}::/usageplans/*/keys/*"
         - PolicyName: S3Access
           PolicyDocument:
             Version: '2012-10-17'

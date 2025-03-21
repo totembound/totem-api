@@ -2,7 +2,7 @@
 const { handler } = require('../src/signup/index');
 
 // Mock the dependencies
-jest.mock('../src/signup/api-key', () => ({
+jest.mock('../src/common/api-key', () => ({
   createUserWithApiKey: jest.fn().mockResolvedValue({
     userId: 'test-user-id',
     email: 'test@example.com',
@@ -12,7 +12,7 @@ jest.mock('../src/signup/api-key', () => ({
   })
 }));
 
-jest.mock('../src/signup/email', () => ({
+jest.mock('../src/common/email', () => ({
   sendWelcomeEmail: jest.fn().mockResolvedValue({ MessageId: 'test-message-id' })
 }));
 
@@ -47,8 +47,8 @@ jest.mock('../src/common/db', () => ({
 }));
 
 // Import the mocked modules for direct access in tests
-const apiKey = require('../src/signup/api-key');
-const email = require('../src/signup/email');
+const apiKey = require('../src/common/api-key');
+const email = require('../src/common/email');
 const utils = require('../src/common/utils');
 const db = require('../src/common/db');
 
