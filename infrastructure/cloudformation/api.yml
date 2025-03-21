@@ -324,18 +324,25 @@ Resources:
       ParentId: !GetAtt TotemBoundApi.RootResourceId
       PathPart: signup
   
-  ApiResourceCheckout:
+  ApiResourceStripeSegment:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref TotemBoundApi
       ParentId: !GetAtt TotemBoundApi.RootResourceId
-      PathPart: create-checkout
+      PathPart: stripe
+
+  ApiResourceCheckout:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref ApiResourceStripeSegment
+      PathPart: checkout
   
   ApiResourceWebhook:
     Type: AWS::ApiGateway::Resource
     Properties:
       RestApiId: !Ref TotemBoundApi
-      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      ParentId: !Ref ApiResourceStripeSegment
       PathPart: webhook
   
   # API Methods - RELAY
