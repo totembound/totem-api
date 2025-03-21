@@ -267,7 +267,11 @@ Resources:
   TotemBoundApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: "totembound-api"
+      Name:
+        Fn::Join:
+          - ""
+          - - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ResourcePrefix]
+            - "-api"
       Description: TotemBound Gasless Transaction API
       EndpointConfiguration:
         Types:
