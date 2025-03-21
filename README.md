@@ -23,9 +23,9 @@ The system consists of several components:
 | Endpoint | Method | Description | Auth Required |
 |----------|--------|-------------|--------------|
 | `/health` | GET | Health check | None |
-| `/relay` | POST | Forward blockchain transactions | API Key |
 | `/signup` | POST | Register for a free API key | None |
-| `/subscription` | DELETE | Cancel premium subscription | None |
+| `/relay` | POST | Forward blockchain transactions | API Key |
+| `/subscription` | DELETE | Cancel premium subscription | API Key |
 | `/stripe/checkout` | POST | Create Stripe checkout for premium | None |
 | `/stripe/webhook` | POST | Stripe webhook for subscription events | Stripe-Signature |
 
