@@ -1,11 +1,6 @@
-const { createUserWithApiKey } = require('./api-key');
-const { sendWelcomeEmail } = require('./email');
-const {
-  validateEmail,
-  normalizeAddress,
-  formatResponse,
-  validateParams
-} = require('../common/utils');
+const { createUserWithApiKey } = require('../common/api-key');
+const { sendWelcomeEmail } = require('../common/email');
+const { validateEmail, normalizeAddress, formatResponse, validateParams } = require('../common/utils');
 const { getUserByEmail, getUserByWallet } = require('../common/db');
 
 /**
