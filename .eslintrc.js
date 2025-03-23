@@ -25,6 +25,7 @@ module.exports = {
     // Style consistency
     "indent": ["error", 2, { "SwitchCase": 1 }],
     "linebreak-style": ["error", "unix"],
+    "brace-style": ["error", "stroustrup"],
     //"quotes": ["error", "single", { "avoidEscape": true }],
     "semi": ["error", "always"],
     "comma-dangle": ["error", "only-multiline"],

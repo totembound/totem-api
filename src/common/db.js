@@ -12,6 +12,21 @@ const client = new DynamoDBClient({ region: process.env.AWS_REGION || 'us-east-1
 const documentClient = DynamoDBDocumentClient.from(client);
 
 /**
+ * Get a user by ID
+ * @param {string} userId - User ID
+ * @returns {Promise<object|null>} - User object or null
+ */
+exports.getUserById = async userId => {
+  const params = {
+    TableName: process.env.USERS_TABLE,
+    Key: { userId }
+  };
+
+  const result = await documentClient.send(new GetCommand(params));
+  return result.Item || null;
+};
+
+/**
  * Get a user by email
  * @param {string} email - User email
  * @returns {Promise<object|null>} - User object or null

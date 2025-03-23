@@ -1,24 +1,24 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const { createUserWithApiKey, updateUserApiKey } = require('../common/api-key');
 const { sendPremiumEmail, sendDowngradeEmail } = require('../common/email');
-const {
-  getUserByEmail,
-  getUserByStripeCustomerId,
-  updateUser
-} = require('../common/db');
+const { getUserByEmail, getUserByStripeCustomerId, updateUser } = require('../common/db');
+const { getParameter } = require('../common/params');
 
 // Handle Stripe webhook events for Premium tier subscription
 exports.handler = async (event, context) => {
   try {
     // Stripe webhook signature verification
-    const stripeSignature = event.headers['stripe-signature'];
+    const stripeSignature = event.headers['Stripe-Signature'];
     let stripeEvent;
+
+    const stripeSecretKey = await getParameter(process.env.STRIPE_SECRET_KEY_PARAM);
+    const stripeWebhookSecret = await getParameter(process.env.STRIPE_WEBHOOK_SECRET_PARAM);
+    const stripe = require('stripe')(stripeSecretKey);
 
     try {
       stripeEvent = stripe.webhooks.constructEvent(
         event.body,
         stripeSignature,
-        process.env.STRIPE_WEBHOOK_SECRET
+        stripeWebhookSecret
       );
     } catch (err) {
       console.error('Stripe signature verification failed:', err);
@@ -43,8 +43,21 @@ exports.handler = async (event, context) => {
           body: JSON.stringify({ received: true })
         };
     }
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error processing webhook:', error);
+
+    // More specific error handling
+    if (error.type === 'StripeCardError') {
+      // Handle card errors
+    }
+    else if (error.type === 'StripeInvalidRequestError') {
+      // Handle invalid parameters
+    }
+    else if (error.type === 'StripeAPIError') {
+      // Handle API errors
+    }
+
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -92,7 +105,8 @@ async function handleCheckoutComplete(session) {
 
     // Send upgrade email
     await sendPremiumEmail(email, updatedUser.apiKey, true);
-  } else {
+  }
+  else {
     // Create new premium user with API key
     try {
       const user = await createUserWithApiKey(email, walletAddress, 'premium');
