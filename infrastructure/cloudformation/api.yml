@@ -11,9 +11,9 @@ Mappings:
       TransactionsTableName: totemboundci-transactions
       CorsOrigin: https://totembound-test.net
       ApiDomain: api.totembound-test.net
-      StripeSuccessUrl: https://totembound-test.net/accounts/success
-      StripeCancelUrl: https://totembound-test.net/accounts/premium
-      StripePriceId: price_premium_monthly_test
+      StripeSuccessUrl: https://totembound-test.net/account/success
+      StripeCancelUrl: https://totembound-test.net/account/premium
+      StripePriceId: price_1R5XI9Pg2kY933H58GfpK9os
       Region: us-west-2
     prod:
       Region: us-east-1
@@ -23,9 +23,9 @@ Mappings:
       TransactionsTableName: totembound-transactions
       CorsOrigin: https://totembound.com
       ApiDomain: api.totembound.com
-      StripeSuccessUrl: https://totembound.com/accounts/success
-      StripeCancelUrl: https://totembound.com/accounts/premium
-      StripePriceId: price_premium_monthly
+      StripeSuccessUrl: https://totembound.com/account/success
+      StripeCancelUrl: https://totembound.com/account/premium
+      StripePriceId: price_1R5XVfB9v7dW9snFDfi0aPy9
       Region: us-east-1
 
 Parameters:
@@ -263,6 +263,35 @@ Resources:
         S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
         S3Key: !Sub "totem-api/checkout/checkout-lambda-${AppVersion}.zip"
   
+  # Lambda Function for Subscription API
+  SubscriptionLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName:
+        Fn::Join:
+          - ""
+          - - Fn::FindInMap: [EnvironmentMap, !Ref Environment, ResourcePrefix]
+            - "-subscription"
+      Handler: subscription/index.handler
+      Role: {"Fn::ImportValue": "totembound-core-stack-LambdaExecutionRoleArn"}
+      Runtime: nodejs18.x
+      Timeout: 10
+      MemorySize: 128
+      Environment:
+        Variables:
+          CORS_ORIGIN: !If 
+          - UseCustomCors
+          - !Ref CustomCorsOrigin
+          - !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+          USERS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]
+          EMAIL_FROM: !Ref FromEmail
+          STRIPE_SECRET_KEY_PARAM: !Ref StripeSecretKeyName
+          FREE_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-FreeTierUsagePlanId"}
+          PREMIUM_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-PremiumTierUsagePlanId"}
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/subscription/subscription-lambda-${AppVersion}.zip"
+
   # API Gateway
   TotemBoundApi:
     Type: AWS::ApiGateway::RestApi
@@ -344,7 +373,14 @@ Resources:
       RestApiId: !Ref TotemBoundApi
       ParentId: !Ref ApiResourceStripeSegment
       PathPart: webhook
-  
+
+  ApiResourceSubscription:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: subscription
+
   # API Methods - RELAY
   RelayPostMethod:
     Type: AWS::ApiGateway::Method
@@ -399,6 +435,7 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
             method.response.header.Cache-Control: true
+
   # API Methods - HEALTH
   HealthGetMethod:
     Type: AWS::ApiGateway::Method
@@ -575,6 +612,8 @@ Resources:
       ResourceId: !Ref ApiResourceWebhook
       HttpMethod: POST
       AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.Stripe-Signature: true
       Integration:
         Type: AWS_PROXY
         IntegrationHttpMethod: POST
@@ -608,7 +647,77 @@ Resources:
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
+
+  # API Methods - SUBSCRIPTION
+  SubscriptionGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceSubscription
+      HttpMethod: GET
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.X-Api-Key: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SubscriptionLambdaFunction.Arn}/invocations"
   
+  SubscriptionDeleteMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceSubscription
+      HttpMethod: DELETE
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.header.X-Api-Key: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SubscriptionLambdaFunction.Arn}/invocations"
+  
+  SubscriptionOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceSubscription
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+              method.response.header.Cache-Control: "'public, max-age=86400'"
+              method.response.header.Access-Control-Allow-Origin: !If 
+              - UseCustomCors
+              - !Sub "'${CustomCorsOrigin}'"
+              - Fn::Join:
+                - ""
+                - - "'"
+                  - Fn::FindInMap: [EnvironmentMap, !Ref Environment, CorsOrigin]
+                  - "'"
+            ResponseTemplates:
+              application/json: '{"message": "CORS preflight success"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref CorsResponseModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+            method.response.header.Cache-Control: true
+            method.response.header.X-Api-Key: true
+
   # API Deployment & Stage
   ApiDeployment:
     Type: AWS::ApiGateway::Deployment
@@ -623,6 +732,9 @@ Resources:
       - CheckoutOptionsMethod
       - WebhookPostMethod
       - WebhookOptionsMethod
+      - SubscriptionGetMethod
+      - SubscriptionDeleteMethod
+      - SubscriptionOptionsMethod
     Properties:
       RestApiId: !Ref TotemBoundApi
       Description: !Sub "Deployment for ${Environment} (${AppVersion})"
@@ -680,6 +792,14 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TotemBoundApi}/*"
 
+  SubscriptionLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref SubscriptionLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TotemBoundApi}/*"
+
 Outputs:
   ApiGatewayUrl:
     Description: URL of the API Gateway endpoint
@@ -719,3 +839,9 @@ Outputs:
     Value: !GetAtt CheckoutLambdaFunction.Arn
     Export:
       Name: !Sub "${AWS::StackName}-CheckoutLambdaArn"
+
+  SubscriptionLambda:
+    Description: ARN of the Subscription Lambda function
+    Value: !GetAtt SubscriptionLambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-SubscriptionLambdaArn"

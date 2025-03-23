@@ -9,7 +9,7 @@ const { execSync } = require('child_process');
 const chalk = require('chalk');
 
 // Configuration
-const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout'];
+const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout', 'subscription'];
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const PACKAGE_DIR = path.join(__dirname, '..', 'packages');
 

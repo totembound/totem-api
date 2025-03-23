@@ -1,8 +1,6 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const { DynamoDB } = require('aws-sdk');
 const { validateEmail, normalizeAddress } = require('../common/utils');
-
-const dynamoDB = new DynamoDB.DocumentClient();
+const { getUserByEmail, getUserByWallet } = require('../common/db');
+const { getParameter } = require('../common/params');
 
 /**
  * Creates a Stripe checkout session for premium subscription
@@ -52,23 +50,28 @@ exports.handler = async (event, context) => {
       };
     }
 
+    // Normalize inputs
+    const normalizedEmail = email.toLowerCase();
     const normalizedWallet = normalizeAddress(walletAddress);
 
-    // Check if user exists in DynamoDB
-    const userParams = {
-      TableName: process.env.USERS_TABLE,
-      FilterExpression: 'email = :email OR walletAddress = :wallet',
-      ExpressionAttributeValues: {
-        ':email': email.toLowerCase(),
-        ':wallet': normalizedWallet
-      }
-    };
+    // Check if user already exists
+    const existingUserEmail = await getUserByEmail(normalizedEmail);
+    const existingUserWallet = await getUserByWallet(normalizedWallet);
 
-    const userResult = await dynamoDB.scan(userParams).promise();
-    const existingUser = userResult.Items.length > 0 ? userResult.Items[0] : null;
+    const mistmatchError = {
+      statusCode: 400,
+      headers,
+      body: JSON.stringify({
+        error: 'Email and wallet mismatch',
+        message: 'Email and wallet are required'
+      })
+    };
+    if (existingUserEmail && existingUserEmail?.userId !== existingUserWallet?.userId) {
+      return mistmatchError;
+    }
 
     // If user already has premium, don't create a new subscription
-    if (existingUser && existingUser.tier === 'premium') {
+    if (existingUserEmail && existingUserEmail.tier === 'premium') {
       return {
         statusCode: 400,
         headers,
@@ -79,15 +82,26 @@ exports.handler = async (event, context) => {
       };
     }
 
+    const stripeSecretKey = await getParameter(process.env.STRIPE_SECRET_KEY_PARAM);
+    const stripe = require('stripe')(stripeSecretKey);
+
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID, // Monthly subscription price
+          price: process.env.STRIPE_PRICE_ID, // Monthly subscription
           quantity: 1
         }
       ],
+      custom_text: {
+        submit: {
+          message: 'TotemBound will charge you $10.00 monthly until you cancel.'
+        }
+      },
+      automatic_tax: {
+        enabled: true
+      },
       mode: 'subscription',
       success_url: process.env.STRIPE_SUCCESS_URL,
       cancel_url: process.env.STRIPE_CANCEL_URL,

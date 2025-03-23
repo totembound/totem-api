@@ -16,10 +16,9 @@ const path = require('path');
 const chalk = require('chalk');
 
 // Configuration
-const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout'];
+const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout', 'subscription'];
 const PACKAGE_DIR = path.join(__dirname, '..', 'packages');
 const CF_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'api.yml');
-const prefix = 'totembound';
 
 // Get environment from command line args
 const environment = process.argv[2];
@@ -39,6 +38,7 @@ if (!validEnvironments.includes(environment)) {
 }
 
 // Get version
+const prefix = environment === 'prod' ? 'totembound' : 'totemboundci';
 const packageJson = require('../package.json');
 const VERSION = process.env.VERSION || packageJson.version;
 
@@ -162,7 +162,7 @@ async function deployCloudFormationStack() {
   console.log(chalk.bold(`\n🚀 Deploying CloudFormation stack...\n`));
 
   // Determine which template to deploy (api-components or core-infrastructure)
-  const stackName = `${prefix}-api-stack`;
+  const stackName = `totembound-api-stack`;
   const templateFileName = `api-${VERSION}.yml`;
 
   // Get S3 path for the template

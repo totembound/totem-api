@@ -9,7 +9,7 @@ const { execSync } = require('child_process');
 const chalk = require('chalk');
 
 // Configuration
-const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout'];
+const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout', 'subscription'];
 const SOURCE_DIR = path.join(__dirname, '..', 'src');
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const COMMON_DIR = path.join(SOURCE_DIR, 'common');
@@ -154,8 +154,8 @@ ${
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_ID=price_...
-STRIPE_SUCCESS_URL=https://app.totembound.com/accounts/success
-STRIPE_CANCEL_URL=https://app.totembound.com/accounts/premium`
+STRIPE_SUCCESS_URL=https://totembound-test.net/account/success
+STRIPE_CANCEL_URL=https://totembound-test.net/account/premium`
     : ''
 }
 ${
