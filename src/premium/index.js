@@ -72,7 +72,7 @@ exports.handler = async (event, context) => {
 async function handleCheckoutComplete(session) {
   // Get customer metadata from session
   const email = session.customer_email;
-  const walletAddress = session.metadata.walletAddress;
+  const walletAddress = session.metadata?.walletAddress;
 
   if (!email || !walletAddress) {
     console.error('Missing email or wallet address in checkout session');

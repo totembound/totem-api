@@ -4,9 +4,10 @@
     "description": "TotemBound API for gasless transaction relay and user management",
     "main": "index.js",
     "scripts": {
-        "test": "jest",
+        "test": "jest --verbose",
         "test:watch": "jest --watch",
-        "test:coverage": "jest --coverage",
+        "test:coverage": "jest --coverage --watchAll=false",
+        "test:ci": "jest --ci --coverage --watchAll=false --maxWorkers=2",
         "lint": "eslint src/**/*.js",
         "lint:fix": "eslint src/**/*.js --fix",
         "build": "node scripts/build.js",
