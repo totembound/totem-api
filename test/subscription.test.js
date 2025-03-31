@@ -256,7 +256,7 @@ describe('Subscription Management API', () => {
                     'x-api-key': 'premium-api-key'
                 }
             };
-
+        
             // Mock premium user
             db.getUserByApiKey.mockResolvedValueOnce({
                 userId: 'user-123',
@@ -264,11 +264,15 @@ describe('Subscription Management API', () => {
                 tier: 'premium',
                 stripeCustomerId: 'cus_test123'
             });
-
+        
             const response = await handler(event);
-
+        
             expect(response.statusCode).toBe(200);
-            expect(JSON.parse(response.body).message).toBe('Success');
+            // Updated assertion to match the new implementation
+            expect(JSON.parse(response.body).message).toBe('Subscription will be canceled at the end of the billing period');
+            // Add assertions for the new fields
+            expect(JSON.parse(response.body).currentPeriodEnd).toBeDefined();
+            expect(JSON.parse(response.body).canceled).toBe(true);
         });
 
         it('should handle errors during subscription cancellation', async () => {
