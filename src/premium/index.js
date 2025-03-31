@@ -1,5 +1,5 @@
 const { createUserWithApiKey, updateUserApiKey } = require('../common/api-key');
-const { sendPremiumEmail, sendDowngradeEmail } = require('../common/email');
+const { sendPremiumEmail, sendDowngradeEmail, sendSubscriptionCanceledEmail, sendSubscriptionReactivatedEmail } = require('../common/email');
 const { getUserByEmail, getUserByStripeCustomerId, updateUser } = require('../common/db');
 const { getParameter } = require('../common/params');
 
@@ -32,6 +32,9 @@ exports.handler = async (event, context) => {
     switch (stripeEvent.type) {
       case 'checkout.session.completed':
         return await handleCheckoutComplete(stripeEvent.data.object);
+
+      case 'customer.subscription.updated':
+        return await handleSubscriptionUpdated(stripeEvent.data.object, stripeEvent.data.previous_attributes);
 
       case 'customer.subscription.deleted':
         return await handleSubscriptionDeleted(stripeEvent.data.object);
@@ -126,6 +129,67 @@ async function handleCheckoutComplete(session) {
         body: JSON.stringify({ error: 'Failed to create premium user', message: error.message })
       };
     }
+  }
+
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ received: true })
+  };
+}
+
+async function handleSubscriptionUpdated(subscription, previousAttributes) {
+  // Find user by Stripe customer ID
+  const user = await getUserByStripeCustomerId(subscription.customer);
+
+  if (!user) {
+    console.error('User not found for Stripe customer:', subscription.customer);
+    return {
+      statusCode: 404,
+      body: JSON.stringify({ error: 'User not found' })
+    };
+  }
+
+  console.log('Subscription update event received:', {
+    subscription: subscription,
+    previous_attributes: previousAttributes
+  });
+
+  // Check if the subscription was canceled (but still active until period end)
+  if (subscription.cancel_at_period_end) {
+    console.log(`Subscription ${subscription.id} for customer ${subscription.customer} was canceled and will end at period end`);
+    
+    // check if we already canceled
+    if (user.subscriptionCanceledAt) {
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ received: true })
+      };
+    }
+
+    await updateUser(user.userId, {
+      subscriptionCanceledAt: new Date().toISOString(),
+      subscriptionEndDate: new Date(subscription.current_period_end * 1000).toISOString()
+    });
+
+    // Send a notification email
+    await sendSubscriptionCanceledEmail(user.email, new Date(subscription.current_period_end * 1000));
+  }
+
+  // Check if this is a reactivation event
+  if (previousAttributes 
+    && previousAttributes.cancel_at_period_end === true 
+    && subscription.cancel_at_period_end === false) {
+
+    console.log(`Subscription ${subscription.id} was reactivated by customer ${subscription.customer}`);
+    
+    // Send reactivation email
+    await sendSubscriptionReactivatedEmail(user.email, new Date(subscription.current_period_end * 1000));
+    
+    // Update user record to remove cancellation flags
+    await updateUser(user.userId, {
+      subscriptionCanceledAt: null,
+      subscriptionEndDate: null
+    });
   }
 
   return {

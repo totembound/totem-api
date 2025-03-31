@@ -198,3 +198,119 @@ exports.sendDowngradeEmail = async (email, apiKey) => {
     throw error;
   }
 };
+
+/**
+ * Send subscription canceled notification email
+ * @param {string} email - Recipient email address
+ * @param {string} expirationDate - End Date of subscription 
+ * @returns {Promise} - SES send email response
+ */
+exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
+  // Format the date nicely
+  const formattedDate = expirationDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const htmlContent = `
+    <h1>Your Premium Subscription Has Been Canceled</h1>
+    <p>We've received your request to cancel your TotemBound Premium subscription.</p>
+    <p>Your Premium subscription will remain active until:</p>
+    <p><strong>${formattedDate}</strong></p>
+    <p>After this date, your account will be automatically downgraded to the Free tier.</p>
+    <p>If you've changed your mind, you can reactivate your subscription through your account settings.</p>
+    <p>We're sorry to see you go! If you have feedback on how we could improve your experience, please let us know.</p>
+    <p>Thank you for being part of the TotemBound community!</p>
+  `;
+
+  const params = {
+    Source: process.env.EMAIL_FROM || defaultEmailFrom,
+    Destination: {
+      ToAddresses: [email]
+    },
+    Message: {
+      Subject: {
+        Data: 'Your TotemBound Premium Subscription Has Been Canceled'
+      },
+      Body: {
+        Html: {
+          Data: htmlContent
+        },
+        Text: {
+          Data: `Your Premium Subscription has been canceled. Your Premium subscription will remain active until: ${formattedDate}. After this date, your account will be automatically downgraded to the Free tier.`
+        }
+      }
+    }
+  };
+
+  try {
+    const command = new SendEmailCommand(params);
+    const result = await sesClient.send(command);;
+    console.log(`Canceled email sent to ${email}, messageId: ${result.MessageId}`);
+    return result;
+  }
+  catch (error) {
+    console.error(`Error sending cancel email to ${email}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Send subscription reactivated notification email
+ * @param {string} email - Recipient email address
+ * @param {string} renewalDate - Renewal Date of subscription 
+ * @returns {Promise} - SES send email response
+ */
+exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
+  // Format the date nicely
+  const formattedDate = renewalDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const htmlContent = `
+    <h1>Your Premium Subscription Has Been Reactivated</h1>
+    <p>Great news! Your TotemBound Premium subscription has been successfully reactivated.</p>
+    <p>Your Premium subscription will continue to renew on:</p>
+    <p><strong>${formattedDate}</strong></p>
+    <p>You will continue to enjoy all Premium benefits, including higher transaction limits, priority processing, and exclusive features.</p>
+    <p>If you need to manage your subscription in the future, you can do so through your account settings.</p>
+    <p>Welcome back to Premium! We're thrilled to have you continue as a valued member of the TotemBound community.</p>
+    <p>Thank you for your continued support!</p>
+  `;
+
+  const params = {
+    Source: process.env.EMAIL_FROM || defaultEmailFrom,
+    Destination: {
+      ToAddresses: [email]
+    },
+    Message: {
+      Subject: {
+        Data: 'Your TotemBound Premium Subscription Has Been Reactivated'
+      },
+      Body: {
+        Html: {
+          Data: htmlContent
+        },
+        Text: {
+          Data: `Your Premium Subscription has been reactivated. Your Premium subscription will continue to renew on: ${renewalDate}. Welcome back to Premium! We're thrilled to have you continue as a valued member of the TotemBound community.`
+        }
+      }
+    }
+  };
+
+  try {
+    const command = new SendEmailCommand(params);
+    const result = await sesClient.send(command);;
+    console.log(`Renewed email sent to ${email}, messageId: ${result.MessageId}`);
+    return result;
+  }
+  catch (error) {
+    console.error(`Error sending renew email to ${email}:`, error);
+    throw error;
+  }
+};
