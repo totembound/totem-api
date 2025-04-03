@@ -207,7 +207,7 @@ exports.sendDowngradeEmail = async (email, apiKey) => {
 
   try {
     const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);;
+    const result = await sesClient.send(command);
     console.log(`Downgrade email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
@@ -261,7 +261,7 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
 
   try {
     const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);;
+    const result = await sesClient.send(command);
     console.log(`Canceled email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
@@ -315,7 +315,7 @@ exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
 
   try {
     const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);;
+    const result = await sesClient.send(command);
     console.log(`Renewed email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
