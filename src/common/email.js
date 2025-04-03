@@ -2,6 +2,7 @@ const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 const fs = require('fs');
 const path = require('path');
 const defaultAppUrl = 'https://totembound.com';
+const defaultLogoUrl = 'https://totembound.com/tb-logo-180.png';
 const defaultEmailFrom = 'no-reply@totembound.com';
 
 // Initialize SES client
@@ -10,34 +11,54 @@ const sesClient = new SESClient({
 });
 
 /**
- * Load email template and replace placeholders
- * @param {string} templateName - Name of the template file
+ * Load main email template and combine with content template
+ * @param {string} contentTemplateName - Name of the content template file
  * @param {object} replacements - Key-value pairs for replacements
  * @returns {string} - Processed HTML template
  */
-const loadTemplate = (templateName, replacements) => {
+const loadTemplate = (contentTemplateName, replacements) => {
   try {
+    // Add some default replacements
+    const allReplacements = {
+      appUrl: process.env.APP_URL || defaultAppUrl,
+      logoUrl: process.env.LOGO_URL || defaultLogoUrl,
+      currentYear: new Date().getFullYear().toString(),
+      brandName: process.env.BRAND_NAME || 'TotemBound',
+      ...replacements
+    };
+    
     // In production, templates are bundled with the Lambda
-    const templatePath = path.join(__dirname, 'templates', `${templateName}.html`);
-    let template = fs.readFileSync(templatePath, 'utf8');
-
-    // Replace placeholders
-    Object.entries(replacements).forEach(([key, value]) => {
+    const mainTemplatePath = path.join(__dirname, 'templates', 'main.html');
+    const contentTemplatePath = path.join(__dirname, 'templates', `${contentTemplateName}.html`);
+    
+    let mainTemplate = fs.readFileSync(mainTemplatePath, 'utf8');
+    let contentTemplate = fs.readFileSync(contentTemplatePath, 'utf8');
+    
+    // Replace placeholders in content template
+    Object.entries(allReplacements).forEach(([key, value]) => {
       const regex = new RegExp(`{{${key}}}`, 'g');
-      template = template.replace(regex, value);
+      contentTemplate = contentTemplate.replace(regex, value);
+    });
+    
+    // Add content to main template
+    allReplacements.content = contentTemplate;
+    
+    // Replace placeholders in main template
+    Object.entries(allReplacements).forEach(([key, value]) => {
+      const regex = new RegExp(`{{${key}}}`, 'g');
+      mainTemplate = mainTemplate.replace(regex, value);
     });
 
-    return template;
+    return mainTemplate;
   }
   catch (error) {
-    console.error(`Error loading template ${templateName}:`, error);
+    console.error(`Error loading template ${contentTemplateName}:`, error);
 
     // Fallback to basic template
     return `
-            <h1>Welcome to TotemBound!</h1>
-            <p>Thank you for signing up. Here is your API key:</p>
-            <p><strong>${replacements.apiKey || '[API KEY]'}</strong></p>
-            <p>You can add this key in your user settings to enable gasless transactions.</p>
+            <h1>${replacements.subject || 'TotemBound Notification'}</h1>
+            <p>${replacements.message || 'Thank you for using TotemBound.'}</p>
+            <p>${replacements.apiKey ? `Your API key: <strong>${replacements.apiKey}</strong>` : ''}</p>
             <p>Happy gaming!</p>
             `;
   }
@@ -50,11 +71,13 @@ const loadTemplate = (templateName, replacements) => {
  * @returns {Promise} - SES send email response
  */
 exports.sendWelcomeEmail = async (email, apiKey) => {
+  const subject = 'Welcome to TotemBound - Your API Key';
+
   // Load and process template
   const htmlContent = loadTemplate('welcome', {
+    subject,
     apiKey,
     date: new Date().toLocaleDateString(),
-    appUrl: process.env.APP_URL || defaultAppUrl
   });
 
   const params = {
@@ -64,7 +87,7 @@ exports.sendWelcomeEmail = async (email, apiKey) => {
     },
     Message: {
       Subject: {
-        Data: 'Welcome to TotemBound - Your API Key'
+        Data: subject
       },
       Body: {
         Html: {
@@ -104,19 +127,17 @@ exports.sendPremiumEmail = async (email, apiKey, isUpgrade = false) => {
   const upgradeText = isUpgrade
     ? 'Your account has been successfully upgraded to Premium tier.'
     : 'Welcome to TotemBound Premium!';
+  
+  const welcomeMessage = isUpgrade
+    ? 'Your account has been successfully upgraded to Premium tier. Thank you for your subscription!'
+    : 'Thank you for subscribing to our premium service. We\'re excited to have you join our Premium members!';
 
-  const htmlContent = `
-    <h1>${upgradeText}</h1>
-    <p>Thank you for subscribing to our premium service. Here is your new Premium API key:</p>
-    <p><strong>${apiKey}</strong></p>
-    <p>Please update your API key in the user settings to enjoy premium benefits:</p>
-    <ul>
-    <li>Higher rate limits</li>
-    <li>Priority transaction processing</li>
-    <li>Access to exclusive game features</li>
-    </ul>
-    <p>Happy gaming!</p>
-  `;
+  const htmlContent = loadTemplate('premium', {
+    subject,
+    apiKey,
+    upgradeText,
+    welcomeMessage
+  });
 
   const params = {
     Source: process.env.EMAIL_FROM || defaultEmailFrom,
@@ -157,15 +178,12 @@ exports.sendPremiumEmail = async (email, apiKey, isUpgrade = false) => {
  * @returns {Promise} - SES send email response
  */
 exports.sendDowngradeEmail = async (email, apiKey) => {
-  const htmlContent = `
-    <h1>Your Premium Subscription Has Ended</h1>
-    <p>Your TotemBound account has been reverted to the Free tier.</p>
-    <p>Here is your new Free tier API key:</p>
-    <p><strong>${apiKey}</strong></p>
-    <p>Please update your API key in the user settings to continue using gasless transactions.</p>
-    <p>If you'd like to upgrade again, visit your account page anytime.</p>
-    <p>Thank you for using TotemBound!</p>
-  `;
+  const subject = 'Your TotemBound Premium Subscription Has Ended';
+
+  const htmlContent = loadTemplate('downgrade', {
+    subject,
+    apiKey
+  });
 
   const params = {
     Source: process.env.EMAIL_FROM || defaultEmailFrom,
@@ -174,7 +192,7 @@ exports.sendDowngradeEmail = async (email, apiKey) => {
     },
     Message: {
       Subject: {
-        Data: 'Your TotemBound Premium Subscription Has Ended'
+        Data: subject
       },
       Body: {
         Html: {
@@ -189,7 +207,7 @@ exports.sendDowngradeEmail = async (email, apiKey) => {
 
   try {
     const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);;
+    const result = await sesClient.send(command);
     console.log(`Downgrade email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
@@ -206,6 +224,8 @@ exports.sendDowngradeEmail = async (email, apiKey) => {
  * @returns {Promise} - SES send email response
  */
 exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
+  const subject = 'Your TotemBound Premium Subscription Has Been Canceled';
+
   // Format the date nicely
   const formattedDate = expirationDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -214,16 +234,10 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
     day: 'numeric'
   });
 
-  const htmlContent = `
-    <h1>Your Premium Subscription Has Been Canceled</h1>
-    <p>We've received your request to cancel your TotemBound Premium subscription.</p>
-    <p>Your Premium subscription will remain active until:</p>
-    <p><strong>${formattedDate}</strong></p>
-    <p>After this date, your account will be automatically downgraded to the Free tier.</p>
-    <p>If you've changed your mind, you can reactivate your subscription through your account settings.</p>
-    <p>We're sorry to see you go! If you have feedback on how we could improve your experience, please let us know.</p>
-    <p>Thank you for being part of the TotemBound community!</p>
-  `;
+  const htmlContent = loadTemplate('subscription-canceled', {
+    subject,
+    formattedDate
+  });
 
   const params = {
     Source: process.env.EMAIL_FROM || defaultEmailFrom,
@@ -232,7 +246,7 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
     },
     Message: {
       Subject: {
-        Data: 'Your TotemBound Premium Subscription Has Been Canceled'
+        Data: subject
       },
       Body: {
         Html: {
@@ -247,7 +261,7 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
 
   try {
     const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);;
+    const result = await sesClient.send(command);
     console.log(`Canceled email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
@@ -264,6 +278,8 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
  * @returns {Promise} - SES send email response
  */
 exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
+  const subject = 'Your TotemBound Premium Subscription Has Been Reactivated';
+
   // Format the date nicely
   const formattedDate = renewalDate.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -272,16 +288,10 @@ exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
     day: 'numeric'
   });
 
-  const htmlContent = `
-    <h1>Your Premium Subscription Has Been Reactivated</h1>
-    <p>Great news! Your TotemBound Premium subscription has been successfully reactivated.</p>
-    <p>Your Premium subscription will continue to renew on:</p>
-    <p><strong>${formattedDate}</strong></p>
-    <p>You will continue to enjoy all Premium benefits, including higher transaction limits, priority processing, and exclusive features.</p>
-    <p>If you need to manage your subscription in the future, you can do so through your account settings.</p>
-    <p>Welcome back to Premium! We're thrilled to have you continue as a valued member of the TotemBound community.</p>
-    <p>Thank you for your continued support!</p>
-  `;
+  const htmlContent = loadTemplate('subscription-reactivated', {
+    subject,
+    formattedDate
+  });
 
   const params = {
     Source: process.env.EMAIL_FROM || defaultEmailFrom,
@@ -290,14 +300,14 @@ exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
     },
     Message: {
       Subject: {
-        Data: 'Your TotemBound Premium Subscription Has Been Reactivated'
+        Data: subject
       },
       Body: {
         Html: {
           Data: htmlContent
         },
         Text: {
-          Data: `Your Premium Subscription has been reactivated. Your Premium subscription will continue to renew on: ${renewalDate}. Welcome back to Premium! We're thrilled to have you continue as a valued member of the TotemBound community.`
+          Data: `Your Premium Subscription has been reactivated. Your Premium subscription will continue to renew on: ${formattedDate}. Welcome back to Premium! We're thrilled to have you continue as a valued member of the TotemBound community.`
         }
       }
     }
@@ -305,7 +315,7 @@ exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
 
   try {
     const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);;
+    const result = await sesClient.send(command);
     console.log(`Renewed email sent to ${email}, messageId: ${result.MessageId}`);
     return result;
   }
