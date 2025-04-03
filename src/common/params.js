@@ -27,4 +27,4 @@ exports.getParameter = async (paramName) => {
     console.error(`Error retrieving parameter ${paramName}:`, error);
     throw error;
   }
-}
+};

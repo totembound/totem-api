@@ -20,7 +20,8 @@ exports.handler = async (event, context) => {
         stripeSignature,
         stripeWebhookSecret
       );
-    } catch (err) {
+    }
+    catch (err) {
       console.error('Stripe signature verification failed:', err);
       return {
         statusCode: 400,
@@ -157,7 +158,7 @@ async function handleSubscriptionUpdated(subscription, previousAttributes) {
   // Check if the subscription was canceled (but still active until period end)
   if (subscription.cancel_at_period_end) {
     console.log(`Subscription ${subscription.id} for customer ${subscription.customer} was canceled and will end at period end`);
-    
+
     // check if we already canceled
     if (user.subscriptionCanceledAt) {
       return {
@@ -176,15 +177,15 @@ async function handleSubscriptionUpdated(subscription, previousAttributes) {
   }
 
   // Check if this is a reactivation event
-  if (previousAttributes 
-    && previousAttributes.cancel_at_period_end === true 
+  if (previousAttributes
+    && previousAttributes.cancel_at_period_end === true
     && subscription.cancel_at_period_end === false) {
 
     console.log(`Subscription ${subscription.id} was reactivated by customer ${subscription.customer}`);
-    
+
     // Send reactivation email
     await sendSubscriptionReactivatedEmail(user.email, new Date(subscription.current_period_end * 1000));
-    
+
     // Update user record to remove cancellation flags
     await updateUser(user.userId, {
       subscriptionCanceledAt: null,
@@ -210,20 +211,6 @@ async function handleSubscriptionDeleted(subscription) {
       body: JSON.stringify({ error: 'User not found' })
     };
   }
-
-  // Deactivate premium API key
-  await apigateway
-    .updateApiKey({
-      apiKey: user.apiKeyId,
-      patchOperations: [
-        {
-          op: 'replace',
-          path: '/enabled',
-          value: 'false'
-        }
-      ]
-    })
-    .promise();
 
   // Downgrade user to free tier using helper
   const updatedUser = await updateUserApiKey(user.userId, 'free');
