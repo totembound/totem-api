@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
+    <title>{{subject}}</title>
+    <style>
+        /* Base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* Reset for email clients */
+        #outlook a {padding:0;}
+        .ExternalClass {width:100%;}
+        .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div {line-height: 100%;}
+        table, td {mso-table-lspace:0pt; mso-table-rspace:0pt;}
+        img {-ms-interpolation-mode:bicubic; border:0;}
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 1rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        .header {
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .logo {
+            width: 60px;
+            height: 60px;
+            margin-right: 15px;
+        }
+        .brand-name {
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #121212 !important;
+                color: #f5f5f5 !important;
+            }
+            .container {
+                background-color: #1e1e1e !important;
+                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                color: #e1e1e1 !important;
+            }
+            .header {
+                background-color: #2a2a2a !important;
+                color: #b0b0b0 !important;
+             }
+            .footer {
+                background-color: #2a2a2a !important;
+                color: #b0b0b0 !important;
+                border-top: 1px solid #333333 !important;
+            }
+            .api-key {
+                background-color: #2a2a2a !important;
+                border: 1px solid #444444 !important;
+            }
+            .info-box {
+                background-color: #2a2a2a !important;
+                border-left: 4px solid #3498db !important;
+            }
+            .footer-links a {
+                color: #66b2ff !important;
+            }
+        }
+        
+        /* Light mode explicit styles to override dark mode in clients that support both */
+        @media (prefers-color-scheme: light) {
+            body {
+                background-color: #f4f4f4 !important;
+                color: #333 !important;
+            }
+            .container {
+                background-color: #ffffff !important;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                color: #2c3e50 !important;
+            }
+        }
+
+        ol, ul {
+            padding-left: 20px;
+            margin: 10px 0 10px 15px;
+        }
+        li {
+            margin-bottom: 8px;
+            padding-left: 5px;
+        }
+        ul li {
+            list-style-position: outside;
+        }
+        ol li {
+            list-style-position: outside;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+            border-top: 1px solid #e9ecef;
+        }
+        .button {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+        .api-key {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 16px;
+            border: 1px solid #e9ecef;
+            margin: 15px 0;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .social-links {
+            margin: 15px 0;
+        }
+        .social-links a {
+            display: inline-block;
+            margin: 0 10px;
+            color: #3498db;
+            text-decoration: none;
+        }
+        .divider {
+            border-top: 1px solid #e9ecef;
+            margin: 20px 0;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #3498db;
+            margin: 15px 0;
+        }
+        .footer-links a {
+            color: #3498db;
+            text-decoration: none;
+            margin: 0 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo-container">
+                <a href="{{appUrl}}"><img src="https://totembound.com/tb-logo-180.png" alt="TotemBound Logo" class="logo"></a>
+                <div class="brand-name">TotemBound</div>
+            </div>
+        </div>
+        
+        <div class="content">
+            {{content}}
+        </div>
+        
+        <div class="footer">
+            <div class="info-box">
+                <strong>Why am I receiving this email?</strong>
+                <p>This email was sent because it contains important information about your account.
+                If you have previously unsubscribed from TotemBound emails, you will still receive essential notifications about your account status.
+                You can update preferences anytime in your Account Settings.</p>
+            </div>
+            
+            <div class="social-links">
+                <a href="{{appUrl}}">Dashboard</a>
+                |
+                <a href="https://github.com/totembound" target="_blank" rel="noopener noreferrer">GitHub</a>
+                |
+                <a href="https://linkedin.com/company/totembound" target="_blank" rel="noopener noreferrer"><span>LinkedIn</span></a>
+                |
+                <a href="https://x.com/totemboundhq" target="_blank" rel="noopener noreferrer"><span>X</span></a>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="footer-links">
+                <a href="{{appUrl}}/terms">Terms of Service</a> |
+                <a href="{{appUrl}}/privacy">Privacy Policy</a>
+            </div>
+            
+            <p>Copyright © {{currentYear}} TotemBound. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
