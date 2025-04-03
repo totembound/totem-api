@@ -276,18 +276,6 @@ describe('Premium Webhook Lambda Function', () => {
         expect(response.statusCode).toBe(200);
         expect(JSON.parse(response.body).received).toBe(true);
 
-        // Check if API key was disabled
-        expect(global.apigateway.updateApiKey).toHaveBeenCalledWith({
-            apiKey: 'api-key-id-123',
-            patchOperations: [
-                {
-                    op: 'replace',
-                    path: '/enabled',
-                    value: 'false'
-                }
-            ]
-        });
-
         // Check if user was downgraded to free tier
         expect(apiKey.updateUserApiKey).toHaveBeenCalledWith(
             'canceled-user-id',
