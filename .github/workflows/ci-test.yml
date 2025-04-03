@@ -59,8 +59,8 @@ jobs:
 
     - name: Run ESLint
       working-directory: ./totem-api
-      # Adding || true to prevent lint warnings from failing the build
-      run: npm run lint || true
+      continue-on-error: true
+      run: npm run lint
 
     - name: Build
       working-directory: ./totem-api
@@ -70,5 +70,5 @@ jobs:
 
     - name: Run tests
       working-directory: ./totem-api
-      run: npm run test || exit 0
+      run: npm run test
 
