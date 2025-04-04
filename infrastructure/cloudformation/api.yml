@@ -68,6 +68,10 @@ Parameters:
     Type: String
     Description: Address of the TotemToken contract
   
+  ShopAddress:
+    Type: String
+    Description: Address of the TotemShop contract
+
   RewardsAddress:
     Type: String
     Description: Address of the TotemRewards contract
@@ -152,6 +156,7 @@ Resources:
           GAME_ADDRESS: !Ref GameAddress
           NFT_ADDRESS: !Ref NftAddress
           TOKEN_ADDRESS: !Ref TokenAddress
+          SHOP_ADDRESS: !Ref ShopAddress
           REWARDS_ADDRESS: !Ref RewardsAddress
           MAX_GAS_PRICE: !Ref MaxGasPrice
           MIN_WALLET_BALANCE: !Ref MinWalletBalance
