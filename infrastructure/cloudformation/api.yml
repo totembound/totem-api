@@ -72,6 +72,10 @@ Parameters:
     Type: String
     Description: Address of the TotemShop contract
 
+  ExpeditionsAddress:
+    Type: String
+    Description: Address of the TotemExpeditions contract
+
   RewardsAddress:
     Type: String
     Description: Address of the TotemRewards contract
@@ -130,7 +134,7 @@ Conditions:
   IsProdEnvironment: !Equals [!Ref Environment, "prod"]
 
 Resources:
-  # Lambda Function for gasless transation
+  # Lambda Function for gasless transactions
   RelayLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
@@ -156,8 +160,9 @@ Resources:
           GAME_ADDRESS: !Ref GameAddress
           NFT_ADDRESS: !Ref NftAddress
           TOKEN_ADDRESS: !Ref TokenAddress
-          SHOP_ADDRESS: !Ref ShopAddress
           REWARDS_ADDRESS: !Ref RewardsAddress
+          SHOP_ADDRESS: !Ref ShopAddress
+          EXPEDITIONS_ADDRESS: !Ref ExpeditionsAddress
           MAX_GAS_PRICE: !Ref MaxGasPrice
           MIN_WALLET_BALANCE: !Ref MinWalletBalance
           USERS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]

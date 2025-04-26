@@ -14,7 +14,8 @@ const contractAddresses = {
   nft: process.env.NFT_ADDRESS,
   token: process.env.TOKEN_ADDRESS,
   rewards: process.env.REWARDS_ADDRESS,
-  shop: process.env.SHOP_ADDRESS
+  shop: process.env.SHOP_ADDRESS,
+  expeditions: process.env.EXPEDITIONS_ADDRESS,
 };
 
 // Initialize provider function (called once on cold start)

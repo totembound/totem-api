@@ -7,6 +7,8 @@
     "NftAddress": "0x9876543210abcdef1234567890abcdef12345678",
     "TokenAddress": "0xfedcba9876543210abcdef1234567890abcdef12",
     "RewardsAddress": "0x1234abcdef9876543210abcdef1234567890abcd",
+    "ShopAddress": "0x1234abcdef9876543210abcdef1234567890abcd",
+    "ExpeditionsAddress": "0x1234abcdef9876543210abcdef1234567890abcd",
     "RpcEndpointUrlName": "/totemboundci/forwarder/rpc-endpoint-url",
     "ForwarderPrivateKeySecretName": "/totemboundci/forwarder/private-key",
     "StripeSecretKeyName": "/totemboundci/stripe/secret-key",
