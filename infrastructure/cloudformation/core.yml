@@ -51,6 +51,8 @@ Resources:
           AttributeType: S
         - AttributeName: walletAddress
           AttributeType: S
+        - AttributeName: apiKey
+          AttributeType: S
       KeySchema:
         - AttributeName: userId
           KeyType: HASH
@@ -64,6 +66,12 @@ Resources:
         - IndexName: wallet-index
           KeySchema:
             - AttributeName: walletAddress
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: apikey-index
+          KeySchema:
+            - AttributeName: apiKey
               KeyType: HASH
           Projection:
             ProjectionType: ALL
@@ -88,6 +96,10 @@ Resources:
           AttributeType: S
         - AttributeName: createdAt
           AttributeType: S
+        - AttributeName: yearMonth
+          AttributeType: S
+        - AttributeName: contractType
+          AttributeType: S
       KeySchema:
         - AttributeName: txId
           KeyType: HASH
@@ -95,6 +107,24 @@ Resources:
         - IndexName: user-time-index
           KeySchema:
             - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # Monthly aggregation GSI (most efficient for monthly reports)
+        - IndexName: user-month-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: yearMonth
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # Contract analytics GSI
+        - IndexName: contract-time-index
+          KeySchema:
+            - AttributeName: contractType
               KeyType: HASH
             - AttributeName: createdAt
               KeyType: RANGE
@@ -206,7 +236,7 @@ Resources:
         BurstLimit: 10
         RateLimit: 5
       Quota:
-        Limit: 100
+        Limit: 50
         Period: DAY
   
   PremiumTierApiUsagePlan:
