@@ -167,6 +167,8 @@ Resources:
           MIN_WALLET_BALANCE: !Ref MinWalletBalance
           USERS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, UsersTableName]
           TRANSACTIONS_TABLE: !FindInMap [EnvironmentMap, !Ref Environment, TransactionsTableName]
+          FREE_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-FreeTierUsagePlanId"}
+          PREMIUM_TIER_USAGE_PLAN_ID: {"Fn::ImportValue": "totembound-core-stack-PremiumTierUsagePlanId"}
       Code:
         S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
         S3Key: !Sub "totem-api/relay/relay-lambda-${AppVersion}.zip"
@@ -348,7 +350,14 @@ Resources:
       RestApiId: !Ref TotemBoundApi
       ParentId: !GetAtt TotemBoundApi.RootResourceId
       PathPart: relay
-  
+
+  ApiResourceRelayQuotas:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref ApiResourceRelay
+      PathPart: quotas
+
   ApiResourceHealth:
     Type: AWS::ApiGateway::Resource
     Properties:
@@ -420,6 +429,60 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+              method.response.header.Cache-Control: "'public, max-age=86400'"
+              method.response.header.Access-Control-Allow-Origin: !If 
+              - UseCustomCors
+              - !Sub "'${CustomCorsOrigin}'"
+              - Fn::Join:
+                - ""
+                - - "'"
+                  - Fn::FindInMap: [EnvironmentMap, !Ref Environment, CorsOrigin]
+                  - "'"
+            ResponseTemplates:
+              application/json: '{"message": "CORS preflight success"}'
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref CorsResponseModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+            method.response.header.Cache-Control: true
+
+  RelayQuotasGetMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceRelayQuotas
+      HttpMethod: GET
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RelayLambdaFunction.Arn}/invocations"
+
+  RelayQuotasOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref ApiResourceRelayQuotas
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      ApiKeyRequired: false
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Max-Age: "'86400'"
               method.response.header.Cache-Control: "'public, max-age=86400'"
               method.response.header.Access-Control-Allow-Origin: !If 
