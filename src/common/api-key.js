@@ -1,5 +1,3 @@
-// common/api-key.js - Environment-based API key verification
-
 // Determine which implementation to use
 const useMockApiKey = process.env.USE_MOCK_DB === 'true' || process.env.USE_MOCK_API_KEY === 'true';
 const isLocalDev = process.env.NODE_ENV === 'development' || process.env.LOCAL_DEV === 'true';

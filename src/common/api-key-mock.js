@@ -1,5 +1,4 @@
-// common/api-key-mock.js - Mock API key verification for local testing
-
+// Mock API key verification for local testing
 const mockApiKeys = new Map();
 
 // Initialize with test data
