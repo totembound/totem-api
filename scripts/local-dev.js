@@ -132,6 +132,17 @@ switch (functionName) {
         res.status(500).json({ error: 'Internal Server Error', message: error.message });
       }
     });
+    // Quota endpoint
+    app.get('/relay/quotas', async (req, res) => {
+      try {
+        const event = createEvent(req);
+        const result = await lambdaHandler(event);
+        sendResponse(res, result);
+      } catch (error) {
+        console.error(chalk.red(`Error in quota handler: ${error.message}`));
+        res.status(500).json({ error: 'Internal Server Error', message: error.message });
+      }
+    });
     // Health check endpoint
     app.get('/health', async (req, res) => {
       try {
