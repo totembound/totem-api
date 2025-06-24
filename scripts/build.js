@@ -5,7 +5,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 const chalk = require('chalk');
 
 // Configuration
@@ -21,6 +20,15 @@ const SKIP_FILES = ['.env', '.env.local', '.env.development', '.env.production']
 // Ensure dist directory exists
 if (!fs.existsSync(DIST_DIR)) {
   fs.mkdirSync(DIST_DIR);
+}
+
+/**
+ * Remove directory recursively (if it exists)
+ */
+function removeDir(dir) {
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -70,29 +78,28 @@ function buildFunction(functionName) {
   // Create function dist directory
   if (!fs.existsSync(functionDist)) {
     fs.mkdirSync(functionDist, { recursive: true });
-    fs.mkdirSync(functionSrcDist, { recursive: true });
   }
 
   // Copy function source files
+   removeDir(functionSrcDist);
+  fs.mkdirSync(functionSrcDist, { recursive: true });
   copyDir(functionSrc, functionSrcDist);
   console.log(chalk.green(`  ✓ Copied ${functionName} source files`));
-
+  
   // Copy common directory at the same level as in source
   const commonDist = path.join(functionDist, 'common');
-  if (!fs.existsSync(commonDist)) {
-    fs.mkdirSync(commonDist, { recursive: true });
-    copyDir(COMMON_DIR, commonDist);
-    console.log(chalk.green(`  ✓ Copied common utilities`));
-  }
+  removeDir(commonDist); // Remove existing common directory
+  fs.mkdirSync(commonDist, { recursive: true });
+  copyDir(COMMON_DIR, commonDist);
+  console.log(chalk.green(`  ✓ Copied common utilities (refreshed)`));
   
   // Copy contract ABIs if this is the relay function
   if (functionName === 'relay') {
     const contractsDist = path.join(functionDist, 'contracts');
-    if (!fs.existsSync(contractsDist)) {
-      fs.mkdirSync(contractsDist, { recursive: true });
-    }
+    removeDir(contractsDist); // Remove existing contracts directory
+    fs.mkdirSync(contractsDist, { recursive: true });
     copyDir(CONTRACTS_DIR, contractsDist);
-    console.log(chalk.green(`  ✓ Copied contract ABIs`));
+    console.log(chalk.green(`  ✓ Copied contract ABIs (refreshed)`));
   }
 
   // Create a package.json for the function if it doesn't exist
