@@ -128,24 +128,17 @@ exports.handler = async (event, context) => {
       return await createResponse(401, { error: 'Invalid API key' });
     }
 
-    // Check daily limit BEFORE processing request
+    // Always check usage status for headers and quota info
     usageStatus = await checkDailyLimit(user.userId, user.tier);
-    if (usageStatus.exceeded) {
-      return await createResponse(429, { 
-        error: 'Daily request limit exceeded',
-        dailyLimit: usageStatus.dailyLimit,
-        currentUsage: usageStatus.currentUsage,
-        resetTime: 'midnight UTC'
-      }, user, usageStatus);
-    }
   }
 
+  // Handle quota information requests BEFORE rate limiting check
   if (event.httpMethod === 'GET' && (event.resource === '/relay/quotas' || event.path === '/relay/quotas')) {
     if (!user) {
       return await createResponse(401, { error: 'API key required for quota information' });
     }
 
-    // Return detailed quota information
+    // Return detailed quota information (always 200, even if exceeded)
     const quotaInfo = {
       userId: user.userId,
       email: user.email,
@@ -161,6 +154,16 @@ exports.handler = async (event, context) => {
     };
 
     return await createResponse(200, quotaInfo, user, usageStatus);
+  }
+
+  // Check daily limit for transaction requests (POST)
+  if (user && usageStatus && usageStatus.exceeded) {
+    return await createResponse(429, { 
+      error: 'Daily request limit exceeded',
+      dailyLimit: usageStatus.dailyLimit,
+      currentUsage: usageStatus.currentUsage,
+      resetTime: 'midnight UTC'
+    }, user, usageStatus);
   }
 
   // Initialize provider if not already done
