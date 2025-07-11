@@ -44,6 +44,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            background-color: #2a2a2a;
         }
         .logo-container {
             display: flex;
@@ -59,6 +60,7 @@
             color: #ffffff;
             font-size: 28px;
             font-weight: bold;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
         
         /* Dark mode support */
@@ -76,7 +78,6 @@
             }
             .header {
                 background-color: #2a2a2a !important;
-                color: #b0b0b0 !important;
              }
             .footer {
                 background-color: #2a2a2a !important;
@@ -189,46 +190,58 @@
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="logo-container">
-                <a href="{{appUrl}}"><img src="https://totembound.com/tb-logo-180.png" alt="TotemBound Logo" class="logo"></a>
-                <div class="brand-name">TotemBound</div>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4;">
+    <!--[if mso]>
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="width:600px;">
+    <tr>
+    <td>
+    <![endif]-->
+    <div class="container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
+        <div class="header" style="padding: 20px; text-align: center; background-color: #2a2a2a;">
+            <div class="logo-container" style="display: inline-block;">
+                <a href="{{appUrl}}" style="text-decoration: none;">
+                    <img src="https://totembound.com/tb-logo-180.png" alt="TotemBound Logo" class="logo" style="width: 60px; height: 60px; vertical-align: middle; margin-right: 15px;">
+                    <span class="brand-name" style="color: #ffffff; font-size: 28px; font-weight: bold; vertical-align: middle; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">TotemBound</span>
+                </a>
             </div>
         </div>
         
-        <div class="content">
+        <div class="content" style="padding: 30px; background-color: #ffffff; color: #333333;">
             {{content}}
         </div>
         
-        <div class="footer">
-            <div class="info-box">
+        <div class="footer" style="background-color: #2a2a2a; padding: 20px; text-align: center; font-size: 12px; color: #b0b0b0; border-top: 1px solid #333333;">
+            <div class="info-box" style="background-color: #3a3a3a; padding: 15px; border-radius: 4px; border-left: 4px solid #3498db; margin: 15px 0; color: #e0e0e0;">
                 <strong>Why am I receiving this email?</strong>
                 <p>This email was sent because it contains important information about your account.
                 If you have previously unsubscribed from TotemBound emails, you will still receive essential notifications about your account status.
                 You can update preferences anytime in your Account Settings.</p>
             </div>
             
-            <div class="social-links">
-                <a href="{{appUrl}}">Dashboard</a>
+            <div class="social-links" style="margin: 15px 0;">
+                <a href="{{appUrl}}" style="color: #66b2ff; text-decoration: none; margin: 0 10px;">Dashboard</a>
                 |
-                <a href="https://github.com/totembound" target="_blank" rel="noopener noreferrer">GitHub</a>
+                <a href="https://github.com/totembound" target="_blank" rel="noopener noreferrer" style="color: #66b2ff; text-decoration: none; margin: 0 10px;">GitHub</a>
                 |
-                <a href="https://linkedin.com/company/totembound" target="_blank" rel="noopener noreferrer"><span>LinkedIn</span></a>
+                <a href="https://linkedin.com/company/totembound" target="_blank" rel="noopener noreferrer" style="color: #66b2ff; text-decoration: none; margin: 0 10px;"><span>LinkedIn</span></a>
                 |
-                <a href="https://x.com/totemboundhq" target="_blank" rel="noopener noreferrer"><span>X</span></a>
+                <a href="https://x.com/totemboundhq" target="_blank" rel="noopener noreferrer" style="color: #66b2ff; text-decoration: none; margin: 0 10px;"><span>X</span></a>
             </div>
             
             <div class="divider"></div>
             
-            <div class="footer-links">
-                <a href="{{appUrl}}/terms">Terms of Service</a> |
-                <a href="{{appUrl}}/privacy">Privacy Policy</a>
+            <div class="footer-links" style="margin: 10px 0;">
+                <a href="{{appUrl}}/terms" style="color: #66b2ff; text-decoration: none; margin: 0 5px;">Terms of Service</a> |
+                <a href="{{appUrl}}/privacy" style="color: #66b2ff; text-decoration: none; margin: 0 5px;">Privacy Policy</a>
             </div>
             
-            <p>Copyright © {{currentYear}} TotemBound. All rights reserved.</p>
+            <p style="color: #b0b0b0; margin-top: 10px;">Copyright © {{currentYear}} TotemBound. All rights reserved.</p>
         </div>
     </div>
+    <!--[if mso]>
+    </td>
+    </tr>
+    </table>
+    <![endif]-->
 </body>
 </html>
