@@ -2,11 +2,16 @@ const { createUserWithApiKey } = require('../common/api-key');
 const { sendWelcomeEmail } = require('../common/email');
 const { validateEmail, normalizeAddress, formatResponse, validateParams } = require('../common/utils');
 const { getUserByEmail, getUserByWallet } = require('../common/db');
+const TurnstileVerification = require('../common/turnstile-verification');
+const { getClientIP } = require('../common/client-utils');
 
 /**
  * Handles user signup and API key creation
  */
 exports.handler = async (event, context) => {
+  // Debug logging for CORS configuration
+  console.log('CORS_ORIGIN environment variable:', process.env.CORS_ORIGIN);
+  
   // Set up CORS headers
   const headers = {
     'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
@@ -41,7 +46,45 @@ exports.handler = async (event, context) => {
       );
     }
 
-    const { email, walletAddress, tier = 'free' } = body;
+    const { email, walletAddress, tier = 'free', turnstileToken } = body;
+
+    // Validate Turnstile token for free tier
+    if (tier.toLowerCase() === 'free') {
+      if (!turnstileToken) {
+        return formatResponse(400, { 
+          error: 'Missing verification', 
+          message: 'Security verification is required',
+          field: 'turnstile',
+          action: 'retry'
+        }, process.env.CORS_ORIGIN);
+      }
+
+      // Verify turnstile token with CloudFlare
+      const turnstileVerification = new TurnstileVerification();
+      const clientIP = getClientIP(event);
+      const verificationResult = await turnstileVerification.verifyToken(turnstileToken, clientIP);
+      
+      if (!verificationResult.success) {
+        console.warn('Turnstile verification failed:', { 
+          ip: clientIP, 
+          errorCodes: verificationResult.errorCodes 
+        });
+        
+        return formatResponse(400, {
+          error: 'Verification failed',
+          message: verificationResult.message,
+          codes: verificationResult.errorCodes,
+          field: 'turnstile',
+          action: 'retry'
+        }, process.env.CORS_ORIGIN);
+      }
+      
+      // Log successful verification
+      console.log('Turnstile verification successful:', { 
+        ip: clientIP,
+        email: email
+      });
+    }
 
     // Validate inputs
     const validationError = validateParams({ email, walletAddress }, ['email', 'walletAddress']);
@@ -75,12 +118,42 @@ exports.handler = async (event, context) => {
     const existingUserEmail = await getUserByEmail(normalizedEmail);
     const existingUserWallet = await getUserByWallet(normalizedWallet);
 
-    if (existingUserEmail || existingUserWallet) {
+    if (existingUserEmail && existingUserWallet) {
       return formatResponse(
         409,
         {
-          error: 'User exists',
-          message: 'An API key is already associated with this email or wallet address',
+          error: 'Account already exists',
+          message: 'Both email and wallet address are already registered.',
+          field: 'both',
+          action: 'signin',
+          keyExists: true
+        },
+        process.env.CORS_ORIGIN
+      );
+    }
+
+    if (existingUserEmail) {
+      return formatResponse(
+        409,
+        {
+          error: 'Email already registered',
+          message: 'This email is already associated with an account.',
+          field: 'email', 
+          action: 'signin',
+          keyExists: true
+        },
+        process.env.CORS_ORIGIN
+      );
+    }
+
+    if (existingUserWallet) {
+      return formatResponse(
+        409,
+        {
+          error: 'Wallet already registered',
+          message: 'This wallet address is already associated with an account.',
+          field: 'wallet',
+          action: 'signin', 
           keyExists: true
         },
         process.env.CORS_ORIGIN
@@ -89,6 +162,16 @@ exports.handler = async (event, context) => {
 
     if (tier.toLowerCase() === 'premium') {
       // For Premium tier, redirect to payment flow
+      const clientIP = getClientIP(event);
+      
+      // Log premium tier signup initiation
+      console.log('Premium tier signup initiated:', {
+        email: normalizedEmail,
+        walletAddress: normalizedWallet,
+        tier: 'premium',
+        clientIP: clientIP
+      });
+
       return formatResponse(
         200,
         {
@@ -98,9 +181,38 @@ exports.handler = async (event, context) => {
         process.env.CORS_ORIGIN
       );
     }
+    else if (tier.toLowerCase() === 'advanced') {
+      // For Advanced tier, user pays transaction fees themselves (no API key, no email required)
+      const clientIP = getClientIP(event);
+      
+      // Log advanced tier signup
+      console.log('Advanced tier signup completed:', {
+        walletAddress: normalizedWallet,
+        tier: 'advanced',
+        clientIP: clientIP
+      });
+
+      return formatResponse(
+        200,
+        {
+          message: 'Advanced tier account created successfully',
+          tier: 'advanced'
+        },
+        process.env.CORS_ORIGIN
+      );
+    }
     else {
       // For Free tier, create and send API key immediately
-      const user = await createUserWithApiKey(normalizedEmail, normalizedWallet, 'free');
+      const clientIP = getClientIP(event);
+      const user = await createUserWithApiKey(normalizedEmail, normalizedWallet, 'free', clientIP);
+
+      // Log successful user account creation
+      console.log('User account created successfully:', {
+        email: normalizedEmail,
+        walletAddress: normalizedWallet,
+        tier: 'free',
+        clientIP: clientIP
+      });
 
       // Send welcome email with API key
       await sendWelcomeEmail(normalizedEmail, user.apiKey);
