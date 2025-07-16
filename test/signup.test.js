@@ -46,11 +46,23 @@ jest.mock('../src/common/db', () => ({
   getUserByWallet: jest.fn().mockResolvedValue(null)
 }));
 
+jest.mock('../src/common/turnstile-verification', () => {
+  return jest.fn().mockImplementation(() => ({
+    verifyToken: jest.fn().mockResolvedValue({ success: true, message: 'Verification successful' })
+  }));
+});
+
+jest.mock('../src/common/client-utils', () => ({
+  getClientIP: jest.fn().mockReturnValue('192.168.1.1')
+}));
+
 // Import the mocked modules for direct access in tests
 const apiKey = require('../src/common/api-key');
 const email = require('../src/common/email');
 const utils = require('../src/common/utils');
 const db = require('../src/common/db');
+const TurnstileVerification = require('../src/common/turnstile-verification');
+const clientUtils = require('../src/common/client-utils');
 
 describe('Signup Lambda Function', () => {
   beforeEach(() => {
@@ -77,7 +89,8 @@ describe('Signup Lambda Function', () => {
       body: JSON.stringify({
         email: 'test@example.com',
         walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
-        tier: 'free'
+        tier: 'free',
+        turnstileToken: 'valid-token'
       })
     };
 
@@ -91,7 +104,8 @@ describe('Signup Lambda Function', () => {
     expect(apiKey.createUserWithApiKey).toHaveBeenCalledWith(
       'test@example.com',
       '0x1234567890abcdef1234567890abcdef12345678',
-      'free'
+      'free',
+      '192.168.1.1'
     );
 
     expect(email.sendWelcomeEmail).toHaveBeenCalledWith('test@example.com', 'test-api-key');
@@ -124,7 +138,9 @@ describe('Signup Lambda Function', () => {
       httpMethod: 'POST',
       body: JSON.stringify({
         email: 'not-an-email',
-        walletAddress: '0x1234567890abcdef1234567890abcdef12345678'
+        walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
+        tier: 'free',
+        turnstileToken: 'valid-token'
       })
     };
 
@@ -139,7 +155,9 @@ describe('Signup Lambda Function', () => {
     const event = {
       httpMethod: 'POST',
       body: JSON.stringify({
-        email: 'test@example.com'
+        email: 'test@example.com',
+        tier: 'free',
+        turnstileToken: 'valid-token'
       })
     };
 
@@ -162,7 +180,9 @@ describe('Signup Lambda Function', () => {
       httpMethod: 'POST',
       body: JSON.stringify({
         email: 'test@example.com',
-        walletAddress: '0x1234567890abcdef1234567890abcdef12345678'
+        walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
+        tier: 'free',
+        turnstileToken: 'valid-token'
       })
     };
 
@@ -170,7 +190,7 @@ describe('Signup Lambda Function', () => {
     const body = JSON.parse(response.body);
 
     expect(response.statusCode).toBe(409);
-    expect(body.error).toBe('User exists');
+    expect(body.error).toBe('Email already registered');
     expect(body.keyExists).toBe(true);
   });
 
@@ -182,7 +202,9 @@ describe('Signup Lambda Function', () => {
       httpMethod: 'POST',
       body: JSON.stringify({
         email: 'test@example.com',
-        walletAddress: '0x1234567890abcdef1234567890abcdef12345678'
+        walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
+        tier: 'free',
+        turnstileToken: 'valid-token'
       })
     };
 
@@ -213,7 +235,8 @@ describe('Signup Lambda Function', () => {
       body: JSON.stringify({
         email: 'Test@Example.COM',
         walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
-        tier: 'free'
+        tier: 'free',
+        turnstileToken: 'valid-token'
       })
     };
 
@@ -223,7 +246,8 @@ describe('Signup Lambda Function', () => {
     expect(apiKey.createUserWithApiKey).toHaveBeenCalledWith(
       'test@example.com', // Should be lowercase
       expect.any(String),
-      'free'
+      'free',
+      '192.168.1.1'
     );
   });
 
@@ -233,7 +257,8 @@ describe('Signup Lambda Function', () => {
       body: JSON.stringify({
         email: 'test@example.com',
         walletAddress: '0x1234567890ABCDEF1234567890abcdef12345678',
-        tier: 'free'
+        tier: 'free',
+        turnstileToken: 'valid-token'
       })
     };
 
@@ -242,5 +267,23 @@ describe('Signup Lambda Function', () => {
     expect(utils.normalizeAddress).toHaveBeenCalledWith(
       '0x1234567890ABCDEF1234567890abcdef12345678'
     );
+  });
+
+  it('should return 400 for missing turnstile token on free tier', async () => {
+    const event = {
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
+        tier: 'free'
+      })
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(400);
+    expect(body.error).toBe('Missing verification');
+    expect(body.field).toBe('turnstile');
   });
 });
