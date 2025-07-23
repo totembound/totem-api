@@ -115,13 +115,12 @@ exports.handler = async (event, context) => {
     const existingUserEmail = await getUserByEmail(normalizedEmail);
     const existingUserWallet = await getUserByWallet(normalizedWallet);
 
-    if (existingUserEmail && existingUserWallet) {
+    if (existingUserEmail || existingUserWallet) {
       return formatResponse(
         409,
         {
           error: 'Account already exists',
-          message: 'Both email and wallet address are already registered.',
-          field: 'both',
+          message: 'An account with these credentials already exists.',
           action: 'signin',
           keyExists: true
         },
@@ -129,101 +128,30 @@ exports.handler = async (event, context) => {
       );
     }
 
-    if (existingUserEmail) {
-      return formatResponse(
-        409,
-        {
-          error: 'Email already registered',
-          message: 'This email is already associated with an account.',
-          field: 'email', 
-          action: 'signin',
-          keyExists: true
-        },
-        process.env.CORS_ORIGIN
-      );
-    }
+    // For Free tier, create and send API key immediately
+    const clientIP = getClientIP(event);
+    const user = await createUserWithApiKey(normalizedEmail, normalizedWallet, 'free', clientIP);
 
-    if (existingUserWallet) {
-      return formatResponse(
-        409,
-        {
-          error: 'Wallet already registered',
-          message: 'This wallet address is already associated with an account.',
-          field: 'wallet',
-          action: 'signin', 
-          keyExists: true
-        },
-        process.env.CORS_ORIGIN
-      );
-    }
+    // Log successful user account creation
+    console.log('User account created successfully:', {
+      email: normalizedEmail,
+      walletAddress: normalizedWallet,
+      tier: 'free',
+      clientIP: clientIP
+    });
 
-    if (tier.toLowerCase() === 'premium') {
-      // For Premium tier, redirect to payment flow
-      const clientIP = getClientIP(event);
-      
-      // Log premium tier signup initiation
-      console.log('Premium tier signup initiated:', {
-        email: normalizedEmail,
-        walletAddress: normalizedWallet,
-        tier: 'premium',
-        clientIP: clientIP
-      });
+    // Send welcome email with API key
+    await sendWelcomeEmail(normalizedEmail, user.apiKey);
 
-      return formatResponse(
-        200,
-        {
-          message: 'Redirect to payment flow',
-          redirectUrl: `${process.env.PAYMENT_URL}?email=${encodeURIComponent(normalizedEmail)}&wallet=${encodeURIComponent(normalizedWallet)}`
-        },
-        process.env.CORS_ORIGIN
-      );
-    }
-    else if (tier.toLowerCase() === 'advanced') {
-      // For Advanced tier, user pays transaction fees themselves (no API key, no email required)
-      const clientIP = getClientIP(event);
-      
-      // Log advanced tier signup
-      console.log('Advanced tier signup completed:', {
-        walletAddress: normalizedWallet,
-        tier: 'advanced',
-        clientIP: clientIP
-      });
-
-      return formatResponse(
-        200,
-        {
-          message: 'Advanced tier account created successfully',
-          tier: 'advanced'
-        },
-        process.env.CORS_ORIGIN
-      );
-    }
-    else {
-      // For Free tier, create and send API key immediately
-      const clientIP = getClientIP(event);
-      const user = await createUserWithApiKey(normalizedEmail, normalizedWallet, 'free', clientIP);
-
-      // Log successful user account creation
-      console.log('User account created successfully:', {
-        email: normalizedEmail,
-        walletAddress: normalizedWallet,
-        tier: 'free',
-        clientIP: clientIP
-      });
-
-      // Send welcome email with API key
-      await sendWelcomeEmail(normalizedEmail, user.apiKey);
-
-      // Return success response
-      return formatResponse(
-        200,
-        {
-          message: 'API key created successfully',
-          apiKey: user.apiKey
-        },
-        process.env.CORS_ORIGIN
-      );
-    }
+    // Return success response
+    return formatResponse(
+      200,
+      {
+        message: 'API key created successfully',
+        apiKey: user.apiKey
+      },
+      process.env.CORS_ORIGIN
+    );
   }
   catch (error) {
     console.error('Error processing signup:', error);

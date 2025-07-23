@@ -111,27 +111,6 @@ describe('Signup Lambda Function', () => {
     expect(email.sendWelcomeEmail).toHaveBeenCalledWith('test@example.com', 'test-api-key');
   });
 
-  it('should redirect to payment flow for premium tier', async () => {
-    const event = {
-      httpMethod: 'POST',
-      body: JSON.stringify({
-        email: 'test@example.com',
-        walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
-        tier: 'premium'
-      })
-    };
-
-    const response = await handler(event);
-    const body = JSON.parse(response.body);
-
-    expect(response.statusCode).toBe(200);
-    expect(body.message).toBe('Redirect to payment flow');
-    expect(body.redirectUrl).toBeDefined();
-
-    // Should not create API key or send email for premium tier
-    expect(apiKey.createUserWithApiKey).not.toHaveBeenCalled();
-    expect(email.sendWelcomeEmail).not.toHaveBeenCalled();
-  });
 
   it('should return 400 for invalid email', async () => {
     const event = {
@@ -190,7 +169,7 @@ describe('Signup Lambda Function', () => {
     const body = JSON.parse(response.body);
 
     expect(response.statusCode).toBe(409);
-    expect(body.error).toBe('Email already registered');
+    expect(body.error).toBe('Account already exists');
     expect(body.keyExists).toBe(true);
   });
 
