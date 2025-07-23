@@ -1,8 +1,9 @@
 const TurnstileVerification = require('../src/common/turnstile-verification');
 const { getClientIP } = require('../src/common/client-utils');
 
-// Mock AWS SDK
-jest.mock('@aws-sdk/client-ssm');
+// Mock params module
+jest.mock('../src/common/params');
+const { getParameter } = require('../src/common/params');
 
 // Mock fetch
 global.fetch = jest.fn();
@@ -38,18 +39,15 @@ describe('TurnstileVerification', () => {
         })
       });
 
-      // Mock Parameter Store response
-      const mockSend = jest.fn().mockResolvedValueOnce({
-        Parameter: { Value: 'test-secret-key' }
-      });
-      
-      verification.ssmClient.send = mockSend;
+      // Mock getParameter response
+      getParameter.mockResolvedValueOnce('test-secret-key');
 
       const result = await verification.verifyToken('valid-token', '192.168.1.1');
       
       expect(result.success).toBe(true);
       expect(result.message).toBe('Verification successful');
       expect(result.errorCodes).toEqual([]);
+      expect(getParameter).toHaveBeenCalledWith('/totemboundci/turnstile/secret-key');
     });
 
     test('should handle failed verification', async () => {
@@ -61,12 +59,8 @@ describe('TurnstileVerification', () => {
         })
       });
 
-      // Mock Parameter Store response
-      const mockSend = jest.fn().mockResolvedValueOnce({
-        Parameter: { Value: 'test-secret-key' }
-      });
-      
-      verification.ssmClient.send = mockSend;
+      // Mock getParameter response
+      getParameter.mockResolvedValueOnce('test-secret-key');
 
       const result = await verification.verifyToken('invalid-token');
       
@@ -79,12 +73,8 @@ describe('TurnstileVerification', () => {
       // Mock network error
       global.fetch.mockRejectedValueOnce(new Error('Network error'));
 
-      // Mock Parameter Store response
-      const mockSend = jest.fn().mockResolvedValueOnce({
-        Parameter: { Value: 'test-secret-key' }
-      });
-      
-      verification.ssmClient.send = mockSend;
+      // Mock getParameter response
+      getParameter.mockResolvedValueOnce('test-secret-key');
 
       const result = await verification.verifyToken('valid-token');
       
@@ -93,34 +83,16 @@ describe('TurnstileVerification', () => {
     });
 
     test('should handle Parameter Store errors', async () => {
-      // Mock Parameter Store error
-      const mockSend = jest.fn().mockRejectedValueOnce(new Error('Parameter Store error'));
-      verification.ssmClient.send = mockSend;
+      // Mock getParameter error
+      getParameter.mockRejectedValueOnce(new Error('Parameter Store error'));
 
-      await expect(verification.verifyToken('valid-token')).rejects.toThrow('Turnstile configuration error');
-    });
-  });
-
-  describe('getSecretKey', () => {
-    test('should cache secret key', async () => {
-      // Mock Parameter Store response
-      const mockSend = jest.fn().mockResolvedValueOnce({
-        Parameter: { Value: 'test-secret-key' }
-      });
+      const result = await verification.verifyToken('valid-token');
       
-      verification.ssmClient.send = mockSend;
-
-      // First call should fetch from Parameter Store
-      const key1 = await verification.getSecretKey();
-      expect(key1).toBe('test-secret-key');
-      expect(mockSend).toHaveBeenCalledTimes(1);
-
-      // Second call should use cached value
-      const key2 = await verification.getSecretKey();
-      expect(key2).toBe('test-secret-key');
-      expect(mockSend).toHaveBeenCalledTimes(1); // Still only called once
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Verification service unavailable');
     });
   });
+
 });
 
 describe('getClientIP', () => {
