@@ -10,7 +10,6 @@ const { getClientIP } = require('../common/client-utils');
  */
 exports.handler = async (event, context) => {
   // Debug logging for CORS configuration
-  console.log('CORS_ORIGIN environment variable:', process.env.CORS_ORIGIN);
   
   // Set up CORS headers
   const headers = {

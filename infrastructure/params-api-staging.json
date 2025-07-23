@@ -1,7 +1,7 @@
 {
     "Environment": "staging",
     "AppVersion": "0.0.1",
-    "CustomCorsOrigin": "http://localhost:3000",
+    "CustomCorsOrigin": "",
     "ForwarderAddress": "0x1234567890abcdef1234567890abcdef12345678",
     "GameAddress": "0xabcdef1234567890abcdef1234567890abcdef12",
     "NftAddress": "0x9876543210abcdef1234567890abcdef12345678",

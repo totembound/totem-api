@@ -1,4 +1,4 @@
-const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
+const { getParameter } = require('./params');
 
 /**
  * CloudFlare Turnstile Server-Side Verification Service
@@ -6,32 +6,9 @@ const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm');
  */
 class TurnstileVerification {
   constructor() {
-    this.ssmClient = new SSMClient({ region: process.env.AWS_REGION || 'us-east-1' });
     this.siteverifyUrl = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
-    this.secretKey = null;
   }
 
-  /**
-   * Retrieve Turnstile secret key from AWS Parameter Store
-   * @returns {Promise<string>} - Secret key
-   */
-  async getSecretKey() {
-    if (this.secretKey) return this.secretKey;
-
-    try {
-      const command = new GetParameterCommand({
-        Name: process.env.TURNSTILE_SECRET_KEY_NAME || '/totemboundci/turnstile/secret-key',
-        WithDecryption: true
-      });
-      const response = await this.ssmClient.send(command);
-      this.secretKey = response.Parameter.Value;
-      return this.secretKey;
-    }
-    catch (error) {
-      console.error('Failed to retrieve Turnstile secret key:', error);
-      throw new Error('Turnstile configuration error');
-    }
-  }
 
   /**
    * Verify Turnstile token with CloudFlare
@@ -45,7 +22,7 @@ class TurnstileVerification {
     }
 
     try {
-      const secretKey = await this.getSecretKey();
+      const secretKey = await getParameter(process.env.TURNSTILE_SECRET_KEY_NAME || '/totemboundci/turnstile/secret-key');
       
       const formData = new URLSearchParams({
         secret: secretKey,
