@@ -9,8 +9,6 @@ const { getClientIP } = require('../common/client-utils');
  * Handles user signup and API key creation
  */
 exports.handler = async (event, context) => {
-  // Debug logging for CORS configuration
-  
   // Set up CORS headers
   const headers = {
     'Access-Control-Allow-Origin': process.env.CORS_ORIGIN || '*',
