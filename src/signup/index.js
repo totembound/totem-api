@@ -45,6 +45,19 @@ exports.handler = async (event, context) => {
 
     const { email, walletAddress, tier = 'free', turnstileToken } = body;
 
+    // Validate inputs
+    const validationError = validateParams({ email, walletAddress }, ['email', 'walletAddress']);
+    if (validationError) {
+      return formatResponse(
+        validationError.statusCode,
+        {
+          error: validationError.error,
+          message: validationError.error
+        },
+        process.env.CORS_ORIGIN
+      );
+    }
+
     // Validate Turnstile token for free tier
     if (tier.toLowerCase() === 'free') {
       if (!turnstileToken) {
@@ -83,19 +96,6 @@ exports.handler = async (event, context) => {
       });
     }
 
-    // Validate inputs
-    const validationError = validateParams({ email, walletAddress }, ['email', 'walletAddress']);
-    if (validationError) {
-      return formatResponse(
-        validationError.statusCode,
-        {
-          error: validationError.error,
-          message: validationError.error
-        },
-        process.env.CORS_ORIGIN
-      );
-    }
-
     if (!validateEmail(email)) {
       return formatResponse(
         400,
@@ -128,30 +128,53 @@ exports.handler = async (event, context) => {
       );
     }
 
-    // For Free tier, create and send API key immediately
-    const clientIP = getClientIP(event);
-    const user = await createUserWithApiKey(normalizedEmail, normalizedWallet, 'free', clientIP);
+    if (tier.toLowerCase() === 'premium') {
+      // For Premium tier, redirect to payment flow
+      const clientIP = getClientIP(event);
 
-    // Log successful user account creation
-    console.log('User account created successfully:', {
-      email: normalizedEmail,
-      walletAddress: normalizedWallet,
-      tier: 'free',
-      clientIP: clientIP
-    });
+      // Log premium tier signup initiation
+      console.log('Premium tier signup initiated:', {
+        email: normalizedEmail,
+        walletAddress: normalizedWallet,
+        tier: 'premium',
+        clientIP: clientIP
+      });
 
-    // Send welcome email with API key
-    await sendWelcomeEmail(normalizedEmail, user.apiKey);
+      return formatResponse(
+        200,
+        {
+          message: 'Redirect to payment flow',
+          redirectUrl: `${process.env.PAYMENT_URL}?email=${encodeURIComponent(normalizedEmail)}&wallet=${encodeURIComponent(normalizedWallet)}`
+        },
+        process.env.CORS_ORIGIN
+      );
+    }
+    else {
+      // For Free tier, create and send API key immediately
+      const clientIP = getClientIP(event);
+      const user = await createUserWithApiKey(normalizedEmail, normalizedWallet, 'free', clientIP);
 
-    // Return success response
-    return formatResponse(
-      200,
-      {
-        message: 'API key created successfully',
-        apiKey: user.apiKey
-      },
-      process.env.CORS_ORIGIN
-    );
+      // Log successful user account creation
+      console.log('User account created successfully:', {
+        email: normalizedEmail,
+        walletAddress: normalizedWallet,
+        tier: 'free',
+        clientIP: clientIP
+      });
+
+      // Send welcome email with API key
+      await sendWelcomeEmail(normalizedEmail, user.apiKey);
+
+      // Return success response
+      return formatResponse(
+        200,
+        {
+          message: 'API key created successfully',
+          apiKey: user.apiKey
+        },
+        process.env.CORS_ORIGIN
+      );
+    }
   }
   catch (error) {
     console.error('Error processing signup:', error);

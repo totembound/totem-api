@@ -111,6 +111,27 @@ describe('Signup Lambda Function', () => {
     expect(email.sendWelcomeEmail).toHaveBeenCalledWith('test@example.com', 'test-api-key');
   });
 
+  it('should redirect to payment flow for premium tier', async () => {
+    const event = {
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        walletAddress: '0x1234567890abcdef1234567890abcdef12345678',
+        tier: 'premium'
+      })
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(200);
+    expect(body.message).toBe('Redirect to payment flow');
+    expect(body.redirectUrl).toBeDefined();
+
+    // Should not create API key or send email for premium tier
+    expect(apiKey.createUserWithApiKey).not.toHaveBeenCalled();
+    expect(email.sendWelcomeEmail).not.toHaveBeenCalled();
+  });
 
   it('should return 400 for invalid email', async () => {
     const event = {
@@ -264,5 +285,27 @@ describe('Signup Lambda Function', () => {
     expect(response.statusCode).toBe(400);
     expect(body.error).toBe('Missing verification');
     expect(body.field).toBe('turnstile');
+  });
+
+  it('should validate parameters before checking turnstile token', async () => {
+    const event = {
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        email: 'test@example.com',
+        // walletAddress is missing
+        tier: 'free',
+        turnstileToken: 'valid-token'
+      })
+    };
+
+    const response = await handler(event);
+    const body = JSON.parse(response.body);
+
+    expect(response.statusCode).toBe(400);
+    expect(body.error).toBe('Missing parameter: walletAddress');
+    
+    // Verify turnstile verification was not called since params failed first
+    const TurnstileVerificationInstance = new TurnstileVerification();
+    expect(TurnstileVerificationInstance.verifyToken).not.toHaveBeenCalled();
   });
 });
