@@ -58,6 +58,17 @@ exports.handler = async (event, context) => {
       );
     }
 
+    if (!validateEmail(email)) {
+      return formatResponse(
+        400,
+        {
+          error: 'Invalid email',
+          message: 'Please provide a valid email address'
+        },
+        process.env.CORS_ORIGIN
+      );
+    }
+
     // Validate Turnstile token for free tier
     if (tier.toLowerCase() === 'free') {
       if (!turnstileToken) {
@@ -94,17 +105,6 @@ exports.handler = async (event, context) => {
         ip: clientIP,
         email: email
       });
-    }
-
-    if (!validateEmail(email)) {
-      return formatResponse(
-        400,
-        {
-          error: 'Invalid email',
-          message: 'Please provide a valid email address'
-        },
-        process.env.CORS_ORIGIN
-      );
     }
 
     // Normalize inputs
