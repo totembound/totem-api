@@ -13,6 +13,7 @@
     "ForwarderPrivateKeySecretName": "/totemboundci/forwarder/private-key",
     "StripeSecretKeyName": "/totemboundci/stripe/secret-key",
     "StripeWebhookSecretName": "/totemboundci/stripe/webhook-secret",
+    "TurnstileSecretKeyName": "/totemboundci/turnstile/secret-key",
     "MaxGasPrice": "50",
     "MinWalletBalance": "0.1",
     "FromEmail": "no-reply@totembound-test.net"

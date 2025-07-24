@@ -86,6 +86,9 @@ STRIPE_PRICE_ID=price_...
 
 # Email Configuration
 EMAIL_FROM=no-reply@totembound.com
+
+# Turnstile Configuration (CloudFlare Captcha)
+TURNSTILE_SECRET_KEY_NAME=/path/secret-key
 ```
 
 ## Deployment

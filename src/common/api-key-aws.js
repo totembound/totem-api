@@ -63,9 +63,10 @@ exports.createApiKey = async (email, walletAddress, tier = 'free') => {
  * @param {string} email - User email
  * @param {string} walletAddress - Ethereum wallet address
  * @param {string} tier - Tier (free or premium)
+ * @param {string} clientIP - Client IP address
  * @returns {Promise<object>} - Created user with API key
  */
-exports.createUserWithApiKey = async (email, walletAddress, tier = 'free') => {
+exports.createUserWithApiKey = async (email, walletAddress, tier = 'free', clientIP = null) => {
   // Normalize inputs
   const normalizedEmail = email.toLowerCase();
   const normalizedWallet = normalizeAddress(walletAddress);
@@ -89,7 +90,8 @@ exports.createUserWithApiKey = async (email, walletAddress, tier = 'free') => {
     apiKeyId,
     apiKey,
     tier,
-    transactionCount: 0
+    transactionCount: 0,
+    clientIP
   });
 
   return {
