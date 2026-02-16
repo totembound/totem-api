@@ -1,0 +1,59 @@
+{
+  "version": "1.0.0",
+  "boxes": {
+    "uncommon_totem_box": {
+      "id": "uncommon_totem_box",
+      "name": "Uncommon Totem Box",
+      "description": "Contains an Uncommon totem. Choose your species!",
+      "icon": "egg",
+      "rarity": "uncommon",
+      "type": "totem_box",
+      "config": {
+        "rarityId": 1,
+        "userChooses": ["species"],
+        "randomized": ["color"]
+      }
+    },
+    "rare_totem_box": {
+      "id": "rare_totem_box",
+      "name": "Rare Totem Box",
+      "description": "Contains a Rare totem. Choose your species!",
+      "icon": "egg",
+      "rarity": "rare",
+      "type": "totem_box",
+      "config": {
+        "rarityId": 2,
+        "userChooses": ["species"],
+        "randomized": ["color"]
+      }
+    },
+    "essence_box_small": {
+      "id": "essence_box_small",
+      "name": "Small Essence Box",
+      "description": "Contains 200-500 Essence",
+      "icon": "sparkles",
+      "rarity": "common",
+      "type": "essence_box",
+      "config": {
+        "minAmount": 200,
+        "maxAmount": 500,
+        "userChooses": [],
+        "randomized": ["amount"]
+      }
+    },
+    "essence_box_large": {
+      "id": "essence_box_large",
+      "name": "Large Essence Box",
+      "description": "Contains 1000-2500 Essence",
+      "icon": "sparkles",
+      "rarity": "rare",
+      "type": "essence_box",
+      "config": {
+        "minAmount": 1000,
+        "maxAmount": 2500,
+        "userChooses": [],
+        "randomized": ["amount"]
+      }
+    }
+  }
+}

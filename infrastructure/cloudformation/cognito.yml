@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TotemBound - Cognito User Pool for Authentication'
+
+Mappings:
+  EnvironmentMap:
+    staging:
+      ResourcePrefix: totemboundci
+      CallbackUrl: https://totembound-test.net
+    prod:
+      ResourcePrefix: totembound
+      CallbackUrl: https://totembound.com
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues:
+      - staging
+      - prod
+    Description: Deployment environment
+
+Resources:
+  # Cognito User Pool
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub
+        - "${Prefix}-user-pool"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+
+      # Email sign-in
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+      # Password policy
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireUppercase: false
+          RequireSymbols: false
+          TemporaryPasswordValidityDays: 7
+
+      # Custom attributes for game data
+      Schema:
+        - Name: userId
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '64'
+        - Name: displayName
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '50'
+        - Name: tier
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '20'
+
+      # Email configuration
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+
+      # Account recovery
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+      # User pool settings
+      MfaConfiguration: 'OFF'
+      UserPoolAddOns:
+        AdvancedSecurityMode: 'OFF'
+
+  # App Client (for frontend)
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub
+        - "${Prefix}-app-client"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+
+      # Auth flows
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+
+      # Token validity
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+      # Prevent user existence errors
+      PreventUserExistenceErrors: ENABLED
+
+      # Read/write attributes
+      ReadAttributes:
+        - email
+        - email_verified
+        - custom:userId
+        - custom:displayName
+        - custom:tier
+      WriteAttributes:
+        - email
+        - custom:userId
+        - custom:displayName
+        - custom:tier
+
+Outputs:
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolId"
+
+  UserPoolArn:
+    Description: Cognito User Pool ARN
+    Value: !GetAtt UserPool.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolArn"
+
+  UserPoolClientId:
+    Description: Cognito App Client ID
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolClientId"
+
+  UserPoolProviderUrl:
+    Description: Cognito Provider URL (for JWT issuer validation)
+    Value: !GetAtt UserPool.ProviderURL
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolProviderUrl"

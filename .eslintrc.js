@@ -40,7 +40,7 @@ module.exports = {
     "curly": ["error", "multi-line"],
     
     // Async
-    "require-await": "error",
+    "require-await": "off",
     
     // Jest specific rules
     "jest/no-disabled-tests": "warn",
@@ -48,5 +48,15 @@ module.exports = {
     "jest/no-identical-title": "error",
     "jest/prefer-to-have-length": "warn",
     "jest/valid-expect": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["test/**/*.js"],
+      "rules": {
+        "arrow-body-style": "off",
+        "brace-style": "off",
+        "require-await": "off"
+      }
+    }
+  ]
 };

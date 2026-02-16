@@ -157,38 +157,6 @@ jest.mock('stripe', () => {
     }));
 });
 
-// Mock ethers library
-jest.mock('ethers', () => {
-    return {
-        JsonRpcProvider: jest.fn().mockImplementation(() => ({
-            getBalance: jest.fn().mockResolvedValue(BigInt('1000000000000000000')), // 1 ETH
-            getFeeData: jest.fn().mockResolvedValue({
-                gasPrice: BigInt('2000000000') // 2 gwei
-            })
-        })),
-        Wallet: jest.fn().mockImplementation(() => ({
-            address: '0xrelayeraddress',
-            provider: {
-                getBalance: jest.fn().mockResolvedValue(BigInt('1000000000000000000'))
-            },
-            connect: () => ({})
-        })),
-        Contract: jest.fn().mockImplementation(() => ({
-            verify: jest.fn().mockResolvedValue(true),
-            relay: jest.fn().mockResolvedValue({
-                hash: '0xtesthash',
-                wait: jest.fn().mockResolvedValue({ hash: '0xtesthash' })
-            })
-        })),
-        formatEther: jest.fn().mockImplementation(() => '1.0'),
-        formatUnits: jest.fn().mockImplementation(() => '2.0'),
-        parseEther: jest.fn().mockImplementation(() => BigInt('1000000000000000000')),
-        parseUnits: jest.fn().mockImplementation(() => BigInt('2000000000')),
-        ZeroAddress: '0x0000000000000000000000000000000000000000',
-        MaxUint256: BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')
-    };
-});
-
 // Mock console methods to reduce noise in tests
 // Comment this out if you want to see console output during tests
 global.console = {

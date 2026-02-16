@@ -1,20 +1,8 @@
 {
     "Environment": "staging",
     "AppVersion": "0.0.1",
-    "CustomCorsOrigin": "",
-    "ForwarderAddress": "0x1234567890abcdef1234567890abcdef12345678",
-    "GameAddress": "0xabcdef1234567890abcdef1234567890abcdef12",
-    "NftAddress": "0x9876543210abcdef1234567890abcdef12345678",
-    "TokenAddress": "0xfedcba9876543210abcdef1234567890abcdef12",
-    "RewardsAddress": "0x1234abcdef9876543210abcdef1234567890abcd",
-    "ShopAddress": "0x1234abcdef9876543210abcdef1234567890abcd",
-    "ExpeditionsAddress": "0x1234abcdef9876543210abcdef1234567890abcd",
-    "RpcEndpointUrlName": "/totemboundci/forwarder/rpc-endpoint-url",
-    "ForwarderPrivateKeySecretName": "/totemboundci/forwarder/private-key",
-    "StripeSecretKeyName": "/totemboundci/stripe/secret-key",
-    "StripeWebhookSecretName": "/totemboundci/stripe/webhook-secret",
+    "StripeSecretKeyParam": "/totemboundci/stripe/secret-key",
+    "StripeWebhookSecretParam": "/totemboundci/stripe/webhook-secret",
     "TurnstileSecretKeyName": "/totemboundci/turnstile/secret-key",
-    "MaxGasPrice": "50",
-    "MinWalletBalance": "0.1",
     "FromEmail": "no-reply@totembound-test.net"
 }

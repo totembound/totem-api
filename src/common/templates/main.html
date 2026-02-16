@@ -3,8 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="light dark">
-    <meta name="supported-color-schemes" content="light dark">
     <title>{{subject}}</title>
     <style>
         /* Base styles */
@@ -13,30 +11,30 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         /* Reset for email clients */
         #outlook a {padding:0;}
         .ExternalClass {width:100%;}
         .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div {line-height: 100%;}
         table, td {mso-table-lspace:0pt; mso-table-rspace:0pt;}
         img {-ms-interpolation-mode:bicubic; border:0;}
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: #e5e7eb;
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
+            background-color: #111827;
         }
         .container {
             max-width: 600px;
             margin: 0 auto;
-            background-color: #ffffff;
+            background-color: #1f2937;
             border-radius: 8px;
             overflow: hidden;
             margin-top: 1rem;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
         .header {
             padding: 20px;
@@ -44,7 +42,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            background-color: #2a2a2a;
+            background-color: #111827;
         }
         .logo-container {
             display: flex;
@@ -62,54 +60,6 @@
             font-weight: bold;
             text-shadow: 0 1px 3px rgba(0,0,0,0.3);
         }
-        
-        /* Dark mode support */
-        @media (prefers-color-scheme: dark) {
-            body {
-                background-color: #121212 !important;
-                color: #f5f5f5 !important;
-            }
-            .container {
-                background-color: #1e1e1e !important;
-                box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
-            }
-            h1, h2, h3, h4, h5, h6 {
-                color: #e1e1e1 !important;
-            }
-            .header {
-                background-color: #2a2a2a !important;
-             }
-            .footer {
-                background-color: #2a2a2a !important;
-                color: #b0b0b0 !important;
-                border-top: 1px solid #333333 !important;
-            }
-            .api-key {
-                background-color: #2a2a2a !important;
-                border: 1px solid #444444 !important;
-            }
-            .info-box {
-                background-color: #2a2a2a !important;
-                border-left: 4px solid #3498db !important;
-            }
-            .footer-links a {
-                color: #66b2ff !important;
-            }
-        }
-        
-        /* Light mode explicit styles to override dark mode in clients that support both */
-        @media (prefers-color-scheme: light) {
-            body {
-                background-color: #f4f4f4 !important;
-                color: #333 !important;
-            }
-            .container {
-                background-color: #ffffff !important;
-            }
-            h1, h2, h3, h4, h5, h6 {
-                color: #2c3e50 !important;
-            }
-        }
 
         ol, ul {
             padding-left: 20px;
@@ -118,6 +68,7 @@
         li {
             margin-bottom: 8px;
             padding-left: 5px;
+            color: #d1d5db;
         }
         ul li {
             list-style-position: outside;
@@ -125,43 +76,53 @@
         ol li {
             list-style-position: outside;
         }
-        
+
         .content {
             padding: 30px;
         }
+        .content p {
+            color: #d1d5db;
+        }
+        .content a {
+            color: #a78bfa;
+        }
         .footer {
-            background-color: #f8f9fa;
+            background-color: #111827;
             padding: 20px;
             text-align: center;
             font-size: 12px;
-            color: #6c757d;
-            border-top: 1px solid #e9ecef;
+            color: #9ca3af;
+            border-top: 1px solid #374151;
         }
         .button {
             display: inline-block;
-            background-color: #3498db;
+            background-color: #7c3aed;
             color: white;
             text-decoration: none;
             padding: 12px 24px;
-            border-radius: 4px;
+            border-radius: 8px;
             font-weight: bold;
             margin: 20px 0;
         }
-        .button:hover {
-            background-color: #2980b9;
-        }
         .api-key {
-            background-color: #f8f9fa;
+            background-color: #374151;
             padding: 15px;
             border-radius: 4px;
             font-family: monospace;
             font-size: 16px;
-            border: 1px solid #e9ecef;
+            border: 1px solid #4b5563;
             margin: 15px 0;
+            color: #e5e7eb;
         }
         h1 {
-            color: #2c3e50;
+            color: #f3f4f6;
             margin-top: 0;
+        }
+        h2, h3 {
+            color: #e5e7eb;
+        }
+        strong {
+            color: #f3f4f6;
         }
         .social-links {
             margin: 15px 0;
@@ -169,35 +130,36 @@
         .social-links a {
             display: inline-block;
             margin: 0 10px;
-            color: #3498db;
+            color: #a78bfa;
             text-decoration: none;
         }
         .divider {
-            border-top: 1px solid #e9ecef;
+            border-top: 1px solid #374151;
             margin: 20px 0;
         }
         .info-box {
-            background-color: #f8f9fa;
+            background-color: #374151;
             padding: 15px;
             border-radius: 4px;
-            border-left: 4px solid #3498db;
+            border-left: 4px solid #7c3aed;
             margin: 15px 0;
+            color: #d1d5db;
         }
         .footer-links a {
-            color: #3498db;
+            color: #a78bfa;
             text-decoration: none;
             margin: 0 10px;
         }
     </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333333; background-color: #f4f4f4;">
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #e5e7eb; background-color: #111827;">
     <!--[if mso]>
     <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="width:600px;">
     <tr>
     <td>
     <![endif]-->
-    <div class="container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden;">
-        <div class="header" style="padding: 20px; text-align: center; background-color: #2a2a2a;">
+    <div class="container" style="max-width: 600px; margin: 0 auto; background-color: #1f2937; border-radius: 8px; overflow: hidden;">
+        <div class="header" style="padding: 20px; text-align: center; background-color: #111827;">
             <div class="logo-container" style="display: inline-block;">
                 <a href="{{appUrl}}" style="text-decoration: none;">
                     <img src="https://totembound.com/tb-logo-180.png" alt="TotemBound Logo" class="logo" style="width: 60px; height: 60px; vertical-align: middle; margin-right: 15px;">
@@ -205,37 +167,37 @@
                 </a>
             </div>
         </div>
-        
-        <div class="content" style="padding: 30px; background-color: #ffffff; color: #333333;">
+
+        <div class="content" style="padding: 30px; background-color: #1f2937; color: #e5e7eb;">
             {{content}}
         </div>
-        
-        <div class="footer" style="background-color: #2a2a2a; padding: 20px; text-align: center; font-size: 12px; color: #b0b0b0; border-top: 1px solid #333333;">
-            <div class="info-box" style="background-color: #3a3a3a; padding: 15px; border-radius: 4px; border-left: 4px solid #3498db; margin: 15px 0; color: #e0e0e0;">
-                <strong>Why am I receiving this email?</strong>
-                <p>This email was sent because it contains important information about your account.
+
+        <div class="footer" style="background-color: #111827; padding: 20px; text-align: center; font-size: 12px; color: #9ca3af; border-top: 1px solid #374151;">
+            <div class="info-box" style="background-color: #374151; padding: 15px; border-radius: 4px; border-left: 4px solid #7c3aed; margin: 15px 0; color: #d1d5db;">
+                <strong style="color: #f3f4f6;">Why am I receiving this email?</strong>
+                <p style="color: #d1d5db;">This email was sent because it contains important information about your account.
                 If you have previously unsubscribed from TotemBound emails, you will still receive essential notifications about your account status.
                 You can update preferences anytime in your Account Settings.</p>
             </div>
-            
+
             <div class="social-links" style="margin: 15px 0;">
-                <a href="{{appUrl}}" style="color: #66b2ff; text-decoration: none; margin: 0 10px;">Dashboard</a>
+                <a href="{{appUrl}}" style="color: #a78bfa; text-decoration: none; margin: 0 10px;">Dashboard</a>
                 |
-                <a href="https://github.com/totembound" target="_blank" rel="noopener noreferrer" style="color: #66b2ff; text-decoration: none; margin: 0 10px;">GitHub</a>
+                <a href="https://github.com/totembound" target="_blank" rel="noopener noreferrer" style="color: #a78bfa; text-decoration: none; margin: 0 10px;">GitHub</a>
                 |
-                <a href="https://linkedin.com/company/totembound" target="_blank" rel="noopener noreferrer" style="color: #66b2ff; text-decoration: none; margin: 0 10px;"><span>LinkedIn</span></a>
+                <a href="https://linkedin.com/company/totembound" target="_blank" rel="noopener noreferrer" style="color: #a78bfa; text-decoration: none; margin: 0 10px;"><span>LinkedIn</span></a>
                 |
-                <a href="https://x.com/totemboundhq" target="_blank" rel="noopener noreferrer" style="color: #66b2ff; text-decoration: none; margin: 0 10px;"><span>X</span></a>
+                <a href="https://x.com/totemboundhq" target="_blank" rel="noopener noreferrer" style="color: #a78bfa; text-decoration: none; margin: 0 10px;"><span>X</span></a>
             </div>
-            
-            <div class="divider"></div>
-            
+
+            <div class="divider" style="border-top: 1px solid #374151; margin: 20px 0;"></div>
+
             <div class="footer-links" style="margin: 10px 0;">
-                <a href="{{appUrl}}/terms" style="color: #66b2ff; text-decoration: none; margin: 0 5px;">Terms of Service</a> |
-                <a href="{{appUrl}}/privacy" style="color: #66b2ff; text-decoration: none; margin: 0 5px;">Privacy Policy</a>
+                <a href="{{appUrl}}/terms" style="color: #a78bfa; text-decoration: none; margin: 0 5px;">Terms of Service</a> |
+                <a href="{{appUrl}}/privacy" style="color: #a78bfa; text-decoration: none; margin: 0 5px;">Privacy Policy</a>
             </div>
-            
-            <p style="color: #b0b0b0; margin-top: 10px;">Copyright © {{currentYear}} TotemBound. All rights reserved.</p>
+
+            <p style="color: #9ca3af; margin-top: 10px;">Copyright &copy; {{currentYear}} TotemBound. All rights reserved.</p>
         </div>
     </div>
     <!--[if mso]>

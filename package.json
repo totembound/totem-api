@@ -1,7 +1,7 @@
 {
     "name": "totem-api",
     "version": "0.0.1",
-    "description": "TotemBound API for gasless transaction relay and user management",
+    "description": "TotemBound REST API - serverless backend for game actions and user management",
     "main": "index.js",
     "scripts": {
         "test": "jest --verbose",
@@ -12,25 +12,29 @@
         "lint:fix": "eslint src/**/*.js --fix",
         "build": "node scripts/build.js",
         "package": "node scripts/package.js",
-        "start:relay": "node scripts/local-dev.js relay",
         "start:signup": "node scripts/local-dev.js signup",
         "start:premium": "node scripts/local-dev.js premium",
         "start:checkout": "node scripts/local-dev.js checkout",
-        "start:all": "concurrently \"npm run start:relay\" \"npm run start:signup\" \"npm run start:premium\" \"npm run start:checkout\"",
         "clean": "rimraf dist node_modules/.cache",
-        "prepare": "husky install"
+        "prepare": "husky install",
+        "dev:local": "IS_LOCAL=true nodemon --watch src src/local-server.js",
+        "docker:up": "cd docker && docker compose up -d",
+        "docker:down": "cd docker && docker compose down",
+        "docker:logs": "cd docker && docker compose logs -f",
+        "db:init": "node scripts/init-tables.js",
+        "setup:local": "bash scripts/setup-local.sh",
+        "token:generate": "node scripts/generate-test-token.js"
     },
     "repository": {
         "type": "git",
         "url": "git+https://github.com/totembound/totem-api.git"
     },
     "keywords": [
-        "blockchain",
         "lambda",
         "serverless",
         "api-gateway",
-        "gasless",
-        "transactions"
+        "game-api",
+        "rest-api"
     ],
     "author": "TotemBound Team",
     "license": "MIT",
@@ -39,27 +43,39 @@
     },
     "homepage": "https://github.com/totembound/totem-api#readme",
     "dependencies": {
-        "@aws-sdk/client-api-gateway": "^3.454.0",
-        "@aws-sdk/client-cloudformation": "^3.454.0",
+        "@aws-sdk/client-cognito-identity-provider": "^3.985.0",
         "@aws-sdk/client-dynamodb": "^3.454.0",
-        "@aws-sdk/client-lambda": "^3.454.0",
-        "@aws-sdk/client-s3": "^3.454.0",
+        "@aws-sdk/client-iot": "^3.454.0",
+        "@aws-sdk/client-iot-data-plane": "^3.454.0",
         "@aws-sdk/client-ses": "^3.454.0",
+        "@aws-sdk/client-ssm": "^3.454.0",
         "@aws-sdk/lib-dynamodb": "^3.454.0",
         "@aws-sdk/util-dynamodb": "^3.454.0",
-        "@aws-sdk/client-ssm": "^3.454.0",
+        "@smithy/node-http-handler": "^4.4.9",
+        "cors": "^2.8.6",
         "dotenv": "^16.3.1",
-        "ethers": "^6.7.1",
         "express": "^4.18.2",
         "helmet": "^7.0.0",
+        "jsonwebtoken": "^9.0.3",
+        "nodemailer": "^8.0.0",
+        "serverless-http": "^3.2.0",
         "stripe": "^13.3.0",
+        "ulid": "^3.0.2",
         "uuid": "^9.0.0"
     },
     "devDependencies": {
+        "@aws-sdk/client-api-gateway": "^3.454.0",
+        "@aws-sdk/client-cloudformation": "^3.454.0",
+        "@aws-sdk/client-lambda": "^3.454.0",
+        "@aws-sdk/client-s3": "^3.454.0",
+        "@csstools/css-parser-algorithms": "^4.0.0",
         "@typescript-eslint/eslint-plugin": "^5.62.0",
         "@typescript-eslint/parser": "^5.62.0",
         "aws-sdk-mock": "^5.8.0",
+        "aws4": "^1.13.2",
         "chalk": "^4.1.2",
+        "swagger-jsdoc": "^6.2.8",
+        "swagger-ui-express": "^5.0.1",
         "concurrently": "^8.2.1",
         "cross-env": "^7.0.3",
         "eslint": "^8.47.0",
@@ -77,15 +93,24 @@
         "nodemon": "^3.0.1",
         "prettier": "^3.5.3",
         "rimraf": "^5.0.1",
-        "serverless-http": "^3.2.0",
-        "sinon": "^15.2.0"
+        "sinon": "^15.2.0",
+        "socket.io": "^4.8.3"
     },
     "jest": {
         "testEnvironment": "node",
         "collectCoverageFrom": [
             "src/**/*.js",
             "!src/**/templates/**",
-            "!**/node_modules/**"
+            "!**/node_modules/**",
+            "!src/app.js",
+            "!src/lambda.js",
+            "!src/local-server.js",
+            "!src/routes/api-docs.js",
+            "!src/types/api-responses.js",
+            "!src/common/db-client.js",
+            "!src/common/cognito-client.js",
+            "!src/common/email.js",
+            "!src/common/iot-publisher.js"
         ],
         "coverageThreshold": {
             "global": {

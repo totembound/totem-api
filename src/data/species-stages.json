@@ -1,0 +1,79 @@
+{
+  "description": "Species-specific stage names from metadata JSON files",
+  "species": {
+    "goose": {
+      "id": 0,
+      "name": "Mystic Goose",
+      "stages": ["Hatchling", "Gosling", "Sentinel", "Guardian", "Wise Elder"]
+    },
+    "otter": {
+      "id": 1,
+      "name": "Spirit Otter",
+      "stages": ["Pup", "Splash", "Glide", "Guardian", "Wise Elder"]
+    },
+    "wolf": {
+      "id": 2,
+      "name": "Shadow Wolf",
+      "stages": ["Pup", "Howler", "Stalker", "Alpha", "Wise Elder"]
+    },
+    "falcon": {
+      "id": 3,
+      "name": "Swift Falcon",
+      "stages": ["Hatchling", "Fledgling", "Hunter", "Raptor", "Wise Elder"]
+    },
+    "beaver": {
+      "id": 4,
+      "name": "Steadfast Beaver",
+      "stages": ["Kit", "Youngling", "Builder", "Warden", "Wise Elder"]
+    },
+    "deer": {
+      "id": 5,
+      "name": "Graceful Deer",
+      "stages": ["Fawn", "Yearling", "Stag", "Warden", "Wise Elder"]
+    },
+    "woodpecker": {
+      "id": 6,
+      "name": "Nimble Woodpecker",
+      "stages": ["Hatchling", "Chick", "Drummer", "Tapper", "Wise Elder"]
+    },
+    "turtle": {
+      "id": 7,
+      "name": "Ancient Turtle",
+      "stages": ["Hatchling", "Swimmer", "Shell", "Guardian", "Wise Elder"]
+    },
+    "bear": {
+      "id": 8,
+      "name": "Mighty Bear",
+      "stages": ["Cub", "Yearling", "Forager", "Guardian", "Wise Elder"]
+    },
+    "raven": {
+      "id": 9,
+      "name": "Clever Raven",
+      "stages": ["Hatchling", "Fledgling", "Trickster", "Oracle", "Wise Elder"]
+    },
+    "snake": {
+      "id": 10,
+      "name": "Wise Snake",
+      "stages": ["Hatchling", "Slider", "Coiler", "Serpent", "Wise Elder"]
+    },
+    "owl": {
+      "id": 11,
+      "name": "Wise Owl",
+      "stages": ["Hatchling", "Chick", "Juvenile", "Adult", "Wise Elder"]
+    }
+  },
+  "speciesById": {
+    "0": "goose",
+    "1": "otter",
+    "2": "wolf",
+    "3": "falcon",
+    "4": "beaver",
+    "5": "deer",
+    "6": "woodpecker",
+    "7": "turtle",
+    "8": "bear",
+    "9": "raven",
+    "10": "snake",
+    "11": "owl"
+  }
+}
