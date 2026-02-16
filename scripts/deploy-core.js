@@ -14,10 +14,6 @@ const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
 
-// Configuration
-const CORE_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'core.yml');
-const prefix = 'totembound';
-
 // Get environment from command line args
 const environment = process.argv[2];
 if (!environment) {
@@ -34,6 +30,10 @@ if (!validEnvironments.includes(environment)) {
   console.log(chalk.cyan(`Available environments: ${validEnvironments.join(', ')}`));
   process.exit(1);
 }
+
+// Configuration
+const CORE_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'core.yml');
+const prefix = environment === 'prod' ? 'totembound' : 'totemboundci';
 
 // Get version
 const packageJson = require('../package.json');

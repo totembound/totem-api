@@ -1,0 +1,49 @@
+graph TD
+    User[User Browser] --> CF[CloudFront CDN]
+    CF --> S3[S3 Static Hosting]
+    S3 --> App[React App - Vite/TypeScript]
+
+    App --> APIGW[API Gateway - REST]
+    APIGW --> CogAuth{Cognito Authorizer}
+
+    CogAuth -->|Auth Routes - No Auth| Lambda[Lambda Function - Express]
+    CogAuth -->|Protected Routes - JWT| Lambda
+
+    Lambda --> DDB[(DynamoDB - 9 Tables)]
+    Lambda --> Cognito[Cognito User Pool]
+    Lambda --> SES[AWS SES]
+    Lambda --> SSM[SSM Parameter Store]
+    Lambda --> IoT[IoT Core]
+    Lambda --> StripeAPI[Stripe API]
+
+    App --> StaticJSON[Static Config - 7 JSON Files]
+    IoT --> |MQTT WebSocket| App
+
+    subgraph "Frontend - totem-app"
+        App
+        StaticJSON
+    end
+
+    subgraph "AWS Backend - totem-api"
+        APIGW
+        CogAuth
+        Lambda
+        DDB
+        Cognito
+        SES
+        SSM
+        IoT
+    end
+
+    subgraph "External Services"
+        StripeAPI
+        CF
+    end
+
+    classDef aws fill:#FF9900,stroke:#232F3E,color:white
+    classDef app fill:#36B37E,stroke:#006644,color:white
+    classDef ext fill:#6772E5,stroke:#32325D,color:white
+
+    class APIGW,CogAuth,Lambda,DDB,Cognito,SES,SSM,IoT aws
+    class User,App,StaticJSON app
+    class StripeAPI,CF,S3 ext

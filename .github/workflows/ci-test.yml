@@ -20,12 +20,6 @@ jobs:
       with:
         path: totem-api
 
-    - name: Checkout contracts repo
-      uses: actions/checkout@v4
-      with:
-        repository: totembound/totem-contracts
-        path: totem-contracts
-
     - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
@@ -41,34 +35,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-node-
 
-    - name: Install Contracts dependencies
-      working-directory: ./totem-contracts
-      run: npm install
-
-    - name: Compile Contracts
-      working-directory: ./totem-contracts
-      run: npx hardhat compile
-
-    - name: Export Contract ABIs
-      working-directory: ./totem-contracts
-      run: npx hardhat export-abi --dest api
-
     - name: Install API dependencies
       working-directory: ./totem-api
       run: npm install
 
     - name: Run ESLint
       working-directory: ./totem-api
-      continue-on-error: true
       run: npm run lint
 
     - name: Build
       working-directory: ./totem-api
       env:
-        CI: false # Prevents build from treating warnings as errors
+        CI: false
       run: npm run build
 
     - name: Run tests
       working-directory: ./totem-api
       run: npm run test
-

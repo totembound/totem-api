@@ -1,0 +1,140 @@
+{
+  "UserPoolDefaults": {
+    "UsernameAttributes": [
+      "email"
+    ],
+    "AutoVerifiedAttributes": [
+      "email"
+    ],
+    "MfaConfiguration": "OFF",
+    "Policies": {
+      "PasswordPolicy": {
+        "MinimumLength": 8,
+        "RequireLowercase": true,
+        "RequireUppercase": true,
+        "RequireNumbers": true,
+        "RequireSymbols": false
+      }
+    }
+  },
+  "TriggerFunctions": {},
+  "UserPools": {
+    "totembound-local": {
+      "Id": "local_totembound",
+      "Name": "TotemBound Local",
+      "UsernameAttributes": [
+        "email"
+      ],
+      "AutoVerifiedAttributes": [
+        "email"
+      ],
+      "Clients": {
+        "totembound-app": {
+          "ClientId": "totembound-local-client",
+          "ClientName": "TotemBound App",
+          "UserPoolId": "local_totembound",
+          "ExplicitAuthFlows": [
+            "ALLOW_USER_PASSWORD_AUTH",
+            "ALLOW_REFRESH_TOKEN_AUTH",
+            "ALLOW_USER_SRP_AUTH"
+          ],
+          "GenerateSecret": false,
+          "RefreshTokenValidity": 30,
+          "AccessTokenValidity": 1,
+          "IdTokenValidity": 1,
+          "TokenValidityUnits": {
+            "AccessToken": "hours",
+            "IdToken": "hours",
+            "RefreshToken": "days"
+          }
+        }
+      },
+      "Users": [
+        {
+          "Username": "testplayer1@example.com",
+          "Password": "TestPassword123!",
+          "Attributes": [
+            {
+              "Name": "email",
+              "Value": "testplayer1@example.com"
+            },
+            {
+              "Name": "email_verified",
+              "Value": "true"
+            },
+            {
+              "Name": "custom:userId",
+              "Value": "usr_a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+            },
+            {
+              "Name": "custom:displayName",
+              "Value": "TestPlayer1"
+            },
+            {
+              "Name": "custom:tier",
+              "Value": "free"
+            }
+          ],
+          "Enabled": true,
+          "UserStatus": "CONFIRMED"
+        },
+        {
+          "Username": "premiumplayer@example.com",
+          "Password": "TestPassword123!",
+          "Attributes": [
+            {
+              "Name": "email",
+              "Value": "premiumplayer@example.com"
+            },
+            {
+              "Name": "email_verified",
+              "Value": "true"
+            },
+            {
+              "Name": "custom:userId",
+              "Value": "usr_b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            },
+            {
+              "Name": "custom:displayName",
+              "Value": "PremiumPlayer"
+            },
+            {
+              "Name": "custom:tier",
+              "Value": "premium"
+            }
+          ],
+          "Enabled": true,
+          "UserStatus": "CONFIRMED"
+        },
+        {
+          "Username": "vipplayer@example.com",
+          "Password": "TestPassword123!",
+          "Attributes": [
+            {
+              "Name": "email",
+              "Value": "vipplayer@example.com"
+            },
+            {
+              "Name": "email_verified",
+              "Value": "true"
+            },
+            {
+              "Name": "custom:userId",
+              "Value": "usr_c3d4e5f6-a7b8-9012-cdef-123456789012"
+            },
+            {
+              "Name": "custom:displayName",
+              "Value": "VIPPlayer"
+            },
+            {
+              "Name": "custom:tier",
+              "Value": "vip"
+            }
+          ],
+          "Enabled": true,
+          "UserStatus": "CONFIRMED"
+        }
+      ]
+    }
+  }
+}

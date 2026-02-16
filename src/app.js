@@ -1,0 +1,1220 @@
+/**
+ * TotemBound Express Application
+ *
+ * Shared Express app used by both:
+ * - local-server.js (local development with .listen())
+ * - lambda.js (AWS Lambda via serverless-http)
+ *
+ * Contains all routes, middleware, and error handling.
+ * Does NOT call app.listen() - that's the caller's responsibility.
+ */
+
+const express = require('express');
+const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const { getSecret } = require('./common/ssm-loader');
+
+// Import auth handlers
+const {
+  handleSignup,
+  handleLogin,
+  handleLogout,
+  handleRefresh,
+  handleGetMe,
+  handleVerify,
+  handleResendVerification,
+  handleForgotPassword,
+  handleResetPassword,
+} = require('./auth');
+
+const app = express();
+
+// ============================================
+// CORS Configuration
+// ============================================
+const IS_LOCAL = process.env.IS_LOCAL === 'true';
+
+const defaultOrigins = IS_LOCAL
+  ? ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002', 'http://localhost:3003']
+  : [];
+
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map(o => o.trim())
+  : defaultOrigins;
+
+app.use(cors({
+  origin: corsOrigins.length > 0 ? corsOrigins : true,
+  credentials: true,
+  maxAge: 86400, // 24hrs - browser caches preflight, skips OPTIONS for repeat requests
+}));
+
+// JSON body parser - skip for webhook routes (need raw body for signature verification)
+app.use((req, res, next) => {
+  if (req.originalUrl === '/webhooks/stripe') {
+    next();
+  }
+  else {
+    express.json()(req, res, next);
+  }
+});
+
+// Request timing + logging
+// Emits structured JSON on every response for CloudWatch Logs Insights queries.
+// Tracks cold starts via global flag (reset on Lambda container init).
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const ms = Number(process.hrtime.bigint() - start) / 1e6;
+    console.log(JSON.stringify({
+      ts: new Date().toISOString(),
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      ms: Math.round(ms),
+      cold: !global.__lambdaWarm,
+    }));
+    global.__lambdaWarm = true;
+  });
+  next();
+});
+
+// ============================================
+// JWT Verification Middleware
+// ============================================
+// In local mode: decode JWT without verification (Cognito Local handles auth)
+// In Lambda mode: API Gateway Cognito Authorizer validates JWT before Lambda is invoked,
+//   so we read the authorizer claims from the event context.
+// ============================================
+const authenticateJWT = (req, res, next) => {
+  // Lambda + API Gateway Cognito Authorizer path
+  // serverless-http sets requestContext on req when running in Lambda
+  if (!IS_LOCAL && req.requestContext && req.requestContext.authorizer) {
+    const claims = req.requestContext.authorizer.claims || req.requestContext.authorizer;
+    const email = claims.email || claims.username || '';
+    req.user = {
+      userId: claims['custom:userId'] || claims.sub,
+      email: email,
+      displayName: claims['custom:displayName'] || (email ? email.split('@')[0] : 'Player'),
+      tier: claims['custom:tier'] || 'free',
+    };
+    return next();
+  }
+
+  // Local development path: decode JWT from header
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'Missing or invalid authorization header' }
+    });
+  }
+
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.decode(token);
+    if (!decoded) {
+      throw new Error('Invalid token');
+    }
+
+    req.user = {
+      userId: decoded['custom:userId'] || decoded.userId || decoded.sub,
+      email: decoded.email,
+      displayName: decoded['custom:displayName'] || decoded.username || (decoded.email ? decoded.email.split('@')[0] : 'Player'),
+      tier: decoded['custom:tier'] || 'free',
+    };
+    console.log(`[auth] ${req.method} ${req.path} - userId: ${req.user.userId}`);
+
+    next();
+  }
+  catch (error) {
+    console.error('JWT verification failed:', error.message);
+    return res.status(401).json({
+      success: false,
+      error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' }
+    });
+  }
+};
+
+// ============================================
+// Health Check
+// ============================================
+app.get('/health', (req, res) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
+// ============================================
+// Public Routes (no auth required)
+// ============================================
+
+// ============================================
+// Auth Routes (public - no Cognito authorizer)
+// ============================================
+app.post('/v1/auth/signup', handleSignup);
+app.post('/v1/auth/login', handleLogin);
+app.post('/v1/auth/verify', handleVerify);
+app.post('/v1/auth/resend-verification', handleResendVerification);
+app.post('/v1/auth/forgot-password', handleForgotPassword);
+app.post('/v1/auth/reset-password', handleResetPassword);
+app.post('/v1/auth/logout', handleLogout);
+app.post('/v1/auth/refresh', handleRefresh);
+app.get('/v1/auth/me', authenticateJWT, handleGetMe);
+
+// ============================================
+// Protected Routes
+// ============================================
+
+// Import route handlers
+let userRoutes, totemRoutes, gameActionRoutes, challengeRoutes,
+  expeditionRoutes, rewardRoutes, achievementRoutes, shopRoutes;
+
+const loadRoutes = () => {
+  const tryRequire = (path, name) => {
+    try {
+      return require(path);
+    }
+    catch (error) {
+      console.warn(`Route not yet implemented: ${name}`);
+      return null;
+    }
+  };
+
+  userRoutes = tryRequire('./functions/user', 'user');
+  totemRoutes = tryRequire('./functions/totems', 'totems');
+  gameActionRoutes = tryRequire('./functions/game-actions', 'game-actions');
+  challengeRoutes = tryRequire('./functions/challenges', 'challenges');
+  expeditionRoutes = tryRequire('./functions/expeditions', 'expeditions');
+  rewardRoutes = tryRequire('./functions/rewards', 'rewards');
+  achievementRoutes = tryRequire('./functions/achievements', 'achievements');
+  shopRoutes = tryRequire('./functions/shop', 'shop');
+
+  console.log('Loaded routes:', {
+    user: !!userRoutes,
+    totems: !!totemRoutes,
+    gameActions: !!gameActionRoutes,
+    challenges: !!challengeRoutes,
+    expeditions: !!expeditionRoutes,
+    rewards: !!rewardRoutes,
+    achievements: !!achievementRoutes,
+    shop: !!shopRoutes,
+  });
+};
+
+loadRoutes();
+
+// User routes
+app.get('/v1/user/profile', authenticateJWT, async (req, res) => {
+  try {
+    if (userRoutes?.getProfile) {
+      const result = await userRoutes.getProfile(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: {
+          id: req.user.userId,
+          email: req.user.email,
+          displayName: req.user.displayName,
+          tier: req.user.tier,
+          currencies: { essence: 2000, gems: 0 },
+          stats: { totalTotems: 0, totalChallengesCompleted: 0, loginStreak: 1 },
+          settings: { notifications: true, darkMode: 'dark' },
+        }
+      });
+    }
+  }
+  catch (error) {
+    console.error('Error in getProfile:', error);
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.put('/v1/user/profile', authenticateJWT, async (req, res) => {
+  try {
+    if (userRoutes?.updateProfile) {
+      const result = await userRoutes.updateProfile(req.user, req.body);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { ...req.body } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Totem routes
+app.get('/v1/totems', authenticateJWT, async (req, res) => {
+  try {
+    if (totemRoutes?.getTotems) {
+      const result = await totemRoutes.getTotems(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: [] });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/totems/:id', authenticateJWT, async (req, res) => {
+  try {
+    if (totemRoutes?.getTotem) {
+      const result = await totemRoutes.getTotem(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Totem not found' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Totem purchase routes
+app.get('/v1/totems/purchase/info', authenticateJWT, async (req, res) => {
+  try {
+    if (totemRoutes?.getPurchaseInfo) {
+      const result = totemRoutes.getPurchaseInfo();
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: { cost: 500, currency: 'essence', availableSpecies: [] }
+      });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/totems/purchase', authenticateJWT, async (req, res) => {
+  try {
+    if (totemRoutes?.purchaseTotem) {
+      const result = await totemRoutes.purchaseTotem(req.user, req.body);
+      if (result.success) {
+        res.status(201).json(result);
+      }
+      else {
+        const statusCode = result.error?.code === 'INSUFFICIENT_FUNDS' ? 402 : 400;
+        res.status(statusCode).json(result);
+      }
+    }
+    else {
+      res.json({ success: true, data: { message: 'Purchase totem (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Game action routes
+app.post('/v1/totems/:id/feed', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.feed) {
+      const result = await gameActionRoutes.feed(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Feed action (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/totems/:id/train', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.train) {
+      const result = await gameActionRoutes.train(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Train action (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/totems/:id/treat', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.treat) {
+      const result = await gameActionRoutes.treat(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Treat action (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/totems/:id/evolve', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.evolve) {
+      const result = await gameActionRoutes.evolve(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Evolve action (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Set totem nickname
+app.post('/v1/totems/:id/nickname', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.setNickname) {
+      const result = await gameActionRoutes.setNickname(req.user, req.params.id, req.body.nickname);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Set nickname (stub)', totemId: req.params.id, nickname: req.body.nickname } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Get totem cooldowns
+app.get('/v1/totems/:id/cooldowns', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.getCooldowns) {
+      const result = await gameActionRoutes.getCooldowns(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: {
+          totemId: req.params.id,
+          cooldowns: {
+            feed: { onCooldown: false, readyAt: null, remainingMs: 0 },
+            train: { onCooldown: false, readyAt: null, remainingMs: 0 },
+            treat: { onCooldown: false, readyAt: null, remainingMs: 0 },
+          }
+        }
+      });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Get evolution status
+app.get('/v1/totems/:id/evolution', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.getEvolutionStatus) {
+      const result = await gameActionRoutes.getEvolutionStatus(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: {
+          totemId: req.params.id,
+          currentStage: 0,
+          canEvolve: false,
+          requirements: null
+        }
+      });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Get totem status summary
+app.get('/v1/totems/:id/status', authenticateJWT, async (req, res) => {
+  try {
+    if (gameActionRoutes?.getTotemStatus) {
+      const result = await gameActionRoutes.getTotemStatus(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { totemId: req.params.id } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Challenge routes
+app.get('/v1/challenges', authenticateJWT, async (req, res) => {
+  try {
+    if (challengeRoutes?.getChallenges) {
+      const result = await challengeRoutes.getChallenges(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: [] });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/challenges/status', authenticateJWT, async (req, res) => {
+  try {
+    if (challengeRoutes?.getStatus) {
+      const result = await challengeRoutes.getStatus(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: {} });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/challenges/:id/complete', authenticateJWT, async (req, res) => {
+  try {
+    if (challengeRoutes?.complete) {
+      const result = await challengeRoutes.complete(req.user, req.params.id, req.body);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Challenge completed (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Expedition routes
+app.get('/v1/expeditions', authenticateJWT, async (req, res) => {
+  try {
+    if (expeditionRoutes?.getExpeditions) {
+      const result = await expeditionRoutes.getExpeditions(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { available: [], active: [] } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/expeditions/active', authenticateJWT, async (req, res) => {
+  try {
+    if (expeditionRoutes?.active) {
+      const result = await expeditionRoutes.active(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { expeditions: [], summary: { total: 0, claimable: 0 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/expeditions/:id/start', authenticateJWT, async (req, res) => {
+  try {
+    if (expeditionRoutes?.start) {
+      const result = await expeditionRoutes.start(req.user, req.params.id, req.body);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Expedition started (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/expeditions/:id/claim', authenticateJWT, async (req, res) => {
+  try {
+    if (expeditionRoutes?.claim) {
+      const result = await expeditionRoutes.claim(req.user, req.params.id);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Expedition claimed (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Reward routes
+app.get('/v1/rewards', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.getStatus) {
+      const result = await rewardRoutes.getStatus(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: {
+          daily: { canClaim: true, streakDays: 0, bestStreak: 0, nextClaimTime: null, isProtected: false, protectionExpiry: null },
+          weekly: { canClaim: false, weeklyStreak: 0, bestStreak: 0, nextClaimTime: null, isProtected: false, protectionExpiry: null, isUnlocked: false }
+        }
+      });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/rewards/status', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.getStatus) {
+      const result = await rewardRoutes.getStatus(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: {
+          daily: { canClaim: true, streakDays: 0, bestStreak: 0, nextClaimTime: null, isProtected: false, protectionExpiry: null },
+          weekly: { canClaim: false, weeklyStreak: 0, bestStreak: 0, nextClaimTime: null, isProtected: false, protectionExpiry: null, isUnlocked: false }
+        }
+      });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/daily', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.claimDaily) {
+      const result = await rewardRoutes.claimDaily(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { claimed: true, reward: { essence: 10 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/daily/claim', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.claimDaily) {
+      const result = await rewardRoutes.claimDaily(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { claimed: true, reward: { amount: 10, streakDays: 1 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/weekly', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.claimWeekly) {
+      const result = await rewardRoutes.claimWeekly(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { claimed: true, reward: { essence: 100 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/weekly/claim', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.claimWeekly) {
+      const result = await rewardRoutes.claimWeekly(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { claimed: true, reward: { amount: 100, weeklyStreak: 1 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Protection purchase routes
+app.post('/v1/rewards/daily/protection', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.purchaseProtection) {
+      const result = await rewardRoutes.purchaseProtection(req.user, req.body, 'daily');
+      if (result.success) {
+        res.json(result);
+      }
+      else {
+        const statusCode = result.error?.code === 'INSUFFICIENT_ESSENCE' ? 402 :
+          result.error?.code === 'ALREADY_PROTECTED' ? 409 :
+            result.error?.code === 'INSUFFICIENT_STREAK' ? 403 : 400;
+        res.status(statusCode).json(result);
+      }
+    }
+    else {
+      res.json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Protection not implemented' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/weekly/protection', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.purchaseProtection) {
+      const result = await rewardRoutes.purchaseProtection(req.user, req.body, 'weekly');
+      if (result.success) {
+        res.json(result);
+      }
+      else {
+        const statusCode = result.error?.code === 'INSUFFICIENT_ESSENCE' ? 402 :
+          result.error?.code === 'ALREADY_PROTECTED' ? 409 :
+            result.error?.code === 'INSUFFICIENT_STREAK' ? 403 : 400;
+        res.status(statusCode).json(result);
+      }
+    }
+    else {
+      res.json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Protection not implemented' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Tutorial reward routes
+app.get('/v1/rewards/tutorial/progress', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.getTutorialProgress) {
+      const result = await rewardRoutes.getTutorialProgress(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: {
+          completedSteps: [],
+          totalSteps: 6,
+          nextStep: 1,
+          rewards: {},
+          totalEssenceEarned: 0,
+          totalExperienceEarned: 0,
+          claimedRewards: []
+        }
+      });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/tutorial', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.claimTutorial) {
+      const result = await rewardRoutes.claimTutorial(req.user, req.body);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { claimed: true, reward: { essence: 25 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Achievement routes
+app.get('/v1/achievements', authenticateJWT, async (req, res) => {
+  try {
+    if (achievementRoutes?.getAchievements) {
+      const result = await achievementRoutes.getAchievements(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: [] });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Shop routes
+app.get('/v1/shop/config', authenticateJWT, async (req, res) => {
+  try {
+    if (shopRoutes?.getConfig) {
+      const result = await shopRoutes.getConfig(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({
+        success: true,
+        data: {
+          listing: { fee: 100, minPrice: 50, maxPrice: 1000000 },
+          purchase: { feePercent: 5 },
+        },
+      });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/shop/listings', authenticateJWT, async (req, res) => {
+  try {
+    if (shopRoutes?.getListings) {
+      const result = await shopRoutes.getListings(req.user, req.query);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { listings: [], pagination: { count: 0, hasMore: false } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/shop/my-listings', authenticateJWT, async (req, res) => {
+  try {
+    if (shopRoutes?.getMyListings) {
+      const result = await shopRoutes.getMyListings(req.user, req.query);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { listings: [], summary: { total: 0, active: 0, sold: 0, cancelled: 0 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/shop/list', authenticateJWT, async (req, res) => {
+  try {
+    if (shopRoutes?.listTotem) {
+      const result = await shopRoutes.listTotem(req.user, req.body);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'List totem (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/shop/purchase', authenticateJWT, async (req, res) => {
+  try {
+    if (shopRoutes?.purchase) {
+      const result = await shopRoutes.purchase(req.user, req.body);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Purchase completed (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/shop/cancel', authenticateJWT, async (req, res) => {
+  try {
+    if (shopRoutes?.cancel) {
+      const result = await shopRoutes.cancel(req.user, req.body);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Cancel listing (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/shop', authenticateJWT, async (req, res) => {
+  try {
+    if (shopRoutes?.getItems) {
+      const result = await shopRoutes.getItems(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: [] });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// ============================================
+// Special Offer Bundle Routes
+// ============================================
+const bundleRoutes = require('./functions/shop/purchase-bundle');
+
+app.get('/v1/shop/bundles', async (req, res) => {
+  try {
+    const result = await bundleRoutes.getSpecialOfferBundles();
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/shop/bundles/purchase', authenticateJWT, async (req, res) => {
+  try {
+    const result = await bundleRoutes.purchaseBundle(req.user, req.body);
+    if (result.success) {
+      res.status(201).json(result);
+    }
+    else {
+      const statusCode = result.error?.code === 'INSUFFICIENT_GEMS' ? 402 :
+        result.error?.code === 'DAILY_LIMIT_REACHED' ? 409 : 400;
+      res.status(statusCode).json(result);
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// ============================================
+// Subscription Routes
+// ============================================
+const subscriptionRoutes = require('./functions/subscriptions');
+
+app.post('/v1/subscription/checkout', authenticateJWT, async (req, res) => {
+  try {
+    const result = await subscriptionRoutes.createSubscriptionCheckout(req.user, req.body);
+    if (result.success) {
+      res.json(result);
+    }
+    else {
+      const statusCode = result.error?.code === 'ALREADY_SUBSCRIBED' ? 409 : 400;
+      res.status(statusCode).json(result);
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/subscription/status', authenticateJWT, async (req, res) => {
+  try {
+    const result = await subscriptionRoutes.getSubscriptionStatus(req.user);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/subscription/cancel', authenticateJWT, async (req, res) => {
+  try {
+    const result = await subscriptionRoutes.cancelSubscription(req.user);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/subscription/reactivate', authenticateJWT, async (req, res) => {
+  try {
+    const result = await subscriptionRoutes.reactivateSubscription(req.user);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/subscription/portal', authenticateJWT, async (req, res) => {
+  try {
+    const result = await subscriptionRoutes.getBillingPortal(req.user);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/subscription/bonus-status', authenticateJWT, async (req, res) => {
+  try {
+    const result = await subscriptionRoutes.getSubscriptionBonusStatus(req.user);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/subscription/claim-bonus', authenticateJWT, async (req, res) => {
+  try {
+    const result = await subscriptionRoutes.claimSubscriptionBonus(req.user);
+    if (result.success) {
+      res.json(result);
+    }
+    else {
+      const statusCode = result.error?.code === 'ALREADY_CLAIMED' ? 409 :
+        result.error?.code === 'NOT_SUBSCRIBED' ? 403 : 400;
+      res.status(statusCode).json(result);
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// ============================================
+// Gem Purchase Routes
+// ============================================
+const gemRoutes = require('./functions/shop/purchase-gems');
+const exchangeRoutes = require('./functions/shop/exchange-gems');
+
+app.get('/v1/shop/gems/packages', async (req, res) => {
+  try {
+    const result = await gemRoutes.getGemPackages();
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/shop/gems/checkout', authenticateJWT, async (req, res) => {
+  try {
+    const result = await gemRoutes.createCheckoutSession(req.user, req.body);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/shop/gems/fulfill', authenticateJWT, async (req, res) => {
+  try {
+    const result = await gemRoutes.fulfillGemPurchase(req.user, req.body);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Stripe webhook (raw body, no auth)
+// JSON parser is skipped for this path (see conditional middleware above)
+app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+  try {
+    const signature = req.headers['stripe-signature'];
+    const webhookSecret = await getSecret('STRIPE_WEBHOOK_SECRET');
+    const stripeKey = await getSecret('STRIPE_SECRET_KEY');
+
+    if (!stripeKey || !webhookSecret || webhookSecret === 'whsec_your_webhook_secret_here') {
+      console.warn('[Webhook] Stripe not configured, ignoring webhook');
+      return res.json({ success: true, message: 'Webhook ignored (not configured)' });
+    }
+
+    // Construct and verify event once
+    const stripeLib = require('stripe')(stripeKey);
+    let event;
+    try {
+      event = stripeLib.webhooks.constructEvent(req.body, signature, webhookSecret);
+    }
+    catch (err) {
+      console.error('[Webhook] Signature verification failed:', err.message);
+      return res.status(400).json({ success: false, error: 'Invalid signature' });
+    }
+
+    console.log(`[Webhook] Received event: ${event.type}`);
+
+    // Subscription events
+    const subscriptionEvents = [
+      'customer.subscription.updated',
+      'customer.subscription.deleted',
+    ];
+    if (subscriptionEvents.includes(event.type)) {
+      const result = await subscriptionRoutes.handleSubscriptionWebhook(event);
+      return res.json(result || { success: true });
+    }
+
+    // checkout.session.completed - dispatch by mode
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
+      if (session.mode === 'subscription') {
+        const result = await subscriptionRoutes.handleSubscriptionWebhook(event);
+        return res.json(result || { success: true });
+      }
+      // payment mode (gem purchases) - fall through to gem handler
+    }
+
+    // Gem purchase events (checkout.session.completed payment mode, charge.refunded)
+    const result = await gemRoutes.handleStripeWebhook(req.body, signature);
+    return res.json(result);
+  }
+  catch (error) {
+    console.error('[Webhook] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// IoT Push Notification Routes
+// ============================================
+const iotRoutes = require('./functions/iot');
+
+app.get('/v1/iot/config', authenticateJWT, async (req, res) => {
+  try {
+    const result = await iotRoutes.getIoTConfig(req.user);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/iot/register', authenticateJWT, async (req, res) => {
+  try {
+    const result = await iotRoutes.registerIoT(req.user, req.body);
+    if (result.success) {
+      res.json(result);
+    }
+    else {
+      res.status(400).json(result);
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// ============================================
+// Loot Box Routes
+// ============================================
+const lootRoutes = require('./functions/loot');
+
+app.get('/v1/loot/items', authenticateJWT, async (req, res) => {
+  try {
+    const result = await lootRoutes.getLootItems(req.user);
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/loot/claim', authenticateJWT, async (req, res) => {
+  try {
+    const result = await lootRoutes.claimLoot(req.user, req.body);
+    if (result.success) {
+      res.json(result);
+    }
+    else {
+      const statusCode = result.error?.code === 'MISSING_PARAM' ? 400 : 422;
+      res.status(statusCode).json(result);
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// ============================================
+// Gem to Essence Exchange Routes
+// ============================================
+app.get('/v1/shop/exchange/bundles', async (req, res) => {
+  try {
+    const result = await exchangeRoutes.getExchangeBundles();
+    res.json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/shop/exchange', authenticateJWT, async (req, res) => {
+  try {
+    const result = await exchangeRoutes.exchangeGemsForEssence(req.user, req.body);
+    if (result.success) {
+      res.json(result);
+    }
+    else {
+      const statusCode = result.error?.code === 'INSUFFICIENT_GEMS' ? 402 : 400;
+      res.status(statusCode).json(result);
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// ============================================
+// Finalize - adds error/404 handlers (must be called last)
+// ============================================
+// Callers (local-server.js, lambda.js) MUST call finalize() after adding
+// any additional routes (e.g., swagger). Error/404 handlers must be last
+// in the Express middleware chain or they'll swallow legitimate routes.
+function finalize() {
+  // Error handler
+  app.use((err, req, res, _next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({
+      success: false,
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: IS_LOCAL ? err.message : 'An unexpected error occurred'
+      }
+    });
+  });
+
+  // 404 Handler
+  app.use((req, res) => {
+    res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: `Route ${req.method} ${req.path} not found` }
+    });
+  });
+}
+
+module.exports = { app, finalize };

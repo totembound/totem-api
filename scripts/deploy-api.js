@@ -1,6 +1,11 @@
 /**
- * Deployment script for Lambda functions
- * Uploads packages to S3 and optionally updates CloudFormation stack
+ * Deployment script for the monolithic API Lambda
+ *
+ * Uploads the Lambda package to S3 and optionally:
+ * - Updates the CloudFormation stack
+ * - Updates the Lambda function code directly
+ *
+ * Usage: node scripts/deploy-api.js [staging|prod]
  */
 
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
@@ -16,102 +21,88 @@ const path = require('path');
 const chalk = require('chalk');
 
 // Configuration
-const LAMBDA_FUNCTIONS = ['relay', 'signup', 'premium', 'checkout', 'subscription'];
+const FUNCTION_NAME = 'totembound-api';
 const PACKAGE_DIR = path.join(__dirname, '..', 'packages');
 const CF_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'api.yml');
 
+// Environment config
+const ENV_CONFIG = {
+  staging: {
+    prefix: 'totemboundci',
+    s3Bucket: 'totemboundci-releases',
+    region: 'us-west-2',
+    stackName: 'totemboundci-api-stack',
+  },
+  prod: {
+    prefix: 'totembound',
+    s3Bucket: 'totembound-releases',
+    region: 'us-east-1',
+    stackName: 'totembound-api-stack',
+  }
+};
+
 // Get environment from command line args
 const environment = process.argv[2];
-if (!environment) {
-  console.error(chalk.red('Error: Environment is required'));
-  console.log(chalk.cyan('Usage: node scripts/deploy.js [environment]'));
-  console.log(chalk.cyan('Available environments: staging, prod'));
+if (!environment || !ENV_CONFIG[environment]) {
+  console.error(chalk.red('Error: Valid environment required'));
+  console.log(chalk.cyan('Usage: node scripts/deploy-api.js [staging|prod]'));
   process.exit(1);
 }
 
-// Validate environment
-const validEnvironments = ['staging', 'prod'];
-if (!validEnvironments.includes(environment)) {
-  console.error(chalk.red(`Error: Invalid environment: ${environment}`));
-  console.log(chalk.cyan(`Available environments: ${validEnvironments.join(', ')}`));
-  process.exit(1);
-}
-
-// Get version
-const prefix = environment === 'prod' ? 'totembound' : 'totemboundci';
+const config = ENV_CONFIG[environment];
 const packageJson = require('../package.json');
 const VERSION = process.env.VERSION || packageJson.version;
 
-// Set bucket name based on environment
-const S3_BUCKET = environment === 'prod' ? 'totembound-releases' : 'totemboundci-releases';
-console.log(chalk.blue(`Using S3 bucket: ${S3_BUCKET}`));
-
-const AWS_REGION = environment === 'prod' ? 'us-east-1' : 'us-west-2';
-console.log(chalk.blue(`Using AWS region: ${AWS_REGION}`));
-
 // AWS clients
-const s3Client = new S3Client({ region: process.env.AWS_REGION || AWS_REGION });
-const cfClient = new CloudFormationClient({ region: process.env.AWS_REGION || AWS_REGION });
-const lambdaClient = new LambdaClient({ region: process.env.AWS_REGION || AWS_REGION });
+const s3Client = new S3Client({ region: config.region });
+const cfClient = new CloudFormationClient({ region: config.region });
+const lambdaClient = new LambdaClient({ region: config.region });
+
+console.log(chalk.blue(`Environment: ${environment}`));
+console.log(chalk.blue(`S3 bucket: ${config.s3Bucket}`));
+console.log(chalk.blue(`Region: ${config.region}`));
+console.log(chalk.blue(`Version: ${VERSION}`));
 
 /**
  * Upload a file to S3
  */
 async function uploadToS3(filePath, key) {
-  console.log(chalk.cyan(`Uploading ${path.basename(filePath)} to S3...`));
+  console.log(chalk.cyan(`  Uploading ${path.basename(filePath)} → s3://${config.s3Bucket}/${key}`));
 
-  try {
-    const fileContent = fs.readFileSync(filePath);
-
-    const command = new PutObjectCommand({
-      Bucket: S3_BUCKET,
-      Key: key,
-      Body: fileContent
-    });
-
-    await s3Client.send(command);
-    console.log(chalk.green(`  ✓ Uploaded to s3://${S3_BUCKET}/${key}`));
-    return true;
-  } catch (error) {
-    console.error(chalk.red(`  ✗ Failed to upload to S3: ${error.message}`));
-    return false;
-  }
+  const fileContent = fs.readFileSync(filePath);
+  await s3Client.send(new PutObjectCommand({
+    Bucket: config.s3Bucket,
+    Key: key,
+    Body: fileContent
+  }));
+  console.log(chalk.green(`  ✓ Uploaded`));
 }
 
 /**
- * Deploy Lambda packages to S3
+ * Upload Lambda package to S3
  */
-async function deployPackagesToS3() {
-  console.log(chalk.bold(`\n📤 Uploading Lambda packages to S3...\n`));
+async function uploadPackage() {
+  console.log(chalk.bold(`\n📤 Uploading Lambda package to S3...\n`));
 
-  const uploadPromises = LAMBDA_FUNCTIONS.map(async functionName => {
-    const zipFileName = `${functionName}-lambda-${VERSION}.zip`;
-    const zipFilePath = path.join(PACKAGE_DIR, zipFileName);
+  const zipFileName = `${FUNCTION_NAME}-${VERSION}.zip`;
+  const zipFilePath = path.join(PACKAGE_DIR, zipFileName);
 
-    if (!fs.existsSync(zipFilePath)) {
-      console.log(chalk.yellow(`Warning: Package not found for ${functionName}`));
-      return false;
-    }
+  if (!fs.existsSync(zipFilePath)) {
+    console.error(chalk.red(`Error: Package not found: ${zipFilePath}`));
+    console.log(chalk.cyan(`Run 'npm run build && npm run package' first.`));
+    return false;
+  }
 
-    const s3Key = `totem-api/${functionName}/${zipFileName}`;
-    const result = await uploadToS3(zipFilePath, s3Key);
+  try {
+    // Upload versioned zip
+    await uploadToS3(zipFilePath, `totem-api/${zipFileName}`);
 
-    if (result) {
-      // Also upload as "latest" version
-      const latestKey = `totem-api/${functionName}/${functionName}-lambda-latest.zip`;
-      await uploadToS3(zipFilePath, latestKey);
-    }
+    // Upload as "latest"
+    await uploadToS3(zipFilePath, `totem-api/${FUNCTION_NAME}-latest.zip`);
 
-    return result;
-  });
-
-  const uploadResults = await Promise.all(uploadPromises);
-
-  if (uploadResults.every(Boolean)) {
-    console.log(chalk.bold.green('\n✅ All packages uploaded successfully!\n'));
     return true;
-  } else {
-    console.log(chalk.bold.red('\n❌ Failed to upload some packages. Check the logs above.\n'));
+  } catch (error) {
+    console.error(chalk.red(`  ✗ Failed: ${error.message}`));
     return false;
   }
 }
@@ -119,24 +110,22 @@ async function deployPackagesToS3() {
 /**
  * Upload CloudFormation template to S3
  */
-async function uploadCloudFormationTemplate() {
-  console.log(chalk.bold(`\n📤 Uploading CloudFormation template to S3...\n`));
+async function uploadTemplate() {
+  console.log(chalk.bold(`\n📤 Uploading CloudFormation template...\n`));
 
   if (!fs.existsSync(CF_TEMPLATE_PATH)) {
-    console.log(chalk.yellow(`Warning: CloudFormation template not found at ${CF_TEMPLATE_PATH}`));
+    console.log(chalk.yellow(`  ⚠ Template not found at ${CF_TEMPLATE_PATH}`));
     return false;
   }
 
-  const templateKey = `totem-api/cloudformation/api-${VERSION}.yml`;
-  const result = await uploadToS3(CF_TEMPLATE_PATH, templateKey);
-
-  if (result) {
-    // Also upload as "latest" version
-    const latestKey = `totem-api/cloudformation/api-latest.yml`;
-    await uploadToS3(CF_TEMPLATE_PATH, latestKey);
+  try {
+    await uploadToS3(CF_TEMPLATE_PATH, `totem-api/cloudformation/api-${VERSION}.yml`);
+    await uploadToS3(CF_TEMPLATE_PATH, `totem-api/cloudformation/api-latest.yml`);
+    return true;
+  } catch (error) {
+    console.error(chalk.red(`  ✗ Failed: ${error.message}`));
+    return false;
   }
-
-  return result;
 }
 
 /**
@@ -144,8 +133,7 @@ async function uploadCloudFormationTemplate() {
  */
 async function stackExists(stackName) {
   try {
-    const command = new DescribeStacksCommand({ StackName: stackName });
-    await cfClient.send(command);
+    await cfClient.send(new DescribeStacksCommand({ StackName: stackName }));
     return true;
   } catch (error) {
     if (error.name === 'ValidationError' && error.message.includes('does not exist')) {
@@ -156,203 +144,88 @@ async function stackExists(stackName) {
 }
 
 /**
- * Create or update CloudFormation stack
+ * Deploy CloudFormation stack
  */
-async function deployCloudFormationStack() {
+async function deployStack() {
   console.log(chalk.bold(`\n🚀 Deploying CloudFormation stack...\n`));
 
-  // Determine which template to deploy (api-components or core-infrastructure)
-  const stackName = `totembound-api-stack`;
-  const templateFileName = `api-${VERSION}.yml`;
+  const templateUrl = `https://${config.s3Bucket}.s3.amazonaws.com/totem-api/cloudformation/api-${VERSION}.yml`;
 
-  // Get S3 path for the template
-  const templateKey = `totem-api/cloudformation/${templateFileName}`;
-  const templateUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${templateKey}`;
+  // Load environment parameters
+  let parameters = [
+    { ParameterKey: 'Environment', ParameterValue: environment },
+    { ParameterKey: 'AppVersion', ParameterValue: VERSION },
+  ];
 
-  console.log(chalk.cyan(`Using template: ${templateFileName}`));
-  console.log(chalk.cyan(`Stack name: ${stackName}`));
-
-  const exists = await stackExists(stackName);
-
-  // Read environment-specific parameters
-  let parameters = [];
-  const paramFilePath = path.join(
-    __dirname,
-    '..',
-    'infrastructure',
-    `params-api-${environment}.json`
-  );
-
+  const paramFilePath = path.join(__dirname, '..', 'infrastructure', `params-api-${environment}.json`);
   if (fs.existsSync(paramFilePath)) {
-    try {
-      const paramConfig = JSON.parse(fs.readFileSync(paramFilePath, 'utf8'));
-      parameters = Object.entries(paramConfig).map(([key, value]) => ({
-        ParameterKey: key,
-        ParameterValue: value
-      }));
-      console.log(chalk.green(`  ✓ Loaded parameters from ${paramFilePath}`));
-    } catch (error) {
-      console.error(chalk.red(`  ✗ Failed to load parameters: ${error.message}`));
-      return false;
-    }
-  } else {
-    console.log(chalk.yellow(`  ⚠ No parameter file found at ${paramFilePath}, using defaults`));
-    // Add default parameters
-    parameters = [
-      {
-        ParameterKey: 'Environment',
-        ParameterValue: environment
+    const paramConfig = JSON.parse(fs.readFileSync(paramFilePath, 'utf8'));
+    for (const [key, value] of Object.entries(paramConfig)) {
+      // Don't override Environment or AppVersion
+      if (key !== 'Environment' && key !== 'AppVersion') {
+        parameters.push({ ParameterKey: key, ParameterValue: value });
       }
-    ];
+    }
+    console.log(chalk.green(`  ✓ Loaded parameters from ${paramFilePath}`));
   }
+
+  const exists = await stackExists(config.stackName);
 
   try {
-    if (exists) {
-      // Update existing stack
-      console.log(chalk.cyan(`Updating stack ${stackName}...`));
+    const command = exists
+      ? new UpdateStackCommand({
+          StackName: config.stackName,
+          TemplateURL: templateUrl,
+          Parameters: parameters,
+          Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
+        })
+      : new CreateStackCommand({
+          StackName: config.stackName,
+          TemplateURL: templateUrl,
+          Parameters: parameters,
+          Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
+        });
 
-      const command = new UpdateStackCommand({
-        StackName: stackName,
-        TemplateURL: templateUrl,
-        Parameters: parameters,
-        Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
-      });
-
-      await cfClient.send(command);
-      console.log(chalk.green(`  ✓ Stack update initiated. Check AWS Console for progress.`));
-    } else {
-      // Create new stack
-      console.log(chalk.cyan(`Creating stack ${stackName}...`));
-
-      const command = new CreateStackCommand({
-        StackName: stackName,
-        TemplateURL: templateUrl,
-        Parameters: parameters,
-        Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
-      });
-
-      await cfClient.send(command);
-      console.log(chalk.green(`  ✓ Stack creation initiated. Check AWS Console for progress.`));
-    }
-
+    await cfClient.send(command);
+    console.log(chalk.green(`  ✓ Stack ${exists ? 'update' : 'creation'} initiated.`));
     return true;
   } catch (error) {
-    console.error(chalk.red(`  ✗ Failed to deploy stack: ${error.message}`));
+    console.error(chalk.red(`  ✗ Failed: ${error.message}`));
     return false;
   }
 }
 
 /**
- * Update Lambda function code
+ * Update Lambda function code directly (faster than CloudFormation)
  */
-async function updateLambdaFunctions() {
-  console.log(chalk.bold(`\n🔄 Updating Lambda functions...\n`));
-  
-  // Get Lambda function names from environment variables or use convention
-  const functionNames = LAMBDA_FUNCTIONS.map(
-    func =>
-      process.env[`${func.toUpperCase()}_FUNCTION_NAME`] || `${prefix}-${func}`
-  );
+async function updateLambdaCode() {
+  console.log(chalk.bold(`\n🔄 Updating Lambda function code...\n`));
 
-  const updatePromises = LAMBDA_FUNCTIONS.map(async (functionName, index) => {
-    const lambdaName = functionNames[index];
-    console.log(chalk.cyan(`Updating ${lambdaName}...`));
+  const lambdaName = `${config.prefix}-api`;
+  console.log(chalk.cyan(`  Updating ${lambdaName}...`));
 
-    try {
-      const command = new UpdateFunctionCodeCommand({
-        FunctionName: lambdaName,
-        S3Bucket: S3_BUCKET,
-        S3Key: `totem-api/${functionName}/${functionName}-lambda-${VERSION}.zip`
-      });
-
-      await lambdaClient.send(command);
-      console.log(chalk.green(`  ✓ Updated ${lambdaName}`));
-      return true;
-    } catch (error) {
-      console.error(chalk.red(`  ✗ Failed to update ${lambdaName}: ${error.message}`));
-      return false;
-    }
-  });
-
-  const updateResults = await Promise.all(updatePromises);
-
-  if (updateResults.every(Boolean)) {
-    console.log(chalk.bold.green('\n✅ All Lambda functions updated successfully!\n'));
+  try {
+    await lambdaClient.send(new UpdateFunctionCodeCommand({
+      FunctionName: lambdaName,
+      S3Bucket: config.s3Bucket,
+      S3Key: `totem-api/${FUNCTION_NAME}-${VERSION}.zip`
+    }));
+    console.log(chalk.green(`  ✓ Updated ${lambdaName}`));
     return true;
-  } else {
-    console.log(
-      chalk.bold.yellow('\n⚠️ Some Lambda functions could not be updated. Check the logs above.\n')
-    );
+  } catch (error) {
+    console.error(chalk.red(`  ✗ Failed: ${error.message}`));
     return false;
   }
 }
 
 /**
- * Run the full deployment
- */
-async function deploy() {
-  console.log(
-    chalk.bold.cyan(
-      `\n🚀 Starting deployment to ${environment.toUpperCase()} environment (v${VERSION})...\n`
-    )
-  );
-
-  // First, upload packages to S3
-  const packagesUploaded = await deployPackagesToS3();
-  if (!packagesUploaded) {
-    console.error(chalk.red('Failed to upload packages. Deployment aborted.'));
-    process.exit(1);
-  }
-
-  // Upload CloudFormation template
-  const templateUploaded = await uploadCloudFormationTemplate();
-  if (!templateUploaded) {
-    console.error(chalk.red('Failed to upload CloudFormation template. Deployment aborted.'));
-    process.exit(1);
-  }
-
-  // Ask for confirmation before updating infrastructure
-  const createOrUpdateStack = await promptYesNo(
-    `Do you want to ${(await stackExists(`totembound-api-${environment}`)) ? 'update' : 'create'} the CloudFormation stack?`
-  );
-
-  if (createOrUpdateStack) {
-    // Deploy or update CloudFormation stack
-    const stackDeployed = await deployCloudFormationStack();
-    if (!stackDeployed) {
-      console.error(chalk.red('Failed to deploy CloudFormation stack. Deployment aborted.'));
-      process.exit(1);
-    }
-  } else {
-    console.log(chalk.yellow('Skipping CloudFormation stack deployment.'));
-  }
-
-  // Ask for confirmation before updating Lambda functions
-  const updateLambdas = await promptYesNo('Do you want to update the Lambda functions directly?');
-
-  if (updateLambdas) {
-    // Update Lambda functions
-    const lambdasUpdated = await updateLambdaFunctions();
-    if (!lambdasUpdated) {
-      console.error(chalk.red('Failed to update some Lambda functions.'));
-      process.exit(1);
-    }
-  } else {
-    console.log(chalk.yellow('Skipping Lambda function updates.'));
-  }
-
-  console.log(chalk.bold.green('\n✅ Deployment completed successfully!\n'));
-}
-
-/**
- * Prompt user for yes/no input
+ * Prompt user for yes/no
  */
 function promptYesNo(question) {
   const readline = require('readline').createInterface({
     input: process.stdin,
     output: process.stdout
   });
-
   return new Promise(resolve => {
     readline.question(`${chalk.cyan(question)} (y/n) `, answer => {
       readline.close();
@@ -361,7 +234,41 @@ function promptYesNo(question) {
   });
 }
 
-// Run deployment
+/**
+ * Main deployment flow
+ */
+async function deploy() {
+  console.log(chalk.bold.cyan(
+    `\n🚀 Deploying API to ${environment.toUpperCase()} (v${VERSION})...\n`
+  ));
+
+  // Upload package to S3
+  if (!(await uploadPackage())) {
+    process.exit(1);
+  }
+
+  // Upload CloudFormation template
+  if (!(await uploadTemplate())) {
+    console.log(chalk.yellow('Skipping template upload (continuing with Lambda update).'));
+  }
+
+  // CloudFormation stack update
+  if (await promptYesNo('Deploy/update CloudFormation stack?')) {
+    await deployStack();
+  } else {
+    console.log(chalk.yellow('Skipping CloudFormation update.'));
+  }
+
+  // Direct Lambda code update
+  if (await promptYesNo('Update Lambda function code directly?')) {
+    await updateLambdaCode();
+  } else {
+    console.log(chalk.yellow('Skipping Lambda code update.'));
+  }
+
+  console.log(chalk.bold.green('\n✅ Deployment completed!\n'));
+}
+
 deploy().catch(error => {
   console.error(chalk.red(`\n❌ Deployment failed: ${error.message}\n`));
   process.exit(1);

@@ -5,10 +5,28 @@ const defaultAppUrl = 'https://totembound.com';
 const defaultLogoUrl = 'https://totembound.com/tb-logo-180.png';
 const defaultEmailFrom = 'no-reply@totembound.com';
 
-// Initialize SES client
-const sesClient = new SESClient({ 
-  region: process.env.AWS_REGION || 'us-east-1' 
-});
+// SES client (lazy-loaded, only used on Lambda)
+let sesClient = null;
+function getSesClient() {
+  if (!sesClient) {
+    sesClient = new SESClient({ region: process.env.AWS_REGION || 'us-east-1' });
+  }
+  return sesClient;
+}
+
+// Nodemailer transport (lazy-loaded, only used locally)
+let localTransport = null;
+function getLocalTransport() {
+  if (!localTransport) {
+    const nodemailer = require('nodemailer');
+    localTransport = nodemailer.createTransport({
+      host: 'localhost',
+      port: 1025,
+      ignoreTLS: true,
+    });
+  }
+  return localTransport;
+}
 
 /**
  * Load main email template and combine with content template
@@ -18,7 +36,6 @@ const sesClient = new SESClient({
  */
 const loadTemplate = (contentTemplateName, replacements) => {
   try {
-    // Add some default replacements
     const allReplacements = {
       appUrl: process.env.APP_URL || defaultAppUrl,
       logoUrl: process.env.LOGO_URL || defaultLogoUrl,
@@ -26,23 +43,22 @@ const loadTemplate = (contentTemplateName, replacements) => {
       brandName: process.env.BRAND_NAME || 'TotemBound',
       ...replacements
     };
-    
-    // In production, templates are bundled with the Lambda
+
     const mainTemplatePath = path.join(__dirname, 'templates', 'main.html');
     const contentTemplatePath = path.join(__dirname, 'templates', `${contentTemplateName}.html`);
-    
+
     let mainTemplate = fs.readFileSync(mainTemplatePath, 'utf8');
     let contentTemplate = fs.readFileSync(contentTemplatePath, 'utf8');
-    
+
     // Replace placeholders in content template
     Object.entries(allReplacements).forEach(([key, value]) => {
       const regex = new RegExp(`{{${key}}}`, 'g');
       contentTemplate = contentTemplate.replace(regex, value);
     });
-    
+
     // Add content to main template
     allReplacements.content = contentTemplate;
-    
+
     // Replace placeholders in main template
     Object.entries(allReplacements).forEach(([key, value]) => {
       const regex = new RegExp(`{{${key}}}`, 'g');
@@ -53,180 +69,184 @@ const loadTemplate = (contentTemplateName, replacements) => {
   }
   catch (error) {
     console.error(`Error loading template ${contentTemplateName}:`, error);
-
-    // Fallback to basic template
     return `
             <h1>${replacements.subject || 'TotemBound Notification'}</h1>
             <p>${replacements.message || 'Thank you for using TotemBound.'}</p>
-            <p>${replacements.apiKey ? `Your API key: <strong>${replacements.apiKey}</strong>` : ''}</p>
             <p>Happy gaming!</p>
             `;
   }
 };
 
 /**
- * Send welcome email with API key
- * @param {string} email - Recipient email address
- * @param {string} apiKey - Generated API key
- * @returns {Promise} - SES send email response
+ * Dual-mode email sender: nodemailer (local) or SES (Lambda)
+ * @param {string} to - Recipient email address
+ * @param {string} subject - Email subject
+ * @param {string} htmlContent - HTML body
+ * @param {string} textContent - Plain text body
+ * @returns {Promise} - Send result
  */
-exports.sendWelcomeEmail = async (email, apiKey) => {
-  const subject = 'Welcome to TotemBound - Your API Key';
+async function sendEmail(to, subject, htmlContent, textContent) {
+  const from = process.env.EMAIL_FROM || defaultEmailFrom;
 
-  // Load and process template
-  const htmlContent = loadTemplate('welcome', {
-    subject,
-    apiKey,
-    date: new Date().toLocaleDateString(),
-  });
-
-  const params = {
-    Source: process.env.EMAIL_FROM || defaultEmailFrom,
-    Destination: {
-      ToAddresses: [email]
-    },
-    Message: {
-      Subject: {
-        Data: subject
-      },
-      Body: {
-        Html: {
-          Data: htmlContent
-        },
-        Text: {
-          Data: `Welcome to TotemBound! Thank you for signing up. Here is your API key: ${apiKey}. You can add this key in your user settings to enable gasless transactions.`
-        }
-      }
+  if (process.env.IS_LOCAL === 'true') {
+    // Local: send via nodemailer → MailHog (SMTP :1025)
+    try {
+      const transport = getLocalTransport();
+      const result = await transport.sendMail({
+        from,
+        to,
+        subject,
+        html: htmlContent,
+        text: textContent,
+      });
+      console.log(`[Email-Local] Sent "${subject}" to ${to}, messageId: ${result.messageId}`);
+      return result;
     }
+    catch (error) {
+      console.error(`[Email-Local] Error sending "${subject}" to ${to}:`, error);
+      throw error;
+    }
+  }
+
+  // Lambda: send via SES
+  const params = {
+    Source: from,
+    Destination: { ToAddresses: [to] },
+    Message: {
+      Subject: { Data: subject },
+      Body: {
+        Html: { Data: htmlContent },
+        Text: { Data: textContent },
+      },
+    },
   };
 
   try {
     const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);
-    console.log(`Welcome email sent to ${email}, messageId: ${result.MessageId}`);
+    const result = await getSesClient().send(command);
+    console.log(`[Email-SES] Sent "${subject}" to ${to}, messageId: ${result.MessageId}`);
     return result;
   }
   catch (error) {
-    console.error(`Error sending welcome email to ${email}:`, error);
+    console.error(`[Email-SES] Error sending "${subject}" to ${to}:`, error);
     throw error;
+  }
+}
+
+/**
+ * Send email verification code
+ */
+exports.sendVerificationEmail = async (email, displayName, code) => {
+  const subject = 'TotemBound - Verify Your Email';
+
+  const htmlContent = loadTemplate('verify-email', {
+    subject,
+    displayName,
+    code,
+  });
+
+  const textContent = `Hi ${displayName}, your TotemBound verification code is: ${code}. Enter this code on the verification page to activate your account.`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    // Don't throw - signup should succeed even if email fails
+    console.error(`Error sending verification email to ${email}:`, error);
+    return null;
   }
 };
 
 /**
- * Send premium welcome email with API key
- * @param {string} email - Recipient email address
- * @param {string} apiKey - Generated API key
- * @param {boolean} isUpgrade - Whether this is an upgrade from free tier
- * @returns {Promise} - SES send email response
+ * Send password reset code email
  */
-exports.sendPremiumEmail = async (email, apiKey, isUpgrade = false) => {
-  const subject = isUpgrade
-    ? 'Your TotemBound Account Has Been Upgraded to Premium!'
-    : 'Welcome to TotemBound Premium!';
+exports.sendPasswordResetEmail = async (email, displayName, code) => {
+  const subject = 'TotemBound - Reset Your Password';
 
-  const upgradeText = isUpgrade
-    ? 'Your account has been successfully upgraded to Premium tier.'
-    : 'Welcome to TotemBound Premium!';
-  
-  const welcomeMessage = isUpgrade
-    ? 'Your account has been successfully upgraded to Premium tier. Thank you for your subscription!'
-    : 'Thank you for subscribing to our premium service. We\'re excited to have you join our Premium members!';
-
-  const htmlContent = loadTemplate('premium', {
+  const htmlContent = loadTemplate('reset-password', {
     subject,
-    apiKey,
-    upgradeText,
-    welcomeMessage
+    displayName,
+    code,
   });
 
-  const params = {
-    Source: process.env.EMAIL_FROM || defaultEmailFrom,
-    Destination: {
-      ToAddresses: [email]
-    },
-    Message: {
-      Subject: {
-        Data: subject
-      },
-      Body: {
-        Html: {
-          Data: htmlContent
-        },
-        Text: {
-          Data: `${isUpgrade ? 'Your account has been upgraded to Premium!' : 'Welcome to TotemBound Premium!'} Here is your Premium API key: ${apiKey}. Please update your API key in user settings to enjoy premium benefits.`
-        }
-      }
-    }
-  };
+  const textContent = `Hi ${displayName}, your TotemBound password reset code is: ${code}. Enter this code on the reset page along with your new password. This code expires in 1 hour. If you didn't request this, ignore this email.`;
 
   try {
-    const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);
-    console.log(`Premium email sent to ${email}, messageId: ${result.MessageId}`);
-    return result;
+    return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending premium email to ${email}:`, error);
-    throw error;
+    console.error(`Error sending password reset email to ${email}:`, error);
+    return null;
   }
 };
 
 /**
- * Send downgrade notification email
- * @param {string} email - Recipient email address
- * @param {string} apiKey - New API key for free tier
- * @returns {Promise} - SES send email response
+ * Send welcome email to new Web2 user
  */
-exports.sendDowngradeEmail = async (email, apiKey) => {
-  const subject = 'Your TotemBound Premium Subscription Has Ended';
+exports.sendNewUserWelcomeEmail = async (email, displayName, starterTotem) => {
+  const subject = `Welcome to TotemBound, ${displayName}!`;
 
-  const htmlContent = loadTemplate('downgrade', {
-    subject,
-    apiKey
-  });
+  const appUrl = process.env.APP_URL || defaultAppUrl;
 
-  const params = {
-    Source: process.env.EMAIL_FROM || defaultEmailFrom,
-    Destination: {
-      ToAddresses: [email]
-    },
-    Message: {
-      Subject: {
-        Data: subject
-      },
-      Body: {
-        Html: {
-          Data: htmlContent
-        },
-        Text: {
-          Data: `Your Premium subscription has ended. Your TotemBound account has been reverted to the Free tier. Here is your new Free tier API key: ${apiKey}. Please update your API key in the user settings to continue using gasless transactions.`
-        }
-      }
-    }
-  };
+  let finalHtml;
+  let finalTextContent;
+
+  if (starterTotem) {
+    const speciesNames = {
+      0: 'Goose', 1: 'Otter', 2: 'Wolf', 3: 'Falcon', 4: 'Beaver',
+      5: 'Deer', 6: 'Woodpecker', 7: 'Turtle', 8: 'Bear', 9: 'Raven',
+      10: 'Snake', 11: 'Owl'
+    };
+
+    const totemSpecies = speciesNames[starterTotem.speciesId] || 'Spirit Animal';
+    const totemLabel = starterTotem.nickname || totemSpecies;
+
+    finalHtml = loadTemplate('welcome-new-user', {
+      subject,
+      displayName,
+      totemName: totemLabel,
+      giftHeading: 'Your First Companion',
+      giftDescription: `A ${totemSpecies} is waiting for you!`,
+      ctaUrl: `${appUrl}/totems`,
+      ctaText: 'Meet Your Totem',
+    });
+    finalTextContent = `Welcome to TotemBound, ${displayName}! Your first companion, a ${totemSpecies} named "${totemLabel}", is waiting for you. You've also received 2,000 Essence to start your adventure. Visit ${appUrl}/totems to meet your new Totem!`;
+  }
+  else {
+    finalHtml = loadTemplate('welcome-new-user', {
+      subject,
+      displayName,
+      totemName: 'Uncommon Totem Box',
+      giftHeading: 'Your Starter Gift',
+      giftDescription: 'Pick your species and claim your first companion!',
+      ctaUrl: `${appUrl}/rewards`,
+      ctaText: 'Claim Your Totem',
+    });
+    finalTextContent = `Welcome to TotemBound, ${displayName}! You've received an Uncommon Totem Box and 2,000 Essence to start your adventure. Visit ${appUrl}/rewards to open your loot and choose your first companion!`;
+  }
 
   try {
-    const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);
-    console.log(`Downgrade email sent to ${email}, messageId: ${result.MessageId}`);
-    return result;
+    return await sendEmail(email, subject, finalHtml, finalTextContent);
   }
   catch (error) {
-    console.error(`Error sending downgrade email to ${email}:`, error);
-    throw error;
+    // Don't throw - signup should succeed even if email fails
+    return null;
   }
 };
+
+// Display name for tier (handles "vip" → "VIP", "premium" → "Premium")
+function tierDisplayName(tier) {
+  if (tier === 'vip') return 'VIP';
+  return tier.charAt(0).toUpperCase() + tier.slice(1);
+}
 
 /**
  * Send subscription canceled notification email
- * @param {string} email - Recipient email address
- * @param {string} expirationDate - End Date of subscription 
- * @returns {Promise} - SES send email response
  */
-exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
-  const subject = 'Your TotemBound Premium Subscription Has Been Canceled';
+exports.sendSubscriptionCanceledEmail = async (email, expirationDate, tier = 'premium') => {
+  const displayTier = tierDisplayName(tier);
+  const subject = `Your TotemBound ${displayTier} Subscription Has Been Canceled`;
 
-  // Format the date nicely
   const formattedDate = expirationDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -239,48 +259,24 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate) => {
     formattedDate
   });
 
-  const params = {
-    Source: process.env.EMAIL_FROM || defaultEmailFrom,
-    Destination: {
-      ToAddresses: [email]
-    },
-    Message: {
-      Subject: {
-        Data: subject
-      },
-      Body: {
-        Html: {
-          Data: htmlContent
-        },
-        Text: {
-          Data: `Your Premium Subscription has been canceled. Your Premium subscription will remain active until: ${formattedDate}. After this date, your account will be automatically downgraded to the Free tier.`
-        }
-      }
-    }
-  };
+  const textContent = `Your ${displayTier} Subscription has been canceled. Your ${displayTier} subscription will remain active until: ${formattedDate}. After this date, your account will be automatically downgraded to the Free tier. You can reactivate anytime from your account settings.`;
 
   try {
-    const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);
-    console.log(`Canceled email sent to ${email}, messageId: ${result.MessageId}`);
-    return result;
+    return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
     console.error(`Error sending cancel email to ${email}:`, error);
-    throw error;
+    return null;
   }
 };
 
 /**
  * Send subscription reactivated notification email
- * @param {string} email - Recipient email address
- * @param {string} renewalDate - Renewal Date of subscription 
- * @returns {Promise} - SES send email response
  */
-exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
-  const subject = 'Your TotemBound Premium Subscription Has Been Reactivated';
+exports.sendSubscriptionReactivatedEmail = async (email, renewalDate, tier = 'premium') => {
+  const displayTier = tierDisplayName(tier);
+  const subject = `Your TotemBound ${displayTier} Subscription Has Been Reactivated`;
 
-  // Format the date nicely
   const formattedDate = renewalDate.toLocaleDateString('en-US', {
     weekday: 'long',
     year: 'numeric',
@@ -293,34 +289,70 @@ exports.sendSubscriptionReactivatedEmail = async (email, renewalDate) => {
     formattedDate
   });
 
-  const params = {
-    Source: process.env.EMAIL_FROM || defaultEmailFrom,
-    Destination: {
-      ToAddresses: [email]
-    },
-    Message: {
-      Subject: {
-        Data: subject
-      },
-      Body: {
-        Html: {
-          Data: htmlContent
-        },
-        Text: {
-          Data: `Your Premium Subscription has been reactivated. Your Premium subscription will continue to renew on: ${formattedDate}. Welcome back to Premium! We're thrilled to have you continue as a valued member of the TotemBound community.`
-        }
-      }
-    }
-  };
+  const textContent = `Your ${displayTier} Subscription has been reactivated. Your ${displayTier} subscription will continue to renew on: ${formattedDate}. Welcome back to ${displayTier}! Enjoy monthly Essence & Gems bonuses, exclusive premium totems, daily reward multiplier, and early access to new content.`;
 
   try {
-    const command = new SendEmailCommand(params);
-    const result = await sesClient.send(command);
-    console.log(`Renewed email sent to ${email}, messageId: ${result.MessageId}`);
-    return result;
+    return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending renew email to ${email}:`, error);
-    throw error;
+    console.error(`Error sending reactivation email to ${email}:`, error);
+    return null;
+  }
+};
+
+/**
+ * Send gem purchase receipt email
+ */
+exports.sendGemPurchaseReceiptEmail = async (email, packageName, gemsAdded, newBalance) => {
+  const subject = `TotemBound - Gem Purchase Receipt: ${packageName}`;
+
+  const htmlContent = loadTemplate('gem-purchase-receipt', {
+    subject,
+    packageName,
+    gemsAdded: gemsAdded.toString(),
+    newBalance: newBalance.toString(),
+  });
+
+  const textContent = `Gem Purchase Receipt - You purchased the ${packageName} pack! ${gemsAdded} Gems have been added to your account. Your new Gem balance is ${newBalance}. Visit the shop to spend your Gems!`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    console.error(`Error sending gem receipt email to ${email}:`, error);
+    return null;
+  }
+};
+
+/**
+ * Send subscription confirmed email (after successful checkout)
+ */
+exports.sendSubscriptionConfirmedEmail = async (email, tier, nextBillingDate) => {
+  const tierName = tierDisplayName(tier);
+  const subject = `Welcome to TotemBound ${tierName}!`;
+
+  const BONUS = { premium: { essence: 500, gems: 100 }, vip: { essence: 1500, gems: 500 } };
+  const bonus = BONUS[tier] || BONUS.premium;
+
+  const formattedDate = nextBillingDate
+    ? new Date(nextBillingDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    : 'your next billing date';
+
+  const htmlContent = loadTemplate('subscription-confirmed', {
+    subject,
+    tierName,
+    essenceBonus: bonus.essence.toString(),
+    gemsBonus: bonus.gems.toString(),
+    nextBillingDate: formattedDate,
+  });
+
+  const textContent = `Welcome to TotemBound ${tierName}! Your subscription is now active. Monthly bonus: ${bonus.essence} Essence + ${bonus.gems} Gems. Next billing date: ${formattedDate}. Visit your account settings to manage your subscription.`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    console.error(`Error sending subscription confirmed email to ${email}:`, error);
+    return null;
   }
 };
