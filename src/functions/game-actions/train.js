@@ -125,7 +125,7 @@ async function train(user, totemId) {
   await updateTotem(userId, totemId, updates);
 
   // 9. Update user's total train count and trigger achievement check
-  let totalTrainCount = 1;
+  let totalTrainCount;
   let achievements = [];
   try {
     const userRecord = await getUser(userId);

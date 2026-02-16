@@ -35,9 +35,6 @@ const INCLUDE_FILES = [
 // Files to skip during copy
 const SKIP_FILES = ['.env', '.env.local', '.env.development', '.env.production'];
 
-// Files that are local-only (not needed in Lambda)
-const SKIP_LOCAL_ONLY = ['local-server.js'];
-
 function removeDir(dir) {
   if (fs.existsSync(dir)) {
     fs.rmSync(dir, { recursive: true, force: true });

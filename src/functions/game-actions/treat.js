@@ -103,7 +103,7 @@ async function treat(user, totemId) {
   await updateTotem(userId, totemId, updates);
 
   // 8. Update user's total treat count and trigger achievement check
-  let totalTreatCount = 1;
+  let totalTreatCount;
   let achievements = [];
   try {
     const userRecord = await getUser(userId);

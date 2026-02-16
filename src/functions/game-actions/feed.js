@@ -117,7 +117,7 @@ async function feed(user, totemId) {
   await updateTotem(userId, totemId, updates);
 
   // 7. Update user's total feed count and trigger achievement check
-  let totalFeedCount = 1;
+  let totalFeedCount;
   let achievements = [];
   try {
     const userRecord = await getUser(userId);
