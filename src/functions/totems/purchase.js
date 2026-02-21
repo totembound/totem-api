@@ -42,55 +42,15 @@ const {
   SPECIES,
 } = require('../../services/totem-creation');
 
+const {
+  SPECIES_DISPLAY_NAMES,
+  getTotemImageUrl,
+} = require('../../config/totem-config');
+
 const { onTotemAcquired } = require('../../services/achievements-service');
 
 // Totem purchase cost (from migration rules)
 const TOTEM_PURCHASE_COST = 500;
-
-// Load totem image CIDs
-let totemImages;
-try {
-  totemImages = require('../../data/totem-images.json');
-}
-catch (e) {
-  totemImages = { gateway: 'https://ipfs.totembound.com/ipfs/', species: {} };
-}
-
-const SPECIES_NAMES = [
-  'goose', 'otter', 'wolf', 'falcon', 'beaver',
-  'deer', 'woodpecker', 'turtle', 'bear', 'raven', 'snake', 'owl'
-];
-
-// Simple species display names (just the animal name, not full "Shadow Wolf" style)
-const SPECIES_DISPLAY_NAMES = [
-  'Goose', 'Otter', 'Wolf', 'Falcon', 'Beaver',
-  'Deer', 'Woodpecker', 'Turtle', 'Bear', 'Raven', 'Snake', 'Owl'
-];
-
-const COLOR_NAMES = [
-  'brown', 'gray', 'white', 'tawny',
-  'slate', 'copper', 'cream', 'dappled',
-  'golden', 'purple', 'charcoal',
-  'emerald', 'crimson', 'sapphire',
-  'silver', 'gold',
-  'frostbite', 'rosy', 'verdant', 'raindrop',
-  'floral', 'sunset', 'ember', 'oceanic',
-  'harvest', 'phantom', 'emberwood', 'starlit'
-];
-
-function getTotemImageUrl(speciesId, colorId, stage = 0) {
-  const speciesName = SPECIES_NAMES[speciesId];
-  const colorName = COLOR_NAMES[colorId];
-  if (!speciesName || !colorName) {
-    return `/totems/${speciesName || 'unknown'}placecard.png`;
-  }
-  const speciesData = totemImages.species[speciesName];
-  if (!speciesData || !speciesData[colorName]) {
-    return `/totems/${speciesName}placecard.png`;
-  }
-  const cid = speciesData[colorName][stage] || speciesData[colorName][0];
-  return `${totemImages.gateway}${cid}`;
-}
 
 /**
  * Purchase a new totem

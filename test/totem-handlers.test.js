@@ -127,7 +127,7 @@ describe('Totem Handlers', () => {
 
     it('should reject unavailable species', async () => {
       // Species ID 6 (Woodpecker) might be unavailable - use a disabled one
-      // This test depends on business-rules.json, so just test invalid range
+      // This test depends on totem-config.json, so just test invalid range
       const result = await purchaseTotem(testUser, { speciesId: 100 });
       expect(result.success).toBe(false);
     });

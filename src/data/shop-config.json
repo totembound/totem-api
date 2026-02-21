@@ -149,7 +149,7 @@
       "description": "Monthly collector bundle with 1 exclusive limited totem",
       "price": 7499,
       "priceFormatted": "$74.99",
-      "polEquivalent": 250,
+
       "gems": 10000,
       "essence": 50000,
       "bonus": 43,
@@ -166,7 +166,7 @@
       "description": "Premium bundle with exclusive Founder title",
       "price": 9999,
       "priceFormatted": "$99.99",
-      "polEquivalent": 333,
+
       "gems": 15000,
       "essence": 75000,
       "bonus": 50,
@@ -183,7 +183,7 @@
       "description": "Ultimate bundle with 2 limited totems, Legend title, and exclusive badge",
       "price": 14999,
       "priceFormatted": "$149.99",
-      "polEquivalent": 500,
+
       "gems": 25000,
       "essence": 125000,
       "bonus": 67,
@@ -222,7 +222,7 @@
         "species": 1,
         "color": 17,
         "rarity": 5,
-        "available": false
+        "available": true
       },
       {
         "id": "series_2026_03",

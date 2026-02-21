@@ -50,6 +50,8 @@ const {
 
 const { onTotemAcquired } = require('../../services/achievements-service');
 
+const { getTotemImageUrl } = require('../../config/totem-config');
+
 // Load special offer bundles from config
 const SPECIAL_OFFER_BUNDLES = shopConfig.specialOfferBundles || [];
 
@@ -64,48 +66,6 @@ function getCurrentMonthlySpecial() {
   const now = new Date();
   const monthYear = `${now.toLocaleString('en-US', { month: 'long' })} ${now.getFullYear()}`;
   return LIMITED_TOTEM_SERIES.find(s => s.month === monthYear) || null;
-}
-
-// Load totem image CIDs for response
-let totemImages;
-try {
-  totemImages = require('../../data/totem-images.json');
-}
-catch (e) {
-  totemImages = { gateway: 'https://ipfs.totembound.com/ipfs/', species: {} };
-}
-
-const SPECIES_NAMES = [
-  'goose', 'otter', 'wolf', 'falcon', 'beaver',
-  'deer', 'woodpecker', 'turtle', 'bear', 'raven', 'snake', 'owl'
-];
-
-const COLOR_NAMES = [
-  'brown', 'gray', 'white', 'tawny',
-  'slate', 'copper', 'cream', 'dappled',
-  'golden', 'purple', 'charcoal',
-  'emerald', 'crimson', 'sapphire',
-  'silver', 'gold',
-  'frostbite', 'rosy', 'verdant', 'raindrop',
-  'floral', 'sunset', 'ember', 'oceanic',
-  'harvest', 'phantom', 'emberwood', 'starlit'
-];
-
-/**
- * Get totem image URL
- */
-function getTotemImageUrl(speciesId, colorId, stage = 0) {
-  const speciesName = SPECIES_NAMES[speciesId];
-  const colorName = COLOR_NAMES[colorId];
-  if (!speciesName || !colorName) {
-    return `/totems/${speciesName || 'unknown'}placecard.png`;
-  }
-  const speciesData = totemImages.species[speciesName];
-  if (!speciesData || !speciesData[colorName]) {
-    return `/totems/${speciesName}placecard.png`;
-  }
-  const cid = speciesData[colorName][stage] || speciesData[colorName][0];
-  return `${totemImages.gateway}${cid}`;
 }
 
 /**

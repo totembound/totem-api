@@ -22,7 +22,7 @@ const COLLECTOR_BUNDLES = shopConfig.monthlySeriesBundles.map(bundle => ({
 }));
 
 // Conversion rate from JSON
-const GEM_TO_STARLIGHT_RATIO = shopConfig.conversionRate.gemToEssence;
+const GEM_TO_ESSENCE_RATIO = shopConfig.conversionRate.gemToEssence;
 
 // Totem pricing from JSON
 const TOTEM_PRICING = shopConfig.totemPricing;
@@ -80,7 +80,7 @@ function getCurrentLimitedSeries() {
 module.exports = {
   GEM_PACKAGES,
   COLLECTOR_BUNDLES,
-  GEM_TO_STARLIGHT_RATIO,
+  GEM_TO_ESSENCE_RATIO,
   TOTEM_PRICING,
   LIMITED_SERIES,
   getPackageById,

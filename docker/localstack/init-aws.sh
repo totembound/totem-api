@@ -20,37 +20,18 @@ awslocal s3 mb s3://totembound-uploads-local 2>/dev/null || true
 echo "Creating SSM parameters..."
 
 # Database config
-awslocal ssm put-parameter \
-  --name "/totembound/local/dynamodb/endpoint" \
-  --value "http://dynamodb-local:8000" \
-  --type String \
-  --overwrite
+# Note: --cli-input-json avoids AWS CLI misinterpreting URLs as remote param files
+awslocal ssm put-parameter --cli-input-json '{"Name":"/totembound/local/dynamodb/endpoint","Value":"http://dynamodb-local:8000","Type":"String","Overwrite":true}'
 
 # Cognito config
-awslocal ssm put-parameter \
-  --name "/totembound/local/cognito/user-pool-id" \
-  --value "local_totembound" \
-  --type String \
-  --overwrite
+awslocal ssm put-parameter --cli-input-json '{"Name":"/totembound/local/cognito/user-pool-id","Value":"local_totembound","Type":"String","Overwrite":true}'
 
-awslocal ssm put-parameter \
-  --name "/totembound/local/cognito/client-id" \
-  --value "totembound-local-client" \
-  --type String \
-  --overwrite
+awslocal ssm put-parameter --cli-input-json '{"Name":"/totembound/local/cognito/client-id","Value":"totembound-local-client","Type":"String","Overwrite":true}'
 
 # Stripe (test keys - replace with your test keys)
-awslocal ssm put-parameter \
-  --name "/totembound/local/stripe/secret-key" \
-  --value "sk_test_your_test_key_here" \
-  --type SecureString \
-  --overwrite
+awslocal ssm put-parameter --cli-input-json '{"Name":"/totembound/local/stripe/secret-key","Value":"sk_test_your_test_key_here","Type":"SecureString","Overwrite":true}'
 
-awslocal ssm put-parameter \
-  --name "/totembound/local/stripe/webhook-secret" \
-  --value "whsec_test_webhook_secret" \
-  --type SecureString \
-  --overwrite
+awslocal ssm put-parameter --cli-input-json '{"Name":"/totembound/local/stripe/webhook-secret","Value":"whsec_test_webhook_secret","Type":"SecureString","Overwrite":true}'
 
 # ============================================
 # SES (Email) - Verify sender identity
