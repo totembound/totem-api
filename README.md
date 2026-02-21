@@ -328,7 +328,7 @@ src/
 ├── services/               # Business logic layer
 ├── common/                 # db-client, cognito-client, email, validation
 ├── config/                 # Gem packages, shop config
-├── data/                   # business-rules.json (server-side game rules)
+├── data/                   # totem-config.json (server-side game rules)
 └── routes/                 # Route definitions + Swagger JSDoc
 ```
 

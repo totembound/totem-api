@@ -39,7 +39,7 @@ const dbClient = require('../src/common/db-client');
 const email = require('../src/common/email');
 const iot = require('../src/common/iot-publisher');
 const ssm = require('../src/common/ssm-loader');
-const { GEM_TO_STARLIGHT_RATIO, getPackagesForDisplay } = require('../src/config/gem-packages');
+const { GEM_TO_ESSENCE_RATIO, getPackagesForDisplay } = require('../src/config/gem-packages');
 const {
   getGemPackages,
   createCheckoutSession,
@@ -91,13 +91,13 @@ describe('getGemPackages', () => {
 
   it('should include correct conversion rate from config', async () => {
     const result = await getGemPackages();
-    expect(result.data.conversionRate).toBe(GEM_TO_STARLIGHT_RATIO);
+    expect(result.data.conversionRate).toBe(GEM_TO_ESSENCE_RATIO);
     expect(result.data.conversionRate).toBe(5);
   });
 
   it('should include conversion note with the ratio', async () => {
     const result = await getGemPackages();
-    expect(result.data.conversionNote).toContain(String(GEM_TO_STARLIGHT_RATIO));
+    expect(result.data.conversionNote).toContain(String(GEM_TO_ESSENCE_RATIO));
     expect(result.data.conversionNote).toContain('Gem Exchange');
   });
 

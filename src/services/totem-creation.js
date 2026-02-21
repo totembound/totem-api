@@ -10,101 +10,17 @@
 
 const { generateId } = require('../common/id-utils');
 
-// ============================================
-// Load static config from JSON files (single source of truth)
-// ============================================
-
-// Load species stage data for proper naming
-let speciesStages;
-try {
-  speciesStages = require('../data/species-stages.json');
-}
-catch (e) {
-  console.warn('Species stages data not found, using defaults');
-  speciesStages = { species: {}, speciesById: {} };
-}
-
-// Load business rules (rarities, species stats, colors, action configs)
-let businessRules;
-try {
-  businessRules = require('../data/business-rules.json');
-}
-catch (e) {
-  console.warn('Business rules not found, using defaults');
-  businessRules = null;
-}
-
-/**
- * Get species-specific stage name (e.g., "Pup" for wolf, "Hatchling" for owl)
- */
-function getStageNameForSpecies(speciesId, stage) {
-  const speciesKey = speciesStages.speciesById?.[speciesId];
-  const speciesData = speciesKey ? speciesStages.species?.[speciesKey] : null;
-
-  const defaultStages = ['Hatchling', 'Chick', 'Juvenile', 'Adult', 'Wise Elder'];
-
-  if (speciesData?.stages?.[stage]) {
-    return speciesData.stages[stage];
-  }
-
-  return defaultStages[stage] || defaultStages[0];
-}
-
-// ============================================
-// Static Config loaded from JSON (business rules)
-// ============================================
-
-const RARITIES = businessRules?.rarities || [
-  { id: 0, name: 'Common', statBonus: 0, dropChance: 75 },
-  { id: 1, name: 'Uncommon', statBonus: 0, dropChance: 15 },
-  { id: 2, name: 'Rare', statBonus: 1, dropChance: 7 },
-  { id: 3, name: 'Epic', statBonus: 2, dropChance: 2.5 },
-  { id: 4, name: 'Legendary', statBonus: 4, dropChance: 0.5 },
-  { id: 5, name: 'Limited', statBonus: 2, dropChance: 0 },
-];
-
-const COLORS_BY_RARITY = businessRules?.colorsByRarity || {
-  common: [{ id: 0, name: 'Brown' }, { id: 1, name: 'Gray' }, { id: 2, name: 'White' }, { id: 3, name: 'Tawny' }],
-  uncommon: [{ id: 4, name: 'Slate' }, { id: 5, name: 'Copper' }, { id: 6, name: 'Cream' }, { id: 7, name: 'Dappled' }],
-  rare: [{ id: 8, name: 'Golden' }, { id: 9, name: 'DarkPurple' }, { id: 10, name: 'Charcoal' }],
-  epic: [{ id: 11, name: 'EmeraldGreen' }, { id: 12, name: 'CrimsonRed' }, { id: 13, name: 'DeepSapphire' }],
-  legendary: [{ id: 14, name: 'EtherealSilver' }, { id: 15, name: 'RadiantGold' }],
-  limited: [{ id: 16, name: 'FrostbiteBlue' }, { id: 17, name: 'RosyPink' }, { id: 18, name: 'VerdantGold' }, { id: 19, name: 'RaindropTeal' }, { id: 20, name: 'FloralViolet' }, { id: 21, name: 'SunsetOrange' }, { id: 22, name: 'EmberRed' }, { id: 23, name: 'OceanicAzure' }, { id: 24, name: 'HarvestGold' }, { id: 25, name: 'PhantomBlack' }, { id: 26, name: 'EmberwoodBrown' }, { id: 27, name: 'StarlitSilver' }],
-};
-
-const SPECIES = businessRules?.species || [
-  { id: 0, name: 'Goose', baseStats: { strength: 8, agility: 6, wisdom: 10 }, available: true },
-  { id: 1, name: 'Otter', baseStats: { strength: 8, agility: 10, wisdom: 6 }, available: true },
-  { id: 2, name: 'Wolf', baseStats: { strength: 11, agility: 8, wisdom: 5 }, available: true },
-  { id: 3, name: 'Falcon', baseStats: { strength: 5, agility: 12, wisdom: 7 }, available: true },
-  { id: 4, name: 'Beaver', baseStats: { strength: 10, agility: 5, wisdom: 9 }, available: true },
-  { id: 5, name: 'Deer', baseStats: { strength: 5, agility: 11, wisdom: 8 }, available: true },
-  { id: 6, name: 'Woodpecker', baseStats: { strength: 7, agility: 11, wisdom: 6 }, available: false },
-  { id: 7, name: 'Turtle', baseStats: { strength: 10, agility: 8, wisdom: 6 }, available: false },
-  { id: 8, name: 'Bear', baseStats: { strength: 12, agility: 5, wisdom: 7 }, available: false },
-  { id: 9, name: 'Raven', baseStats: { strength: 5, agility: 8, wisdom: 11 }, available: false },
-  { id: 10, name: 'Snake', baseStats: { strength: 7, agility: 6, wisdom: 11 }, available: false },
-  { id: 11, name: 'Owl', baseStats: { strength: 5, agility: 7, wisdom: 12 }, available: true },
-];
-
-const AVAILABLE_SPECIES_IDS = SPECIES.filter((s) => s.available).map((s) => s.id);
-
-// Simple species display names (just the animal name, not full "Shadow Wolf" style)
-const SPECIES_DISPLAY_NAMES = [
-  'Goose', 'Otter', 'Wolf', 'Falcon', 'Beaver',
-  'Deer', 'Woodpecker', 'Turtle', 'Bear', 'Raven', 'Snake', 'Owl'
-];
-
-// Action configs for business rule validation
-const ACTION_CONFIGS = businessRules?.actionConfigs || {
-  feed: { cost: 10, cooldown: 0, maxDaily: 3, minHappiness: 0, happinessChange: 10, experienceGain: 0 },
-  train: { cost: 20, cooldown: 0, maxDaily: 0, minHappiness: 20, happinessChange: -10, experienceGain: 50 },
-  treat: { cost: 20, cooldown: 14400, maxDaily: 0, minHappiness: 0, happinessChange: 10, experienceGain: 0 },
-  evolve: { cost: 0, cooldown: 0, maxDaily: 0, minHappiness: 30, happinessChange: 0, experienceGain: 0 },
-};
-
-const STAGE_THRESHOLDS = businessRules?.stageThresholds || [0, 500, 1500, 3500, 7500];
-const PRESTIGE_XP_REQUIREMENT = businessRules?.prestigeXpRequirement || 2500;
+const {
+  RARITIES,
+  SPECIES,
+  AVAILABLE_SPECIES_IDS,
+  SPECIES_DISPLAY_NAMES,
+  COLORS_BY_RARITY,
+  ACTION_CONFIGS,
+  STAGE_THRESHOLDS,
+  PRESTIGE_XP_REQUIREMENT,
+  getStageNameForSpecies,
+} = require('../config/totem-config');
 
 // ============================================
 // Rarity Determination
@@ -434,7 +350,7 @@ module.exports = {
   calculateInitialStats,
   getStageNameForSpecies,
 
-  // Config loaded from JSON (for reference)
+  // Config re-exported for consumers that import from here
   RARITIES,
   COLORS_BY_RARITY,
   SPECIES,

@@ -1,5 +1,5 @@
 {
-  "description": "Business rules for totem creation and validation. Static config used by API.",
+  "description": "Totem game configuration. Single source of truth for API-side game rules.",
   "rarities": [
     { "id": 0, "name": "Common", "statBonus": 0, "dropChance": 75 },
     { "id": 1, "name": "Uncommon", "statBonus": 0, "dropChance": 15 },
@@ -70,6 +70,20 @@
     "treat": { "cost": 20, "cooldown": 14400, "maxDaily": 0, "minHappiness": 0, "happinessChange": 10, "experienceGain": 0 },
     "evolve": { "cost": 0, "cooldown": 0, "maxDaily": 0, "minHappiness": 30, "happinessChange": 0, "experienceGain": 0 }
   },
+  "domains": [
+    { "id": 0, "name": "Air", "speciesIds": [3, 6, 9, 11] },
+    { "id": 1, "name": "Earth", "speciesIds": [2, 5, 8, 10] },
+    { "id": 2, "name": "Water", "speciesIds": [0, 1, 4, 7] }
+  ],
   "stageThresholds": [0, 500, 1500, 3500, 7500],
-  "prestigeXpRequirement": 2500
+  "prestigeXpRequirement": 2500,
+  "timeWindows": {
+    "windowDuration": 28800,
+    "windowsPerDay": 3,
+    "windows": [
+      { "start": 0, "end": 28800 },
+      { "start": 28800, "end": 57600 },
+      { "start": 57600, "end": 86400 }
+    ]
+  }
 }

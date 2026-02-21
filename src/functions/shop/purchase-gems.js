@@ -9,7 +9,7 @@
  * In production: Stripe checkout flow with webhook fulfillment
  */
 
-const { GEM_TO_STARLIGHT_RATIO, getPackageById, getPackagesForDisplay } = require('../../config/gem-packages');
+const { GEM_TO_ESSENCE_RATIO, getPackageById, getPackagesForDisplay } = require('../../config/gem-packages');
 const { addGems, getUser, getBundlePurchasesToday } = require('../../common/db-client');
 const { sendGemPurchaseReceiptEmail } = require('../../common/email');
 const { publishBalanceUpdate, publishNotification } = require('../../common/iot-publisher');
@@ -35,8 +35,8 @@ async function getGemPackages() {
     success: true,
     data: {
       packages: getPackagesForDisplay(),
-      conversionRate: GEM_TO_STARLIGHT_RATIO,
-      conversionNote: `Use the Gem Exchange to convert 1 Gem = ${GEM_TO_STARLIGHT_RATIO} Essence`,
+      conversionRate: GEM_TO_ESSENCE_RATIO,
+      conversionNote: `Use the Gem Exchange to convert 1 Gem = ${GEM_TO_ESSENCE_RATIO} Essence`,
     },
   };
 }

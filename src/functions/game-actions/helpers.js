@@ -2,75 +2,31 @@
  * Game Actions Helpers
  *
  * Shared logic for game actions - ALL VALUES MUST MATCH CONTRACT RULES
- * Source of truth: /src/data/business-rules.json (from totem-contracts)
+ * Source of truth: /src/data/totem-config.json (from totem-contracts)
  *
  * DO NOT use random values - use exact fixed values from contract
  */
 
-// ============================================
-// Load Business Rules (Source of Truth)
-// ============================================
+const {
+  ACTION_CONFIGS,
+  STAGE_THRESHOLDS,
+  PRESTIGE_XP_REQUIREMENT,
+  TIME_WINDOWS,
+  DEFAULT_STAGE_NAMES,
+  getStageNameForSpecies,
+} = require('../../config/totem-config');
 
-let businessRules;
-try {
-  businessRules = require('../../data/business-rules.json');
-}
-catch (e) {
-  console.error('CRITICAL: business-rules.json not found - using hardcoded fallbacks');
-  businessRules = null;
-}
-
-// Action configs from contract (phase-6-game-logic-setup.ts)
-const ACTION_CONFIGS = businessRules?.actionConfigs || {
-  feed: { cost: 10, cooldown: 0, maxDaily: 3, minHappiness: 0, happinessChange: 10, experienceGain: 0 },
-  train: { cost: 20, cooldown: 0, maxDaily: 0, minHappiness: 20, happinessChange: -10, experienceGain: 50 },
-  treat: { cost: 20, cooldown: 14400, maxDaily: 0, minHappiness: 0, happinessChange: 10, experienceGain: 0 },
-  evolve: { cost: 0, cooldown: 0, maxDaily: 0, minHappiness: 30, happinessChange: 0, experienceGain: 0 },
-};
-
-// Stage thresholds from contract (phase-3-proxy-deployments.ts)
-const STAGE_THRESHOLDS = businessRules?.stageThresholds || [0, 500, 1500, 3500, 7500];
-const PRESTIGE_XP_REQUIREMENT = businessRules?.prestigeXpRequirement || 2500;
-
-// Time windows from contract (8-hour UTC slots)
-const TIME_WINDOWS = businessRules?.timeWindows || {
-  windowDuration: 28800, // 8 hours in seconds
-  windowsPerDay: 3,
-  windows: [
-    { start: 0, end: 28800 },      // 00:00 - 08:00 UTC
-    { start: 28800, end: 57600 },  // 08:00 - 16:00 UTC
-    { start: 57600, end: 86400 },  // 16:00 - 24:00 UTC
-  ],
-};
-
-// ============================================
-// Stage Names (from IPFS metadata)
-// ============================================
-
-let speciesStages;
-try {
-  speciesStages = require('../../data/species-stages.json');
-}
-catch (e) {
-  console.warn('Species stages data not found, using default names');
-  speciesStages = { species: {}, speciesById: {} };
-}
-
-const DEFAULT_STAGE_NAMES = ['Hatchling', 'Chick', 'Juvenile', 'Adult', 'Wise Elder'];
 const MAX_STAGE = 4;
+
+// ============================================
+// Stage Names
+// ============================================
 
 /**
  * Get stage name for a given species and stage number
  */
 function getStageName(speciesId, stage = 0) {
-  const speciesKey = speciesStages.speciesById?.[speciesId];
-  const speciesData = speciesKey ? speciesStages.species?.[speciesKey] : null;
-
-  if (speciesData?.stages?.[stage]) {
-    return speciesData.stages[stage];
-  }
-
-  return DEFAULT_STAGE_NAMES[stage] || DEFAULT_STAGE_NAMES[DEFAULT_STAGE_NAMES.length - 1];
+  return getStageNameForSpecies(speciesId, stage);
 }
 
 // ============================================
@@ -367,7 +323,7 @@ function buildActionResult(actionType, totem, statChanges, xpGained) {
 // ============================================
 
 module.exports = {
-  // Config from business rules
+  // Config from totem-config
   ACTION_CONFIGS,
   STAGE_THRESHOLDS,
   PRESTIGE_XP_REQUIREMENT,
