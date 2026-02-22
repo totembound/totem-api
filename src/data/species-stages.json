@@ -34,12 +34,12 @@
     "woodpecker": {
       "id": 6,
       "name": "Nimble Woodpecker",
-      "stages": ["Hatchling", "Chick", "Drummer", "Tapper", "Wise Elder"]
+      "stages": ["Hatchling", "Fledgling", "Forager", "Warden", "Wise Elder"]
     },
     "turtle": {
       "id": 7,
       "name": "Ancient Turtle",
-      "stages": ["Hatchling", "Swimmer", "Shell", "Guardian", "Wise Elder"]
+      "stages": ["Hatchling", "Youngling", "Wayfarer", "Warden", "Wise Elder"]
     },
     "bear": {
       "id": 8,
@@ -49,12 +49,12 @@
     "raven": {
       "id": 9,
       "name": "Clever Raven",
-      "stages": ["Hatchling", "Fledgling", "Trickster", "Oracle", "Wise Elder"]
+      "stages": ["Hatchling", "Fledgling", "Messenger", "Warden", "Wise Elder"]
     },
     "snake": {
       "id": 10,
       "name": "Wise Snake",
-      "stages": ["Hatchling", "Slider", "Coiler", "Serpent", "Wise Elder"]
+      "stages": ["Hatchling", "Slitherling", "Striker", "Warden", "Wise Elder"]
     },
     "owl": {
       "id": 11,
