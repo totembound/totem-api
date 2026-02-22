@@ -46,12 +46,32 @@ Parameters:
 
   StripePricePremium:
     Type: String
-    Description: Stripe Price ID for Premium subscription tier. Leave empty until Stripe products are created.
+    Description: Stripe Price ID for Premium subscription tier
     Default: ''
 
   StripePriceVip:
     Type: String
-    Description: Stripe Price ID for VIP subscription tier. Leave empty until Stripe products are created.
+    Description: Stripe Price ID for VIP subscription tier
+    Default: ''
+
+  StripePriceStarter:
+    Type: String
+    Description: Stripe Price ID for Starter gem package ($4.99)
+    Default: ''
+
+  StripePricePopular:
+    Type: String
+    Description: Stripe Price ID for Popular gem package ($9.99)
+    Default: ''
+
+  StripePriceBestValue:
+    Type: String
+    Description: Stripe Price ID for Best Value gem package ($24.99)
+    Default: ''
+
+  StripePriceUltimate:
+    Type: String
+    Description: Stripe Price ID for Ultimate gem package ($49.99)
     Default: ''
 
   IoTEndpoint:
@@ -119,6 +139,10 @@ Resources:
             - !Ref FromEmail
           STRIPE_PRICE_PREMIUM: !Ref StripePricePremium
           STRIPE_PRICE_VIP: !Ref StripePriceVip
+          STRIPE_PRICE_STARTER: !Ref StripePriceStarter
+          STRIPE_PRICE_POPULAR: !Ref StripePricePopular
+          STRIPE_PRICE_BEST_VALUE: !Ref StripePriceBestValue
+          STRIPE_PRICE_ULTIMATE: !Ref StripePriceUltimate
           IOT_ENDPOINT: !Ref IoTEndpoint
           IOT_IDENTITY_POOL_ID: !Ref IoTIdentityPoolId
           IOT_BROWSER_POLICY_NAME: !Ref IoTBrowserPolicyName
@@ -168,7 +192,7 @@ Resources:
         gatewayresponse.header.Access-Control-Allow-Origin: !Sub
           - "'${Origin}'"
           - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
 
   GatewayResponse5XX:
@@ -180,7 +204,7 @@ Resources:
         gatewayresponse.header.Access-Control-Allow-Origin: !Sub
           - "'${Origin}'"
           - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
-        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
 
   # ============================================
@@ -265,7 +289,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -285,6 +309,7 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Max-Age: true
+
 
   # /v1
   V1Resource:
@@ -338,7 +363,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -391,7 +416,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -444,7 +469,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -497,7 +522,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -550,7 +575,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -603,7 +628,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -656,7 +681,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -709,7 +734,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -773,7 +798,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -835,7 +860,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"
@@ -898,7 +923,7 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: !Sub
                 - "'${Origin}'"

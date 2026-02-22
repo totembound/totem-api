@@ -97,8 +97,8 @@ Resources:
         - ALLOW_USER_SRP_AUTH
 
       # Token validity
-      AccessTokenValidity: 1
-      IdTokenValidity: 1
+      AccessTokenValidity: 24
+      IdTokenValidity: 24
       RefreshTokenValidity: 30
       TokenValidityUnits:
         AccessToken: hours

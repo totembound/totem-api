@@ -21,7 +21,7 @@ const isLocal = process.env.IS_LOCAL === 'true' || process.env.NODE_ENV === 'dev
 const _USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || 'local_user_pool';
 const CLIENT_ID = process.env.COGNITO_CLIENT_ID || 'local_client_id';
 const JWT_SECRET = process.env.JWT_SECRET || 'local-dev-secret-key-change-in-prod';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '7d';
 
 // ============================================
@@ -107,7 +107,7 @@ function localGenerateTokens(userId, email) {
 
   localTokenStore.set(refreshToken, { userId, email, createdAt: Date.now() });
 
-  return { accessToken, refreshToken, idToken, expiresIn: 3600, tokenType: 'Bearer' };
+  return { accessToken, refreshToken, idToken, expiresIn: 86400, tokenType: 'Bearer' };
 }
 
 function localVerifyAccessToken(token) {

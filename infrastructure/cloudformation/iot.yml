@@ -1,8 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >
-  TotemBound IoT Core - Real-time push notifications via MQTT/WebSocket.
-  Server publishes to per-user topics; browser subscribes via Cognito Identity Pool credentials.
-  Used ONLY for server-initiated events (Stripe webhooks, admin broadcasts).
+Description: TotemBound IoT - Real-time push via MQTT/WebSocket
 
 Parameters:
   Environment:
@@ -17,10 +14,15 @@ Parameters:
     Description: Cognito User Pool Client ID (from cognito stack)
   LambdaExecutionRoleArn:
     Type: String
-    Description: Lambda execution role ARN (from core stack) - will be updated with IoT publish permission
+    Description: Lambda execution role ARN (from core stack)
+  IoTBrowserPolicyName:
+    Type: String
+    Description: Pre-created IoT browser policy name (created outside CloudFormation to avoid CFN IoT policy lifecycle issues)
+    Default: ''
 
 Conditions:
   IsProduction: !Equals [!Ref Environment, prod]
+  HasBrowserPolicy: !Not [!Equals [!Ref IoTBrowserPolicyName, '']]
 
 Resources:
 
@@ -62,26 +64,19 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
-              # Connect to IoT Core with identity-scoped client ID
               - Effect: Allow
                 Action: iot:Connect
                 Resource: !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:client/${!cognito-identity.amazonaws.com:sub}-*'
-              # Subscribe to own user topic only
               - Effect: Allow
                 Action: iot:Subscribe
-                Resource: !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/user/${!cognito-identity.amazonaws.com:sub}/*'
-              # Subscribe to global broadcast topic
-              - Effect: Allow
-                Action: iot:Subscribe
-                Resource: !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/global/*'
-              # Receive messages from own topic
+                Resource:
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/user/${!cognito-identity.amazonaws.com:sub}/*'
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/global/*'
               - Effect: Allow
                 Action: iot:Receive
-                Resource: !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/user/${!cognito-identity.amazonaws.com:sub}/*'
-              # Receive messages from global broadcast topic
-              - Effect: Allow
-                Action: iot:Receive
-                Resource: !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/global/*'
+                Resource:
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/user/${!cognito-identity.amazonaws.com:sub}/*'
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/global/*'
 
   # Unauthenticated role (required but has no permissions)
   UnauthenticatedRole:
@@ -119,25 +114,6 @@ Resources:
         unauthenticated: !GetAtt UnauthenticatedRole.Arn
 
   # ===========================================================================
-  # IoT Policy for browser clients (attached via Cognito Identity)
-  # ===========================================================================
-  IoTBrowserPolicy:
-    Type: AWS::IoT::Policy
-    Properties:
-      PolicyName: !Sub 'totembound-${Environment}-browser-iot-policy'
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action: iot:Connect
-            Resource: '*'
-          - Effect: Allow
-            Action:
-              - iot:Subscribe
-              - iot:Receive
-            Resource: '*'
-
-  # ===========================================================================
   # Lambda IoT Publish Policy (added to existing Lambda execution role)
   # ===========================================================================
   LambdaIoTPublishPolicy:
@@ -163,7 +139,7 @@ Resources:
 
 Outputs:
   IdentityPoolId:
-    Description: Cognito Identity Pool ID for browser IoT authentication
+    Description: Cognito Identity Pool ID
     Value: !Ref IdentityPool
     Export:
       Name: !Sub '${AWS::StackName}-IdentityPoolId'
@@ -176,6 +152,6 @@ Outputs:
 
   IoTBrowserPolicyName:
     Description: IoT Policy name for browser clients
-    Value: !Ref IoTBrowserPolicy
+    Value: !If [HasBrowserPolicy, !Ref IoTBrowserPolicyName, '']
     Export:
       Name: !Sub '${AWS::StackName}-IoTBrowserPolicyName'
