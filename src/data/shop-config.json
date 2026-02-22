@@ -202,36 +202,73 @@
   },
   "limitedTotemSeries": {
     "description": "Monthly limited totem releases. Each month features a new exclusive color/species combo.",
-    "schedule": "First of each month",
-    "availabilityDays": 30,
-    "maxPerUser": 1,
+    "schedule": "Full calendar month, rotates annually",
+    "availabilityWindow": "calendar_month",
+    "dailyLimit": 1,
     "series": [
       {
-        "id": "series_2026_01",
-        "month": "January 2026",
-        "name": "Frostbite Falcon",
-        "species": 3,
+        "id": "limited_series_01",
+        "month": "January",
+        "name": "Frostbound Goose",
+        "species": 0,
         "color": 16,
-        "rarity": 5,
-        "available": false
+        "rarity": 5
       },
       {
-        "id": "series_2026_02",
-        "month": "February 2026",
-        "name": "Rosy Otter",
+        "id": "limited_series_02",
+        "month": "February",
+        "name": "Lovewave Otter",
         "species": 1,
         "color": 17,
-        "rarity": 5,
-        "available": true
+        "rarity": 5
       },
       {
-        "id": "series_2026_03",
-        "month": "March 2026",
-        "name": "Verdant Deer",
-        "species": 5,
+        "id": "limited_series_03",
+        "month": "March",
+        "name": "Cloverfang Wolf",
+        "species": 2,
         "color": 18,
-        "rarity": 5,
-        "available": false
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_04",
+        "month": "April",
+        "name": "Thunderstrike Falcon",
+        "species": 3,
+        "color": 19,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_05",
+        "month": "May",
+        "name": "Blossomroot Beaver",
+        "species": 4,
+        "color": 20,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_06",
+        "month": "June",
+        "name": "Solstride Deer",
+        "species": 5,
+        "color": 21,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_07",
+        "month": "July",
+        "name": "Blazebeak Woodpecker",
+        "species": 6,
+        "color": 22,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_12",
+        "month": "December",
+        "name": "Everfrost Owl",
+        "species": 11,
+        "color": 27,
+        "rarity": 5
       }
     ]
   }
