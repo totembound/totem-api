@@ -59,13 +59,15 @@ const SPECIAL_OFFER_BUNDLES = shopConfig.specialOfferBundles || [];
 const LIMITED_TOTEM_SERIES = shopConfig.limitedTotemSeries?.series || [];
 
 /**
- * Get current month's limited series totem config
- * @returns {Object|null} Monthly series config or null if not found
+ * Get current month's limited series totem config.
+ * Matches by calendar month name (e.g. "March"). Series rotate annually —
+ * each month's special returns every year with no deploy needed.
+ * @returns {Object|null} Monthly series config or null if none for this month
  */
 function getCurrentMonthlySpecial() {
   const now = new Date();
-  const monthYear = `${now.toLocaleString('en-US', { month: 'long' })} ${now.getFullYear()}`;
-  return LIMITED_TOTEM_SERIES.find(s => s.month === monthYear) || null;
+  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  return LIMITED_TOTEM_SERIES.find(s => s.month === monthName) || null;
 }
 
 /**
