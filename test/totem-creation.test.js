@@ -152,9 +152,9 @@ describe('Totem Creation Service', () => {
       });
     });
 
-    it('should have 7 available species', () => {
-      // 0 Goose, 1 Otter, 2 Wolf, 3 Falcon, 4 Beaver, 5 Deer, 11 Owl
-      expect(AVAILABLE_SPECIES_IDS).toHaveLength(7);
+    it('should have 8 available species', () => {
+      // 0 Goose, 1 Otter, 2 Wolf, 3 Falcon, 4 Beaver, 5 Deer, 6 Woodpecker, 11 Owl
+      expect(AVAILABLE_SPECIES_IDS).toHaveLength(8);
     });
 
     it('should exclude unavailable species', () => {
@@ -296,13 +296,13 @@ describe('Totem Creation Service', () => {
     });
 
     it('should return null for unavailable species with availability check', () => {
-      expect(getSpecies(6)).toBeNull(); // Woodpecker - unavailable
+      expect(getSpecies(8)).toBeNull(); // Bear - unavailable
     });
 
     it('should return unavailable species when check is disabled', () => {
-      const species = getSpecies(6, false);
+      const species = getSpecies(8, false);
       expect(species).not.toBeNull();
-      expect(species.speciesId).toBe(6);
+      expect(species.speciesId).toBe(8);
     });
 
     it('should return null for invalid species ID', () => {
@@ -318,8 +318,8 @@ describe('Totem Creation Service', () => {
     });
 
     it('should return false for unavailable species', () => {
-      expect(isSpeciesAvailable(6)).toBe(false);  // Woodpecker
       expect(isSpeciesAvailable(8)).toBe(false);  // Bear
+      expect(isSpeciesAvailable(7)).toBe(false);  // Turtle
     });
   });
 
@@ -412,8 +412,8 @@ describe('Totem Creation Service', () => {
 
     it('should throw for unavailable species', () => {
       expect(() => {
-        createTotem({ userId: 'usr_test123', speciesId: 6 }); // Woodpecker - unavailable
-      }).toThrow('Species 6 is not available');
+        createTotem({ userId: 'usr_test123', speciesId: 8 }); // Bear - unavailable
+      }).toThrow('Species 8 is not available');
     });
 
     it('should set nickname when name provided', () => {
