@@ -1,8 +1,11 @@
 {
-    "Environment": "staging",
-    "AppVersion": "0.0.1",
     "StripeSecretKeyParam": "/totemboundci/stripe/secret-key",
     "StripeWebhookSecretParam": "/totemboundci/stripe/webhook-secret",
-    "TurnstileSecretKeyName": "/totemboundci/turnstile/secret-key",
-    "FromEmail": "no-reply@totembound-test.net"
+    "FromEmail": "no-reply@totembound-test.net",
+    "StripePriceStarter": "price_1Sy3FqB9v7dW9snFCD2lJ8jx",
+    "StripePricePopular": "price_1Sy3G8B9v7dW9snFc1tvXScK",
+    "StripePriceBestValue": "price_1Sy3GMB9v7dW9snFLDNeRcsR",
+    "StripePriceUltimate": "price_1Sy3GgB9v7dW9snFmGsEqOHy",
+    "StripePricePremium": "price_1Sy322B9v7dW9snFPrmyDlmh",
+    "StripePriceVip": "price_1Sy32PB9v7dW9snFMI14R3pA"
 }

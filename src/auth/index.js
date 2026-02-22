@@ -130,10 +130,13 @@ async function handleSignup(req, res) {
       refName: 'Welcome Bonus',
     });
 
-    // Send welcome email (non-blocking - don't fail signup if email fails)
-    sendNewUserWelcomeEmail(email, cognitoResult.displayName, null).catch((err) => {
+    // Send welcome email (await to ensure Lambda doesn't freeze before send completes)
+    try {
+      await sendNewUserWelcomeEmail(email, cognitoResult.displayName, null);
+    }
+    catch (err) {
       console.error('Failed to send welcome email:', err);
-    });
+    }
 
     // NOTE: Do NOT fire onUserSignup with totemCount=1 here — user has no totem yet.
     // The collector achievement fires when user opens their loot box (onTotemAcquired).
@@ -432,14 +435,15 @@ async function handleGetMe(req, res) {
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader) {
     return res.status(401).json({
       success: false,
       error: 'No token provided',
     });
   }
 
-  const token = authHeader.substring(7);
+  // Accept both raw token and Bearer-prefixed token
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
   const result = verifyAccessToken(token);
 
   if (!result.valid) {
@@ -462,8 +466,9 @@ function authMiddleware(req, res, next) {
 function optionalAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7);
+  if (authHeader) {
+    // Accept both raw token and Bearer-prefixed token
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
     const result = verifyAccessToken(token);
 
     if (result.valid) {

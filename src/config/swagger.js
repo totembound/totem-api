@@ -7,31 +7,29 @@
 
 const swaggerJsdoc = require('swagger-jsdoc');
 
+const IS_LOCAL = process.env.IS_LOCAL === 'true';
+const ENV = process.env.ENVIRONMENT || process.env.NODE_ENV || 'development';
+
+const apiVersion = require('../../package.json').version;
+
+const servers = IS_LOCAL
+  ? [{ url: 'http://localhost:3001', description: 'Local development server' }]
+  : ENV === 'production'
+    ? [{ url: 'https://api.totembound.com', description: 'Production server' }]
+    : [{ url: 'https://api.totembound-test.net', description: 'Staging server' }];
+
 const options = {
   definition: {
     openapi: '3.0.0',
     info: {
       title: 'TotemBound API',
-      version: '1.0.0',
+      version: apiVersion,
       description: 'REST API for TotemBound game - manage totems, rewards, challenges, and shop',
       contact: {
         name: 'TotemBound Team',
       },
     },
-    servers: [
-      {
-        url: 'http://localhost:3001',
-        description: 'Local development server',
-      },
-      {
-        url: 'https://api.totembound-test.net',
-        description: 'Staging server',
-      },
-      {
-        url: 'https://api.totembound.com',
-        description: 'Production server',
-      },
-    ],
+    servers,
     components: {
       securitySchemes: {
         bearerAuth: {

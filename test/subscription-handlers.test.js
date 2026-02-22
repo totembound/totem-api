@@ -281,7 +281,7 @@ describe('Subscription Handlers', () => {
         notificationType: 'REWARD_CLAIMED',
         title: 'Subscription Active!',
         message: 'Welcome to the Vip plan!',
-        data: { tier: 'vip', devMode: true },
+        data: { tier: 'vip', previousTier: 'free', devMode: true },
       });
     });
 

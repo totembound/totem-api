@@ -379,6 +379,12 @@ Resources:
                   - !Sub
                     - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Prefix}/*"
                     - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource:
+                  - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm"
+                  - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
 
 Outputs:
   UsersTableName:

@@ -87,7 +87,7 @@
  *                   properties:
  *                     accessToken: { type: string, description: "JWT for API calls" }
  *                     refreshToken: { type: string, description: "Token for refreshing access" }
- *                     expiresIn: { type: number, example: 3600 }
+ *                     expiresIn: { type: number, example: 86400 }
  *                     user: { $ref: '#/components/schemas/User' }
  *       401:
  *         description: Invalid credentials
@@ -1497,7 +1497,9 @@
  *   get:
  *     tags: [Shop]
  *     summary: Get special offer bundles
- *     description: Returns available collector bundles and monthly series bundles. No auth required.
+ *     description: Returns available collector bundles and monthly series bundles.
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Available bundles
@@ -1561,7 +1563,9 @@
  *   get:
  *     tags: [Gems]
  *     summary: Get gem packages
- *     description: Returns available gem packages for purchase. No auth required.
+ *     description: Returns available gem packages for purchase.
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: List of gem packages
@@ -1646,7 +1650,9 @@
  *   get:
  *     tags: [Gems]
  *     summary: Get Gem-to-Essence exchange bundles
- *     description: Returns available exchange options. 1 Gem = 5 Essence base rate with bundle bonuses. No auth required.
+ *     description: Returns available exchange options. 1 Gem = 5 Essence base rate with bundle bonuses.
+ *     security:
+ *       - bearerAuth: []
  *     responses:
  *       200:
  *         description: Exchange bundles

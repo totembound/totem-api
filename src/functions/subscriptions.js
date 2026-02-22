@@ -56,6 +56,17 @@ async function createSubscriptionCheckout(user, body) {
     };
   }
 
+  // Check current tier before any checkout (applies to both dev mode and Stripe)
+  const currentUser = await getUser(userId);
+  if (currentUser?.tier === tier) {
+    return {
+      success: false,
+      error: { code: 'ALREADY_SUBSCRIBED', message: `Already on ${tier} plan` },
+    };
+  }
+
+  const previousTier = currentUser?.tier || 'free';
+
   const priceId = getPriceIdFromTier(tier);
   if (!priceId) {
     return {
@@ -67,7 +78,7 @@ async function createSubscriptionCheckout(user, body) {
   const stripeClient = await getStripeAsync();
   if (!stripeClient) {
     // Dev mode: directly set the tier
-    console.log(`[Subscription] Stripe not configured, dev mode: setting ${userId} to ${tier}`);
+    console.log(`[Subscription] Stripe not configured, dev mode: ${previousTier} → ${tier} for ${userId}`);
     await updateUser(userId, {
       tier,
       subscription: {
@@ -76,6 +87,12 @@ async function createSubscriptionCheckout(user, body) {
         devMode: true,
         cancelAtPeriodEnd: false,
       },
+    });
+
+    // Log the tier change transaction
+    await logTransaction(userId, {
+      type: previousTier === 'free' ? 'subscription_activated' : 'subscription_upgraded',
+      details: { from: previousTier, to: tier, devMode: true },
     });
 
     // Send subscription confirmed email (non-blocking)
@@ -96,31 +113,66 @@ async function createSubscriptionCheckout(user, body) {
 
     publishNotification(userId, {
       notificationType: 'REWARD_CLAIMED',
-      title: 'Subscription Active!',
-      message: `Welcome to the ${tier.charAt(0).toUpperCase() + tier.slice(1)} plan!`,
-      data: { tier, devMode: true },
+      title: previousTier === 'free' ? 'Subscription Active!' : 'Subscription Upgraded!',
+      message: previousTier === 'free'
+        ? `Welcome to the ${tier.charAt(0).toUpperCase() + tier.slice(1)} plan!`
+        : `Upgraded from ${previousTier} to ${tier}!`,
+      data: { tier, previousTier, devMode: true },
     }).catch(err => console.error('[Subscription] IoT notification push failed:', err.message));
 
     return {
       success: true,
       data: {
         tier,
-        message: `Dev mode: upgraded to ${tier}`,
+        previousTier,
+        message: previousTier === 'free'
+          ? `Dev mode: subscribed to ${tier}`
+          : `Dev mode: upgraded from ${previousTier} to ${tier}`,
         devMode: true,
       },
     };
   }
 
-  // Get current user to check existing subscription
-  const currentUser = await getUser(userId);
-  if (currentUser?.tier === tier) {
-    return {
-      success: false,
-      error: { code: 'ALREADY_SUBSCRIBED', message: `Already on ${tier} plan` },
-    };
-  }
-
   try {
+    // If user already has an active Stripe subscription, update it (swap price) instead of creating a new one
+    const existingSubId = currentUser?.subscription?.subscriptionId;
+    if (existingSubId && currentUser?.subscription?.status === 'active') {
+      console.log(`[Subscription] Upgrading existing subscription ${existingSubId}: ${previousTier} → ${tier}`);
+      const existingSub = await stripeClient.subscriptions.retrieve(existingSubId);
+      const _updatedSub = await stripeClient.subscriptions.update(existingSubId, {
+        items: [{
+          id: existingSub.items.data[0].id,
+          price: priceId,
+        }],
+        proration_behavior: 'create_prorations',
+        metadata: { userId, tier },
+      });
+
+      // Update user record immediately (webhook will also fire, but this is faster)
+      await updateUser(userId, {
+        tier,
+        'subscription.tier': tier,
+      });
+
+      await logTransaction(userId, {
+        type: 'subscription_upgraded',
+        details: { from: previousTier, to: tier, subscriptionId: existingSubId },
+      });
+
+      console.log(`[Subscription] Upgraded ${existingSubId} to ${tier} for user ${userId}`);
+
+      return {
+        success: true,
+        data: {
+          tier,
+          previousTier,
+          message: `Upgraded from ${previousTier} to ${tier}`,
+          upgraded: true,
+        },
+      };
+    }
+
+    // New subscription — create Stripe checkout session
     const sessionParams = {
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],

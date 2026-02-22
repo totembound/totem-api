@@ -103,14 +103,15 @@ const authenticateJWT = (req, res, next) => {
   // Local development path: decode JWT from header
   const authHeader = req.headers.authorization;
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader) {
     return res.status(401).json({
       success: false,
       error: { code: 'UNAUTHORIZED', message: 'Missing or invalid authorization header' }
     });
   }
 
-  const token = authHeader.split(' ')[1];
+  // Accept both raw token and Bearer-prefixed token (deployed uses raw, some tools use Bearer)
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
 
   try {
     const decoded = jwt.decode(token);
@@ -138,8 +139,9 @@ const authenticateJWT = (req, res, next) => {
 };
 
 // ============================================
-// Health Check
+// Health
 // ============================================
+
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });

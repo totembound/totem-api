@@ -293,8 +293,9 @@ Deploy in order (each stack exports values the next one imports):
 | Stack | File | Resources |
 |-------|------|-----------|
 | 1. Core | `infrastructure/cloudformation/core.yml` | 9 DynamoDB tables, IAM Lambda role |
-| 2. Cognito | `infrastructure/cloudformation/cognito.yml` | User Pool, App Client |
+| 2. Cognito | `infrastructure/cloudformation/cognito.yml` | User Pool, App Client (24h token validity) |
 | 3. API | `infrastructure/cloudformation/api.yml` | Lambda, REST API Gateway, Cognito Authorizer |
+| 4. IoT | `infrastructure/cloudformation/iot.yml` | Cognito Identity Pool, IoT policies (real-time MQTT/WebSocket push) |
 
 ### CI/CD
 
@@ -302,10 +303,12 @@ GitHub Actions workflows in `totem-devops/.github/workflows/`:
 
 | Workflow | Trigger | Action |
 |----------|---------|--------|
-| `ci-api-build.yml` | Manual | Build + package → S3 release bucket |
-| `ci-api-deploy.yml` | Manual | Deploy CF stacks to staging |
-| `prod-api-build.yml` | Manual | Build + package → S3 release bucket |
-| `prod-api-deploy.yml` | Manual | Deploy CF stacks to production |
+| `ci-api-build.yml` | Manual | Build + package Lambda zip → S3 |
+| `ci-api-deploy.yml` | Manual | Deploy Lambda code from S3 (staging) |
+| `prod-api-build.yml` | Manual | Build + package Lambda zip → S3 |
+| `prod-api-deploy.yml` | Manual | Deploy Lambda code from S3 (production) |
+| `ci-infra-deploy.yml` | Manual | Deploy CF stacks: core, cognito, api, iot (staging) |
+| `prod-infra-deploy.yml` | Manual | Deploy CF stacks: core, cognito, api, iot (production) |
 
 ## Project Structure
 

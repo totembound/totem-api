@@ -1,0 +1,112 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "LambdaReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:GetFunction",
+                "lambda:GetFunctionConfiguration",
+                "lambda:ListFunctions",
+                "lambda:ListVersionsByFunction",
+                "lambda:GetPolicy"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "DynamoDBReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:ListTables",
+                "dynamodb:DescribeTable",
+                "dynamodb:DescribeTimeToLive",
+                "dynamodb:ListTagsOfResource"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "CognitoReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "cognito-idp:ListUserPools",
+                "cognito-idp:DescribeUserPool",
+                "cognito-idp:ListUserPoolClients",
+                "cognito-idp:DescribeUserPoolClient",
+                "cognito-idp:ListUsers"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "APIGatewayReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "apigateway:GET"
+            ],
+            "Resource": "arn:aws:apigateway:*::/*"
+        },
+        {
+            "Sid": "SSMReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameter",
+                "ssm:GetParameters",
+                "ssm:GetParametersByPath",
+                "ssm:DescribeParameters"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "CloudWatchLogsReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "logs:DescribeLogGroups",
+                "logs:DescribeLogStreams",
+                "logs:GetLogEvents",
+                "logs:FilterLogEvents"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "IAMReadSelf",
+            "Effect": "Allow",
+            "Action": [
+                "iam:GetUser",
+                "iam:ListAttachedUserPolicies",
+                "iam:ListUserPolicies",
+                "iam:GetRole",
+                "iam:ListRoles"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "LambdaDeploy",
+            "Effect": "Allow",
+            "Action": [
+                "lambda:UpdateFunctionCode",
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:PublishVersion"
+            ],
+            "Resource": [
+                "arn:aws:lambda:us-west-2:783764593258:function:totemboundci-*"
+            ]
+        },
+        {
+            "Sid": "CognitoIdentityReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "cognito-identity:ListIdentityPools",
+                "cognito-identity:DescribeIdentityPool"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "IoTReadOnly",
+            "Effect": "Allow",
+            "Action": [
+                "iot:DescribeEndpoint",
+                "iot:ListThings"
+            ],
+            "Resource": "*"
+        }
+    ]
+}

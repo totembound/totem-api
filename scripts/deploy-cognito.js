@@ -1,6 +1,8 @@
 /**
- * Deployment script for Core Infrastructure
- * Creates/updates the core CloudFormation stack
+ * Deployment script for Cognito Infrastructure
+ * Creates/updates the Cognito CloudFormation stack
+ *
+ * Usage: node scripts/deploy-cognito.js [staging|prod]
  */
 
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
@@ -18,7 +20,7 @@ const chalk = require('chalk');
 const environment = process.argv[2];
 if (!environment) {
   console.error(chalk.red('Error: Environment is required'));
-  console.log(chalk.cyan('Usage: node scripts/deploy-core.js [environment]'));
+  console.log(chalk.cyan('Usage: node scripts/deploy-cognito.js [environment]'));
   console.log(chalk.cyan('Available environments: staging, prod'));
   process.exit(1);
 }
@@ -32,7 +34,7 @@ if (!validEnvironments.includes(environment)) {
 }
 
 // Configuration
-const CORE_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'core.yml');
+const COGNITO_TEMPLATE_PATH = path.join(__dirname, '..', 'infrastructure', 'cloudformation', 'cognito.yml');
 const prefix = environment === 'prod' ? 'totembound' : 'totemboundci';
 
 // Get version
@@ -77,21 +79,21 @@ async function uploadToS3(filePath, key) {
 /**
  * Upload CloudFormation template to S3
  */
-async function uploadCoreTemplate() {
-  console.log(chalk.bold(`\n📤 Uploading Core Infrastructure template to S3...\n`));
+async function uploadCognitoTemplate() {
+  console.log(chalk.bold(`\n📤 Uploading Cognito template to S3...\n`));
 
-  if (!fs.existsSync(CORE_TEMPLATE_PATH)) {
-    console.log(chalk.yellow(`Warning: Core template not found at ${CORE_TEMPLATE_PATH}`));
+  if (!fs.existsSync(COGNITO_TEMPLATE_PATH)) {
+    console.log(chalk.yellow(`Warning: Cognito template not found at ${COGNITO_TEMPLATE_PATH}`));
     return false;
   }
 
-  const templateKey = `totem-api/cloudformation/core-${VERSION}.yml`;
-  const result = await uploadToS3(CORE_TEMPLATE_PATH, templateKey);
+  const templateKey = `totem-api/cloudformation/cognito-${VERSION}.yml`;
+  const result = await uploadToS3(COGNITO_TEMPLATE_PATH, templateKey);
 
   if (result) {
     // Also upload as "latest" version
-    const latestKey = `totem-api/cloudformation/core-latest.yml`;
-    await uploadToS3(CORE_TEMPLATE_PATH, latestKey);
+    const latestKey = `totem-api/cloudformation/cognito-latest.yml`;
+    await uploadToS3(COGNITO_TEMPLATE_PATH, latestKey);
   }
 
   return result;
@@ -115,17 +117,17 @@ async function stackExists(stackName) {
 }
 
 /**
- * Create or update the core CloudFormation stack
+ * Create or update the Cognito CloudFormation stack
  */
-async function deployCoreStack() {
-  console.log(chalk.bold(`\n🚀 Deploying Core Infrastructure CloudFormation stack...\n`));
-  const stackName = `${prefix}-core-stack`;
+async function deployCognitoStack() {
+  console.log(chalk.bold(`\n🚀 Deploying Cognito CloudFormation stack...\n`));
+  const stackName = `${prefix}-cognito-stack`;
 
   // Get S3 path for the template
-  const templateKey = `totem-api/cloudformation/core-${VERSION}.yml`;
+  const templateKey = `totem-api/cloudformation/cognito-${VERSION}.yml`;
   const templateUrl = `https://${S3_BUCKET}.s3.amazonaws.com/${templateKey}`;
 
-  console.log(chalk.cyan(`Using template: core-${VERSION}.yml`));
+  console.log(chalk.cyan(`Using template: cognito-${VERSION}.yml`));
   console.log(chalk.cyan(`Stack name: ${stackName}`));
 
   const exists = await stackExists(stackName);
@@ -136,7 +138,7 @@ async function deployCoreStack() {
     __dirname,
     '..',
     'infrastructure',
-    `params-core-${environment}.json`
+    `params-cognito-${environment}.json`
   );
 
   if (fs.existsSync(paramFilePath)) {
@@ -155,7 +157,6 @@ async function deployCoreStack() {
   }
   else {
     console.log(chalk.yellow(`  ⚠ No parameter file found at ${paramFilePath}, using defaults`));
-    // For core infrastructure, only environment is required
     parameters = [
       {
         ParameterKey: 'Environment',
@@ -172,8 +173,7 @@ async function deployCoreStack() {
       const command = new UpdateStackCommand({
         StackName: stackName,
         TemplateURL: templateUrl,
-        Parameters: parameters,
-        Capabilities: ['CAPABILITY_NAMED_IAM']
+        Parameters: parameters
       });
 
       await cfClient.send(command);
@@ -186,8 +186,7 @@ async function deployCoreStack() {
       const command = new CreateStackCommand({
         StackName: stackName,
         TemplateURL: templateUrl,
-        Parameters: parameters,
-        Capabilities: ['CAPABILITY_NAMED_IAM']
+        Parameters: parameters
       });
 
       await cfClient.send(command);
@@ -225,36 +224,36 @@ function promptYesNo(question) {
 async function deploy() {
   console.log(
     chalk.bold.cyan(
-      `\n🚀 Starting Core Infrastructure deployment to ${environment.toUpperCase()} environment (v${VERSION})...\n`
+      `\n🚀 Starting Cognito deployment to ${environment.toUpperCase()} environment (v${VERSION})...\n`
     )
   );
 
   // Upload CloudFormation template to S3
-  const templateUploaded = await uploadCoreTemplate();
+  const templateUploaded = await uploadCognitoTemplate();
   if (!templateUploaded) {
-    console.error(chalk.red('Failed to upload core template. Deployment aborted.'));
+    console.error(chalk.red('Failed to upload Cognito template. Deployment aborted.'));
     process.exit(1);
   }
 
   // Ask for confirmation before deploying infrastructure
-  const stackName = `${prefix}-core-stack`;
+  const stackName = `${prefix}-cognito-stack`;
   const createOrUpdateStack = await promptYesNo(
-    `Do you want to ${(await stackExists(stackName)) ? 'update' : 'create'} the Core Infrastructure stack (${stackName})?`
+    `Do you want to ${(await stackExists(stackName)) ? 'update' : 'create'} the Cognito stack (${stackName})?`
   );
 
   if (createOrUpdateStack) {
     // Deploy or update CloudFormation stack
-    const stackDeployed = await deployCoreStack();
+    const stackDeployed = await deployCognitoStack();
     if (!stackDeployed) {
-      console.error(chalk.red('Failed to deploy Core Infrastructure stack. Deployment aborted.'));
+      console.error(chalk.red('Failed to deploy Cognito stack. Deployment aborted.'));
       process.exit(1);
     }
   }
   else {
-    console.log(chalk.yellow('Skipping Core Infrastructure stack deployment.'));
+    console.log(chalk.yellow('Skipping Cognito stack deployment.'));
   }
 
-  console.log(chalk.bold.green('\n✅ Core Infrastructure deployment completed successfully!\n'));
+  console.log(chalk.bold.green('\n✅ Cognito deployment completed successfully!\n'));
 }
 
 // Run deployment
