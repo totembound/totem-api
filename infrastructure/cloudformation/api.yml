@@ -11,7 +11,7 @@ Mappings:
       CognitoStackName: totemboundci-cognito-stack
       TablePrefix: TotemBound
       DefaultFromEmail: no-reply@totembound-test.net
-    prod:
+    production:
       ResourcePrefix: totembound
       S3Bucket: totembound-releases
       CorsOrigin: https://totembound.com
@@ -26,7 +26,7 @@ Parameters:
     Default: staging
     AllowedValues:
       - staging
-      - prod
+      - production
     Description: Deployment environment
 
   AppVersion:
@@ -116,6 +116,7 @@ Resources:
       Runtime: nodejs20.x
       Timeout: 30
       MemorySize: 512
+      ReservedConcurrentExecutions: 50
       Environment:
         Variables:
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
@@ -174,6 +175,7 @@ Resources:
       Type: COGNITO_USER_POOLS
       RestApiId: !Ref TotemBoundApi
       IdentitySource: method.request.header.Authorization
+      AuthorizerResultTtlInSeconds: 300
       ProviderARNs:
         - Fn::ImportValue: !Sub
             - "${StackName}-UserPoolArn"
@@ -996,8 +998,9 @@ Resources:
         - ResourcePath: '/*'
           HttpMethod: '*'
           MetricsEnabled: true
-          ThrottlingBurstLimit: 100
-          ThrottlingRateLimit: 50
+          LoggingLevel: ERROR
+          ThrottlingBurstLimit: 500
+          ThrottlingRateLimit: 200
 
   # ============================================
   # Lambda Permission for API Gateway

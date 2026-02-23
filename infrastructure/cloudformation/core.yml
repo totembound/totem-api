@@ -8,7 +8,7 @@ Mappings:
       ResourcePrefix: totemboundci
       S3Bucket: totemboundci-releases
       TablePrefix: TotemBound
-    prod:
+    production:
       Region: us-east-1
       ResourcePrefix: totembound
       S3Bucket: totembound-releases
@@ -20,7 +20,7 @@ Parameters:
     Default: staging
     AllowedValues:
       - staging
-      - prod
+      - production
     Description: Deployment environment
 
 Resources:
