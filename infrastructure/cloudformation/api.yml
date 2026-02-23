@@ -116,7 +116,7 @@ Resources:
       Runtime: nodejs20.x
       Timeout: 30
       MemorySize: 512
-      # ReservedConcurrentExecutions: 50  # TODO: uncomment after Lambda quota increase approved (current limit: 10)
+      ReservedConcurrentExecutions: 50
       Environment:
         Variables:
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
