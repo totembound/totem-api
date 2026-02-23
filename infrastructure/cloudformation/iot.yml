@@ -5,7 +5,7 @@ Parameters:
   Environment:
     Type: String
     Default: staging
-    AllowedValues: [staging, prod]
+    AllowedValues: [staging, production]
   CognitoUserPoolId:
     Type: String
     Description: Cognito User Pool ID (from cognito stack)
@@ -21,7 +21,7 @@ Parameters:
     Default: ''
 
 Conditions:
-  IsProduction: !Equals [!Ref Environment, prod]
+  IsProduction: !Equals [!Ref Environment, production]
   HasBrowserPolicy: !Not [!Equals [!Ref IoTBrowserPolicyName, '']]
 
 Resources:

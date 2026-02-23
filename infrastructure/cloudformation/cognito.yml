@@ -6,7 +6,7 @@ Mappings:
     staging:
       ResourcePrefix: totemboundci
       CallbackUrl: https://totembound-test.net
-    prod:
+    production:
       ResourcePrefix: totembound
       CallbackUrl: https://totembound.com
 
@@ -16,7 +16,7 @@ Parameters:
     Default: staging
     AllowedValues:
       - staging
-      - prod
+      - production
     Description: Deployment environment
 
 Resources:
