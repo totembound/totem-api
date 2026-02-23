@@ -7,5 +7,8 @@
     "StripePriceBestValue": "price_1Sy3GMB9v7dW9snFLDNeRcsR",
     "StripePriceUltimate": "price_1Sy3GgB9v7dW9snFmGsEqOHy",
     "StripePricePremium": "price_1Sy322B9v7dW9snFPrmyDlmh",
-    "StripePriceVip": "price_1Sy32PB9v7dW9snFMI14R3pA"
+    "StripePriceVip": "price_1Sy32PB9v7dW9snFMI14R3pA",
+    "IoTEndpoint": "a2qxr7qrf28xz2-ats.iot.us-west-2.amazonaws.com",
+    "IoTIdentityPoolId": "us-west-2:f394b734-442f-4ee9-88fd-6b4928cb46e0",
+    "IoTBrowserPolicyName": "totemboundci-browser-iot-policy"
 }
