@@ -333,9 +333,10 @@ function calculateXpReward(maxScore, score) {
   const cappedScore = Math.min(Math.max(0, score), maxScore);
 
   // Calculate XP using contract formula: (score * maxXP) / maxScore
+  // Minimum 1 XP for any positive score
   const xp = Math.floor((cappedScore * maxXP) / maxScore);
 
-  return xp;
+  return cappedScore > 0 ? Math.max(1, xp) : 0;
 }
 
 // Fixed happiness reward for challenge completion
@@ -376,13 +377,13 @@ async function completeChallenge(userId, challengeId, totemId, score) {
     };
   }
 
-  // 2. Validate score
-  if (typeof score !== 'number' || score < 0) {
+  // 2. Validate score (must be > 0, cannot submit a zero score)
+  if (typeof score !== 'number' || score <= 0) {
     return {
       success: false,
       error: {
         code: 'INVALID_SCORE',
-        message: 'Score must be a non-negative number',
+        message: 'Score must be a positive number',
       },
     };
   }

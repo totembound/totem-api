@@ -298,13 +298,26 @@ describe('calculateXpReward', () => {
   });
 
   test('should handle zero score', () => {
-    // score=0: floor((0 * 10) / 1000) = 0
+    // score=0: no XP awarded
     expect(calculateXpReward(1000, 0)).toBe(0);
   });
 
   test('should handle negative score as zero', () => {
     // Negative score capped to 0
     expect(calculateXpReward(1000, -500)).toBe(0);
+  });
+
+  test('should award minimum 1 XP for any positive score', () => {
+    // score=1: floor((1 * 10) / 1000) = 0, but min 1 XP
+    expect(calculateXpReward(1000, 1)).toBe(1);
+    // score=50: floor((50 * 10) / 1000) = 0, but min 1 XP
+    expect(calculateXpReward(1000, 50)).toBe(1);
+    // score=99: floor((99 * 10) / 1000) = 0, but min 1 XP
+    expect(calculateXpReward(1000, 99)).toBe(1);
+    // score=100: floor((100 * 10) / 1000) = 1, already >= 1
+    expect(calculateXpReward(1000, 100)).toBe(1);
+    // score=199 on maxScore=2000: floor((199 * 20) / 2000) = 1, already >= 1
+    expect(calculateXpReward(2000, 199)).toBe(1);
   });
 
   test('should calculate max XP for perfect score', () => {
@@ -459,6 +472,14 @@ describe('completeChallenge', () => {
 
     expect(result.success).toBe(false);
     expect(result.error.code).toBe('INVALID_SCORE');
+  });
+
+  test('should reject zero score (cannot submit 0)', async () => {
+    const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', 0);
+
+    expect(result.success).toBe(false);
+    expect(result.error.code).toBe('INVALID_SCORE');
+    expect(result.error.message).toBe('Score must be a positive number');
   });
 
   test('should reject when totem not found', async () => {
