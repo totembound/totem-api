@@ -637,27 +637,119 @@ describe('Expeditions Service', () => {
   // =============================================================================
 
   describe('rollForRunes', () => {
-    it('should return rune drop results for epic expedition', () => {
-      // exp_spirit-diplomacy: lesser 100%, greater 75%, ancient 25%
+    it('should award 0 or 1 lesser rune for 30min expedition (20% chance)', () => {
+      // exp_lunch-delivery-mission: 30min, lesser 20%, greater 0%, ancient 0%
+      const expedition = expeditionsService.getExpeditionDefinition('exp_lunch-delivery-mission');
+      let lesserCount = 0;
+      const iterations = 10000;
+
+      for (let i = 0; i < iterations; i++) {
+        const runes = expeditionsService.rollForRunes(expedition);
+        // Each roll should be 0 or 1
+        expect(runes.lesser).toBeLessThanOrEqual(1);
+        expect(runes.greater).toBe(0);
+        expect(runes.ancient).toBe(0);
+        lesserCount += runes.lesser;
+      }
+
+      // ~20% drop rate
+      expect(lesserCount / iterations).toBeGreaterThan(0.12);
+      expect(lesserCount / iterations).toBeLessThan(0.28);
+    });
+
+    it('should award exactly 1 lesser rune for 3hr expedition (100% chance)', () => {
+      // exp_wind-scout-patrol: 180min, lesser 100%, greater 0%, ancient 0%
+      const expedition = expeditionsService.getExpeditionDefinition('exp_wind-scout-patrol');
+      const iterations = 100;
+
+      for (let i = 0; i < iterations; i++) {
+        const runes = expeditionsService.rollForRunes(expedition);
+        expect(runes.lesser).toBe(1);
+        expect(runes.greater).toBe(0);
+        expect(runes.ancient).toBe(0);
+      }
+    });
+
+    it('should award exactly 1 lesser rune for 6hr expedition (100% chance)', () => {
+      // exp_diplomatic-envoy: 360min, lesser 100%, greater 25%, ancient 0%
+      const expedition = expeditionsService.getExpeditionDefinition('exp_diplomatic-envoy');
+      let lesserCount = 0, greaterCount = 0;
+      const iterations = 10000;
+
+      for (let i = 0; i < iterations; i++) {
+        const runes = expeditionsService.rollForRunes(expedition);
+        expect(runes.lesser).toBe(1);
+        expect(runes.ancient).toBe(0);
+        lesserCount += runes.lesser;
+        greaterCount += runes.greater;
+      }
+
+      expect(lesserCount).toBe(iterations);
+      // Greater ~25% chance, 0 or 1 each roll
+      expect(greaterCount / iterations).toBeGreaterThan(0.17);
+      expect(greaterCount / iterations).toBeLessThan(0.33);
+    });
+
+    it('should award 2 lesser runes for 12hr expedition (100% chance)', () => {
+      // exp_festival-envoy: 720min, lesser 100%, greater 50%, ancient 10%
+      const expedition = expeditionsService.getExpeditionDefinition('exp_festival-envoy');
+      let lesserCount = 0, greaterCount = 0, ancientCount = 0;
+      const iterations = 10000;
+
+      for (let i = 0; i < iterations; i++) {
+        const runes = expeditionsService.rollForRunes(expedition);
+        expect(runes.lesser).toBe(2);
+        lesserCount += runes.lesser;
+        greaterCount += runes.greater;
+        ancientCount += runes.ancient;
+      }
+
+      expect(lesserCount).toBe(iterations * 2);
+      // Greater ~50% chance
+      expect(greaterCount / iterations).toBeGreaterThan(0.42);
+      expect(greaterCount / iterations).toBeLessThan(0.58);
+      // Ancient ~10% chance
+      expect(ancientCount / iterations).toBeGreaterThan(0.05);
+      expect(ancientCount / iterations).toBeLessThan(0.15);
+    });
+
+    it('should award 3 lesser runes for 24hr expedition (100% chance)', () => {
+      // exp_spirit-diplomacy: 1440min, lesser 100%, greater 75%, ancient 25%
       const expedition = expeditionsService.getExpeditionDefinition('exp_spirit-diplomacy');
       let lesserCount = 0, greaterCount = 0, ancientCount = 0;
       const iterations = 10000;
 
       for (let i = 0; i < iterations; i++) {
         const runes = expeditionsService.rollForRunes(expedition);
+        expect(runes.lesser).toBe(3);
         lesserCount += runes.lesser;
         greaterCount += runes.greater;
         ancientCount += runes.ancient;
       }
 
-      // Lesser has 100% chance — always drops
-      expect(lesserCount).toBe(iterations);
-      // Greater has 75% chance
+      expect(lesserCount).toBe(iterations * 3);
+      // Greater ~75% chance (still 0 or 1 per drop)
       expect(greaterCount / iterations).toBeGreaterThan(0.65);
       expect(greaterCount / iterations).toBeLessThan(0.85);
-      // Ancient has 25% chance
+      // Ancient ~25% chance (still 0 or 1 per drop)
       expect(ancientCount / iterations).toBeGreaterThan(0.15);
       expect(ancientCount / iterations).toBeLessThan(0.35);
+    });
+
+    it('should apply runeMultiplier to drop chances', () => {
+      // 3hr expedition with 100% lesser — halved to 50% by below_average multiplier
+      const expedition = expeditionsService.getExpeditionDefinition('exp_wind-scout-patrol');
+      let lesserCount = 0;
+      const iterations = 10000;
+
+      for (let i = 0; i < iterations; i++) {
+        const runes = expeditionsService.rollForRunes(expedition, 0.5);
+        lesserCount += runes.lesser;
+      }
+
+      // ~50% of iterations should drop 1 lesser rune
+      expect(lesserCount / iterations).toBeGreaterThan(0.42);
+      expect(lesserCount / iterations).toBeLessThan(0.58);
     });
 
     it('should return no runes for expedition with no drop chances', () => {

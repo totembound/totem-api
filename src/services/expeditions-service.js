@@ -485,7 +485,23 @@ function calculateEssenceReward(expeditionId, multiplier = 1.0) {
 }
 
 /**
- * Roll for rune drops with multiplier applied to chances
+ * Get base rune quantity by expedition duration tier.
+ * Longer expeditions reward more runes when the drop chance succeeds.
+ *   30min → 1, 3hr → 1, 6hr → 2, 12hr → 3, 24hr → 4
+ * @param {number} durationMinutes - Expedition duration in minutes
+ * @returns {number} Base quantity per successful roll
+ */
+function getRuneQuantity(durationMinutes) {
+  if (durationMinutes >= 1440) return 3; // 24hr
+  if (durationMinutes >= 720) return 2;  // 12hr
+  return 1;                               // 30min / 3hr / 6hr
+}
+
+/**
+ * Roll for rune drops with multiplier applied to chances.
+ * Quantity scales with expedition duration so longer expeditions
+ * reward more runes (not just the same single rune).
+ *
  * @param {object} expedition - Expedition definition
  * @param {number} runeMultiplier - Multiplier for rune drop chances
  * @returns {object} Runes earned { lesser: number, greater: number, ancient: number }
@@ -494,8 +510,11 @@ function rollForRunes(expedition, runeMultiplier = 1.0) {
   const { runeDropChances } = expedition;
   if (!runeDropChances) return { lesser: 0, greater: 0, ancient: 0 };
 
+  // Only lesser runes scale in quantity with duration; greater/ancient stay 0 or 1.
+  const lesserQty = getRuneQuantity(expedition.durationMinutes);
+
   const runes = {
-    lesser: Math.random() * 100 < (runeDropChances.lesser || 0) * runeMultiplier ? 1 : 0,
+    lesser: Math.random() * 100 < (runeDropChances.lesser || 0) * runeMultiplier ? lesserQty : 0,
     greater: Math.random() * 100 < (runeDropChances.greater || 0) * runeMultiplier ? 1 : 0,
     ancient: Math.random() * 100 < (runeDropChances.ancient || 0) * runeMultiplier ? 1 : 0,
   };
