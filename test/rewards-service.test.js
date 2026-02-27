@@ -91,19 +91,20 @@ describe('Rewards Service', () => {
       expect(calculateDailyBonus(0)).toBe(0);
     });
 
-    it('should return 5% bonus for 1 day streak', () => {
-      expect(calculateDailyBonus(1)).toBe(5);
+    it('should return 0% bonus for 1 day streak (first claim, no consecutive bonus)', () => {
+      expect(calculateDailyBonus(1)).toBe(0);
     });
 
-    it('should return 25% bonus for 5 day streak', () => {
-      expect(calculateDailyBonus(5)).toBe(25);
+    it('should return 20% bonus for 5 day streak', () => {
+      expect(calculateDailyBonus(5)).toBe(20); // (5-1) * 5% = 20%
     });
 
-    it('should return 100% bonus for 20 day streak', () => {
-      expect(calculateDailyBonus(20)).toBe(100);
+    it('should return 95% bonus for 20 day streak', () => {
+      expect(calculateDailyBonus(20)).toBe(95); // (20-1) * 5% = 95%
     });
 
-    it('should cap at 100% bonus for streaks over 20 days', () => {
+    it('should cap at 100% bonus for streaks over 21 days', () => {
+      expect(calculateDailyBonus(21)).toBe(100); // (21-1) * 5% = 100%
       expect(calculateDailyBonus(25)).toBe(100);
       expect(calculateDailyBonus(50)).toBe(100);
       expect(calculateDailyBonus(100)).toBe(100);
@@ -115,61 +116,62 @@ describe('Rewards Service', () => {
       expect(calculateWeeklyBonus(0)).toBe(0);
     });
 
-    it('should return 10% bonus for 1 week streak', () => {
-      expect(calculateWeeklyBonus(1)).toBe(10);
+    it('should return 0% bonus for 1 week streak (first claim, no consecutive bonus)', () => {
+      expect(calculateWeeklyBonus(1)).toBe(0);
     });
 
-    it('should return 50% bonus for 5 week streak', () => {
-      expect(calculateWeeklyBonus(5)).toBe(50);
+    it('should return 40% bonus for 5 week streak', () => {
+      expect(calculateWeeklyBonus(5)).toBe(40); // (5-1) * 10% = 40%
     });
 
-    it('should return 100% bonus for 10 week streak', () => {
-      expect(calculateWeeklyBonus(10)).toBe(100);
+    it('should return 90% bonus for 10 week streak', () => {
+      expect(calculateWeeklyBonus(10)).toBe(90); // (10-1) * 10% = 90%
     });
 
-    it('should cap at 100% bonus for streaks over 10 weeks', () => {
+    it('should cap at 100% bonus for streaks over 11 weeks', () => {
+      expect(calculateWeeklyBonus(11)).toBe(100); // (11-1) * 10% = 100%
       expect(calculateWeeklyBonus(15)).toBe(100);
       expect(calculateWeeklyBonus(20)).toBe(100);
     });
   });
 
   describe('calculateRewardAmount', () => {
-    it('should calculate daily reward correctly for new player', () => {
+    it('should calculate daily reward correctly for new player (no bonus on first claim)', () => {
       const result = calculateRewardAmount('daily', 1);
       expect(result.baseAmount).toBe(10);
-      expect(result.bonusPercent).toBe(5);
-      expect(result.bonusAmount).toBe(0); // floor(10 * 0.05) = 0
+      expect(result.bonusPercent).toBe(0); // (1-1) * 5% = 0%
+      expect(result.bonusAmount).toBe(0);
       expect(result.totalAmount).toBe(10);
     });
 
     it('should calculate daily reward with 10 day streak', () => {
       const result = calculateRewardAmount('daily', 10);
       expect(result.baseAmount).toBe(10);
-      expect(result.bonusPercent).toBe(50);
-      expect(result.bonusAmount).toBe(5); // floor(10 * 0.5) = 5
-      expect(result.totalAmount).toBe(15);
+      expect(result.bonusPercent).toBe(45); // (10-1) * 5% = 45%
+      expect(result.bonusAmount).toBe(4); // floor(10 * 0.45) = 4
+      expect(result.totalAmount).toBe(14);
     });
 
     it('should calculate daily reward at max streak', () => {
-      const result = calculateRewardAmount('daily', 20);
+      const result = calculateRewardAmount('daily', 21);
       expect(result.baseAmount).toBe(10);
-      expect(result.bonusPercent).toBe(100);
+      expect(result.bonusPercent).toBe(100); // (21-1) * 5% = 100%
       expect(result.bonusAmount).toBe(10); // floor(10 * 1.0) = 10
       expect(result.totalAmount).toBe(20);
     });
 
-    it('should calculate weekly reward correctly for new player', () => {
+    it('should calculate weekly reward correctly for new player (no bonus on first claim)', () => {
       const result = calculateRewardAmount('weekly', 1);
       expect(result.baseAmount).toBe(100);
-      expect(result.bonusPercent).toBe(10);
-      expect(result.bonusAmount).toBe(10); // floor(100 * 0.1) = 10
-      expect(result.totalAmount).toBe(110);
+      expect(result.bonusPercent).toBe(0); // (1-1) * 10% = 0%
+      expect(result.bonusAmount).toBe(0);
+      expect(result.totalAmount).toBe(100);
     });
 
     it('should calculate weekly reward at max streak', () => {
-      const result = calculateRewardAmount('weekly', 10);
+      const result = calculateRewardAmount('weekly', 11);
       expect(result.baseAmount).toBe(100);
-      expect(result.bonusPercent).toBe(100);
+      expect(result.bonusPercent).toBe(100); // (11-1) * 10% = 100%
       expect(result.bonusAmount).toBe(100); // floor(100 * 1.0) = 100
       expect(result.totalAmount).toBe(200);
     });
@@ -285,7 +287,7 @@ describe('Rewards Service', () => {
       expect(result.success).toBe(true);
       expect(result.newStreak).toBe(6);
       expect(result.reward.streakAtClaim).toBe(6);
-      expect(result.reward.bonusPercent).toBe(30); // 6 * 5% = 30%
+      expect(result.reward.bonusPercent).toBe(25); // (6-1) * 5% = 25%
     });
 
     it('should reset streak if claim is too late', async () => {
@@ -352,8 +354,8 @@ describe('Rewards Service', () => {
   // =============================================================================
 
   describe('claimWeeklyReward', () => {
-    it('should successfully claim first weekly reward', async () => {
-      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1110 });
+    it('should successfully claim first weekly reward (no bonus on first claim)', async () => {
+      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1100 });
 
       const result = await claimWeeklyReward('usr_test123');
 
@@ -361,15 +363,15 @@ describe('Rewards Service', () => {
       expect(result.reward.type).toBe('weekly');
       expect(result.reward.baseAmount).toBe(100);
       expect(result.reward.streakAtClaim).toBe(1);
-      expect(result.reward.bonusPercent).toBe(10); // 1 * 10% = 10%
-      expect(result.reward.bonusAmount).toBe(10);
-      expect(result.reward.totalAmount).toBe(110);
+      expect(result.reward.bonusPercent).toBe(0); // (1-1) * 10% = 0%
+      expect(result.reward.bonusAmount).toBe(0);
+      expect(result.reward.totalAmount).toBe(100);
       expect(result.newStreak).toBe(1);
-      expect(result.newBalance).toBe(1110);
+      expect(result.newBalance).toBe(1100);
 
       expect(dbClient.addEssence).toHaveBeenCalledWith(
         'usr_test123',
-        110, // 100 base + 10 bonus
+        100, // 100 base, no bonus on first claim
         { type: 'reward_weekly', ref: expect.stringMatching(/^weekly_\d{4}-\d{2}-\d{2}$/) }
       );
     });
@@ -390,8 +392,8 @@ describe('Rewards Service', () => {
 
       expect(result.success).toBe(true);
       expect(result.newStreak).toBe(5);
-      expect(result.reward.bonusPercent).toBe(50); // 5 * 10% = 50%
-      expect(result.reward.totalAmount).toBe(150); // 100 + 50
+      expect(result.reward.bonusPercent).toBe(40); // (5-1) * 10% = 40%
+      expect(result.reward.totalAmount).toBe(140); // 100 + 40
     });
 
     it('should cap weekly bonus at 100%', async () => {
@@ -439,7 +441,7 @@ describe('Rewards Service', () => {
       expect(result.daily.canClaim).toBe(true);
       expect(result.daily.currentStreak).toBe(0);
       expect(result.daily.potentialReward.baseAmount).toBe(10);
-      expect(result.daily.potentialReward.bonusPercent).toBe(5); // Will be streak 1 after claim
+      expect(result.daily.potentialReward.bonusPercent).toBe(0); // Streak 1 = no bonus (first claim)
       expect(result.weekly.canClaim).toBe(true);
       expect(result.weekly.currentStreak).toBe(0);
       expect(result.weekly.potentialReward.baseAmount).toBe(100);
@@ -475,11 +477,11 @@ describe('Rewards Service', () => {
       expect(result.daily.canClaim).toBe(true);
       expect(result.daily.currentStreak).toBe(5);
       expect(result.daily.longestStreak).toBe(10);
-      expect(result.daily.potentialReward.bonusPercent).toBe(30); // (5+1) * 5% = 30%
+      expect(result.daily.potentialReward.bonusPercent).toBe(25); // ((5+1)-1) * 5% = 25%
 
       expect(result.weekly.canClaim).toBe(true);
       expect(result.weekly.currentStreak).toBe(3);
-      expect(result.weekly.potentialReward.bonusPercent).toBe(40); // (3+1) * 10% = 40%
+      expect(result.weekly.potentialReward.bonusPercent).toBe(30); // ((3+1)-1) * 10% = 30%
     });
 
     it('should show streak will reset if grace period exceeded', async () => {
@@ -595,7 +597,7 @@ describe('Rewards Service', () => {
         totalEssenceEarned: 1200,
       };
       dbClient.getItem.mockResolvedValue(streakState);
-      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1110 });
+      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1100 });
 
       const result = await claimWeeklyReward('usr_test123');
 
@@ -615,13 +617,13 @@ describe('Rewards Service', () => {
         totalEssenceEarned: 360,
       };
       dbClient.getItem.mockResolvedValue(streakState);
-      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1140 });
+      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1130 });
 
       const result = await claimWeeklyReward('usr_test123');
 
       expect(result.success).toBe(true);
       expect(result.newStreak).toBe(4); // Continues
-      expect(result.reward.bonusPercent).toBe(40); // 4 * 10%
+      expect(result.reward.bonusPercent).toBe(30); // (4-1) * 10% = 30%
     });
 
     it('should handle addEssence failure', async () => {
@@ -646,7 +648,7 @@ describe('Rewards Service', () => {
     });
 
     it('should return successful claim with correct nextClaimTime', async () => {
-      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1110 });
+      dbClient.addEssence.mockResolvedValueOnce({ success: true, newBalance: 1100 });
 
       const before = Date.now();
       const result = await claimWeeklyReward('usr_test123');

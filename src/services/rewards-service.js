@@ -179,7 +179,9 @@ function isBeforeTodayUTC(timestamp) {
  * 5% per day, max 100% (caps at 20 days)
  */
 function calculateDailyBonus(streak) {
-  const bonusPercent = streak * REWARD_CONFIG.daily.streakBonusPercent;
+  // Bonus starts on 2nd consecutive claim (streak 2+), first claim = base only
+  const consecutiveDays = Math.max(0, streak - 1);
+  const bonusPercent = consecutiveDays * REWARD_CONFIG.daily.streakBonusPercent;
   return Math.min(bonusPercent, REWARD_CONFIG.daily.maxStreakBonusPercent);
 }
 
@@ -188,7 +190,9 @@ function calculateDailyBonus(streak) {
  * 10% per consecutive week, max 100% (caps at 10 weeks)
  */
 function calculateWeeklyBonus(weekStreak) {
-  const bonusPercent = weekStreak * REWARD_CONFIG.weekly.streakBonusPercent;
+  // Bonus starts on 2nd consecutive claim (streak 2+), first claim = base only
+  const consecutiveWeeks = Math.max(0, weekStreak - 1);
+  const bonusPercent = consecutiveWeeks * REWARD_CONFIG.weekly.streakBonusPercent;
   return Math.min(bonusPercent, REWARD_CONFIG.weekly.maxStreakBonusPercent);
 }
 
