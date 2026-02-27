@@ -76,6 +76,7 @@ async function claimExpeditionHandler(user, body) {
       success: true,
       data: {
         rewards: result.rewards,
+        score: result.score,
         expedition: result.expedition,
         totalExpeditions: result.totalExpeditions,
         achievements: result.achievements,
