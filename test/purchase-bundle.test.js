@@ -67,7 +67,6 @@ const dbClient = require('../src/common/db-client');
 const {
   purchaseBundle,
   getCurrentMonthlySpecial,
-  getBundleByBundleId,
 } = require('../src/functions/shop/purchase-bundle');
 
 // ---------------------------------------------------------------------------
