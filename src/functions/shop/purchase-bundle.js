@@ -66,7 +66,7 @@ const LIMITED_TOTEM_SERIES = shopConfig.limitedTotemSeries?.series || [];
  */
 function getCurrentMonthlySpecial() {
   const now = new Date();
-  const monthName = now.toLocaleString('en-US', { month: 'long' });
+  const monthName = now.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
   return LIMITED_TOTEM_SERIES.find(s => s.month === monthName) || null;
 }
 
@@ -267,7 +267,9 @@ async function purchaseBundle(user, body = {}) {
     const stats = calculateInitialStats(speciesData.baseStats, statBonus);
 
     const totemId = generateId('totem');
-    const now = new Date().toISOString();
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
+    const todayUTC = `${nowDate.getUTCFullYear()}-${String(nowDate.getUTCMonth() + 1).padStart(2, '0')}-${String(nowDate.getUTCDate()).padStart(2, '0')}`;
 
     const totemData = {
       pk: `USER#${userId}`,
@@ -293,24 +295,43 @@ async function purchaseBundle(user, body = {}) {
       updatedAt: now,
     };
 
-    // 2. Atomic transaction: deduct gems + add essence + create totem
-    // All three succeed or none do — no partial state possible.
-    await transactWrite([
-      {
-        // Deduct gems and add essence in a single user-row update
-        Update: {
-          TableName: TABLES.USERS,
-          Key: { pk: userPK(userId), sk: 'PROFILE' },
-          UpdateExpression: 'SET currencies.gems = currencies.gems - :gemCost, currencies.essence = if_not_exists(currencies.essence, :zero) + :essenceAmount, updatedAt = :now',
-          ConditionExpression: 'attribute_exists(pk) AND currencies.gems >= :gemCost',
-          ExpressionAttributeValues: {
-            ':gemCost': bundle.gemCost,
-            ':essenceAmount': bundle.essence,
-            ':zero': 0,
-            ':now': now,
-          },
-        },
+    // 2. Atomic transaction: deduct gems + add essence + create totem + enforce daily limit
+    // All succeed or none do — no partial state possible.
+    // Daily limit is enforced atomically via condition expression on user record,
+    // preventing race conditions from eventually-consistent GSI reads.
+    const exprValues = {
+      ':gemCost': bundle.gemCost,
+      ':essenceAmount': bundle.essence,
+      ':zero': 0,
+      ':now': now,
+    };
+    let updateExpr = 'SET currencies.gems = currencies.gems - :gemCost, currencies.essence = if_not_exists(currencies.essence, :zero) + :essenceAmount, updatedAt = :now';
+    let conditionExpr = 'attribute_exists(pk) AND currencies.gems >= :gemCost';
+    const exprNames = {};
+
+    if (bundle.dailyLimit) {
+      // Track last purchase date per bundle on user record for atomic enforcement
+      updateExpr += ', #lpd = :todayUTC';
+      conditionExpr += ' AND (attribute_not_exists(#lpd) OR #lpd <> :todayUTC)';
+      exprNames['#lpd'] = `lpd_${bundle.id}`;
+      exprValues[':todayUTC'] = todayUTC;
+    }
+
+    const userUpdate = {
+      Update: {
+        TableName: TABLES.USERS,
+        Key: { pk: userPK(userId), sk: 'PROFILE' },
+        UpdateExpression: updateExpr,
+        ConditionExpression: conditionExpr,
+        ExpressionAttributeValues: exprValues,
       },
+    };
+    if (Object.keys(exprNames).length > 0) {
+      userUpdate.Update.ExpressionAttributeNames = exprNames;
+    }
+
+    await transactWrite([
+      userUpdate,
       {
         // Create the totem
         Put: {
@@ -411,17 +432,29 @@ async function purchaseBundle(user, body = {}) {
     };
   }
   catch (error) {
-    // TransactionCanceledException means ConditionExpression failed (insufficient gems)
+    // TransactionCanceledException means a ConditionExpression failed
+    // Could be insufficient gems OR daily limit already reached (race condition)
     if (error.name === 'TransactionCanceledException') {
       const user = await getUser(userId);
       const available = user?.currencies?.gems || 0;
+      if (available < bundle.gemCost) {
+        return {
+          success: false,
+          error: {
+            code: 'INSUFFICIENT_GEMS',
+            message: `Not enough Gems. Need ${bundle.gemCost}, have ${available}.`,
+            required: bundle.gemCost,
+            available,
+          },
+        };
+      }
+      // Gems were sufficient — daily limit condition must have failed
       return {
         success: false,
         error: {
-          code: 'INSUFFICIENT_GEMS',
-          message: `Not enough Gems. Need ${bundle.gemCost}, have ${available}.`,
-          required: bundle.gemCost,
-          available,
+          code: 'DAILY_LIMIT_REACHED',
+          message: `Daily limit of ${bundle.dailyLimit || 1} reached for this bundle`,
+          limit: bundle.dailyLimit || 1,
         },
       };
     }
@@ -440,5 +473,6 @@ module.exports = {
   purchaseBundle,
   getSpecialOfferBundles,
   getBundleByBundleId,
+  getCurrentMonthlySpecial,
   SPECIAL_OFFER_BUNDLES,
 };
