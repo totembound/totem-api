@@ -382,28 +382,28 @@ describe('Reward Handlers', () => {
       expect(result.data.daily.isProtected).toBe(true);
     });
 
-    it('should check weekly unlock via achievement progress', async () => {
+    it('should check weekly unlock via achievement milestoneIndex', async () => {
       rewardsService.getRewardStatus.mockResolvedValue({
         success: true,
         daily: { canClaim: true },
         weekly: { canClaim: false },
       });
       achievementsService.getAchievementProgress.mockResolvedValue({
-        currentValue: 10, // >= 7 means unlocked
+        milestoneIndex: 0, // >= 0 means Week Warrior unlocked
       });
 
       const result = await getStatus(testUser);
       expect(result.data.weekly.isUnlocked).toBe(true);
     });
 
-    it('should show weekly locked when achievement not reached', async () => {
+    it('should show weekly locked when no milestone reached', async () => {
       rewardsService.getRewardStatus.mockResolvedValue({
         success: true,
         daily: { canClaim: true },
         weekly: { canClaim: false },
       });
       achievementsService.getAchievementProgress.mockResolvedValue({
-        currentValue: 3, // < 7 means locked
+        milestoneIndex: -1, // no milestones unlocked
       });
 
       const result = await getStatus(testUser);
