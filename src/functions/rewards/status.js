@@ -45,9 +45,9 @@ async function isWeeklyUnlocked(userId) {
     const progress = await getAchievementProgress(userId, 'ach_login-progression');
     if (!progress) return false;
 
-    // Check if milestone 7 (Week Warrior) has been reached
-    // The currentValue tracks the highest streak, milestones are at [7, 30, 90, 180, 365]
-    return (progress.currentValue || 0) >= 7;
+    // milestoneIndex tracks the highest unlocked milestone (0 = Week Warrior at 7 days).
+    // It never resets, so this correctly reflects permanent unlock even if the streak resets.
+    return (progress.milestoneIndex ?? -1) >= 0;
   }
   catch (error) {
     console.error(`[Status] Error checking weekly unlock for ${userId}:`, error.message);
