@@ -645,18 +645,28 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
     };
   }
 
-  // Check happiness cost requirement (validate before deducting anything)
+  // Resolve all team totems for happiness validation and deduction
+  const allTotemIds = Array.isArray(totemIds) && totemIds.length > 0 ? totemIds : [totemId];
+  const teamTotems = [];
+  for (const tid of allTotemIds) {
+    const t = tid === totemId ? totem : await getTotem(userId, tid);
+    if (t) teamTotems.push({ id: tid, totem: t });
+  }
+
+  // Check happiness cost requirement for ALL team totems (validate before deducting anything)
   const happinessCost = expedition.happinessCost || 0;
   if (happinessCost > 0) {
-    const currentHappiness = totem.stats?.happiness ?? 50;
-    if (currentHappiness < happinessCost) {
-      return {
-        success: false,
-        error: 'Insufficient happiness',
-        message: `This expedition requires ${happinessCost} happiness. Your totem has ${currentHappiness}.`,
-        required: happinessCost,
-        available: currentHappiness,
-      };
+    for (const { id: tid, totem: t } of teamTotems) {
+      const currentHappiness = t.stats?.happiness ?? 50;
+      if (currentHappiness < happinessCost) {
+        return {
+          success: false,
+          error: 'Insufficient happiness',
+          message: `This expedition requires ${happinessCost} happiness. Totem ${tid} has ${currentHappiness}.`,
+          required: happinessCost,
+          available: currentHappiness,
+        };
+      }
     }
   }
 
@@ -681,12 +691,14 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
     }
   }
 
-  // Deduct happiness cost from totem
+  // Deduct happiness cost from ALL team totems
   if (happinessCost > 0) {
-    const currentHappiness = totem.stats?.happiness ?? 50;
-    await updateTotem(userId, totemId, {
-      'stats.happiness': Math.max(0, currentHappiness - happinessCost),
-    });
+    for (const { id: tid, totem: t } of teamTotems) {
+      const currentHappiness = t.stats?.happiness ?? 50;
+      await updateTotem(userId, tid, {
+        'stats.happiness': Math.max(0, currentHappiness - happinessCost),
+      });
+    }
   }
 
   // Calculate timing

@@ -270,6 +270,64 @@ describe('Expeditions Service', () => {
       );
     });
 
+    it('should deduct happiness from ALL team totems', async () => {
+      const totem1 = { ...mockTotem, id: 'ttm_captain', stats: { happiness: 50 } };
+      const totem2 = { ...mockTotem, id: 'ttm_member1', stats: { happiness: 40 } };
+      const totem3 = { ...mockTotem, id: 'ttm_member2', stats: { happiness: 30 } };
+
+      dbClient.getTotem
+        .mockResolvedValueOnce(totem1) // captain lookup
+        .mockResolvedValueOnce(totem2) // team member 2
+        .mockResolvedValueOnce(totem3); // team member 3
+      dbClient.getUserTotems.mockResolvedValue([{ id: 'ttm_captain' }, { id: 'ttm_member1' }, { id: 'ttm_member2' }]);
+      dbClient.getItem.mockResolvedValue(null); // No active expedition
+      dbClient.deductEssence.mockResolvedValue({ success: true });
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+
+      const result = await expeditionsService.startExpedition(
+        testUserId,
+        'ttm_captain',
+        'exp_lunch-delivery-mission', // happinessCost: 1
+        ['ttm_captain', 'ttm_member1', 'ttm_member2']
+      );
+
+      expect(result.success).toBe(true);
+
+      // Verify happiness was deducted from ALL 3 totems (happinessCost=1)
+      const updateCalls = dbClient.updateTotem.mock.calls;
+      const happinessUpdates = updateCalls.filter(
+        ([, , updates]) => updates['stats.happiness'] !== undefined
+      );
+      expect(happinessUpdates).toHaveLength(3);
+      expect(happinessUpdates[0]).toEqual([testUserId, 'ttm_captain', { 'stats.happiness': 49 }]);
+      expect(happinessUpdates[1]).toEqual([testUserId, 'ttm_member1', { 'stats.happiness': 39 }]);
+      expect(happinessUpdates[2]).toEqual([testUserId, 'ttm_member2', { 'stats.happiness': 29 }]);
+    });
+
+    it('should fail when any team totem has insufficient happiness', async () => {
+      const totem1 = { ...mockTotem, id: 'ttm_captain', stats: { happiness: 50 } };
+      const totem2 = { ...mockTotem, id: 'ttm_member1', stats: { happiness: 0 } }; // too low
+
+      dbClient.getTotem
+        .mockResolvedValueOnce(totem1) // captain lookup
+        .mockResolvedValueOnce(totem2); // team member with 0 happiness
+      dbClient.getUserTotems.mockResolvedValue([{ id: 'ttm_captain' }, { id: 'ttm_member1' }, { id: 'ttm_member2' }]);
+      dbClient.getItem.mockResolvedValue(null);
+
+      const result = await expeditionsService.startExpedition(
+        testUserId,
+        'ttm_captain',
+        'exp_lunch-delivery-mission', // happinessCost: 1
+        ['ttm_captain', 'ttm_member1', 'ttm_member2']
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Insufficient happiness');
+      // Verify no Essence was deducted (validation happens before cost)
+      expect(dbClient.deductEssence).not.toHaveBeenCalled();
+    });
+
     it('should fail when expedition does not exist', async () => {
       const result = await expeditionsService.startExpedition(
         testUserId,
