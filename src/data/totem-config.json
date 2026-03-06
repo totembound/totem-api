@@ -84,8 +84,8 @@
       "name": "Beaver",
       "baseStats": {
         "strength": 10,
-        "agility": 5,
-        "wisdom": 9
+        "agility": 9,
+        "wisdom": 5
       },
       "available": true
     },
@@ -114,8 +114,8 @@
       "name": "Turtle",
       "baseStats": {
         "strength": 10,
-        "agility": 8,
-        "wisdom": 6
+        "agility": 6,
+        "wisdom": 8
       },
       "available": false
     },
