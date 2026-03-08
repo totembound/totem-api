@@ -629,24 +629,27 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
     };
   }
 
-  // Check if totem is already on an expedition
-  const activeExpedition = await getActiveExpedition(userId, totemId);
-  if (activeExpedition) {
-    return {
-      success: false,
-      error: 'Totem is busy',
-      message: 'This totem is already on an expedition',
-      activeExpedition: {
-        id: activeExpedition.id,
-        expeditionId: activeExpedition.expeditionId,
-        expeditionName: EXPEDITIONS[activeExpedition.expeditionId]?.name,
-        endsAt: activeExpedition.endsAt,
-      },
-    };
-  }
-
-  // Resolve all team totems for happiness validation and deduction
+  // Resolve all team totems
   const allTotemIds = Array.isArray(totemIds) && totemIds.length > 0 ? totemIds : [totemId];
+
+  // Check if ANY team totem is already on an expedition (not just the lead)
+  for (const tid of allTotemIds) {
+    const existingExp = await getActiveExpedition(userId, tid);
+    if (existingExp) {
+      return {
+        success: false,
+        error: 'Totem is busy',
+        message: `Totem ${tid} is already on an expedition`,
+        activeExpedition: {
+          id: existingExp.id,
+          expeditionId: existingExp.expeditionId,
+          expeditionName: EXPEDITIONS[existingExp.expeditionId]?.name,
+          endsAt: existingExp.endsAt,
+          busyTotemId: tid,
+        },
+      };
+    }
+  }
   const teamTotems = [];
   for (const tid of allTotemIds) {
     const t = tid === totemId ? totem : await getTotem(userId, tid);
@@ -725,16 +728,16 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
 
   await putItem(TABLES.EXPEDITION_STATE, expeditionRecord);
 
-  // Mark totem as busy (optional: store expedition reference)
-  // Use whole map object instead of dot-notation paths to avoid
-  // DynamoDB ValidationException when parent attribute doesn't exist
-  try {
-    await updateTotem(userId, totemId, {
-      expedition: { active: true, expeditionId: expId, endsAt: endsAt.toISOString() },
-    });
-  }
-  catch (err) {
-    console.warn('[Expedition] Failed to mark totem busy (non-critical):', err.message);
+  // Mark ALL team totems as busy
+  for (const tid of allTotemIds) {
+    try {
+      await updateTotem(userId, tid, {
+        expedition: { active: true, expeditionId: expId, endsAt: endsAt.toISOString() },
+      });
+    }
+    catch (err) {
+      console.warn(`[Expedition] Failed to mark totem ${tid} busy (non-critical):`, err.message);
+    }
   }
 
   console.log(`[Expedition] Started "${expedition.name}" for totem ${totemId} by user ${userId} (cost: ${essenceCost} Essence, ${happinessCost} happiness)`);
@@ -809,9 +812,9 @@ async function claimExpeditionReward(userId, totemId) {
     };
   }
 
-  // Get totem for scoring and XP update
-  const totem = await getTotem(userId, totemId);
-  if (!totem) {
+  // Get lead totem for scoring
+  const leadTotem = await getTotem(userId, totemId);
+  if (!leadTotem) {
     return {
       success: false,
       error: 'Totem not found',
@@ -819,8 +822,8 @@ async function claimExpeditionReward(userId, totemId) {
     };
   }
 
-  // Calculate synergy score based on totem-expedition match
-  const scoreResult = calculateExpeditionScore(totem, expedition);
+  // Calculate synergy score based on lead totem-expedition match
+  const scoreResult = calculateExpeditionScore(leadTotem, expedition);
   const multipliers = getScoreMultipliers(scoreResult.tier);
 
   // Calculate rewards with score multiplier
@@ -848,12 +851,18 @@ async function claimExpeditionReward(userId, totemId) {
     }
   }
 
-  // Add XP to totem
-  const currentExp = totem.experience || 0;
-  const newExp = currentExp + expReward;
-  await updateTotem(userId, totemId, {
-    experience: newExp,
-  });
+  // Add XP to ALL team totems (all paid happiness, all earn XP)
+  const allTotemIds = activeExpedition.totemIds || [totemId];
+  const totemExpUpdates = {};
+  for (const tid of allTotemIds) {
+    const t = tid === totemId ? leadTotem : await getTotem(userId, tid);
+    if (t) {
+      const currentExp = t.experience || 0;
+      const newExp = currentExp + expReward;
+      await updateTotem(userId, tid, { experience: newExp });
+      totemExpUpdates[tid] = newExp;
+    }
+  }
 
   // Create history record
   const historyRecord = {
@@ -862,6 +871,7 @@ async function claimExpeditionReward(userId, totemId) {
     id: activeExpedition.id,
     odUserId: userId,
     totemId,
+    totemIds: allTotemIds,
     expeditionId: activeExpedition.expeditionId,
     expeditionName: expedition.name,
     startedAt: activeExpedition.startedAt,
@@ -885,14 +895,16 @@ async function claimExpeditionReward(userId, totemId) {
     sk: activeExpeditionSK(totemId),
   });
 
-  // Clear totem busy status
-  try {
-    await updateTotem(userId, totemId, {
-      expedition: { active: false, expeditionId: null, endsAt: null },
-    });
-  }
-  catch (err) {
-    console.warn('[Expedition] Failed to clear totem busy status (non-critical):', err.message);
+  // Clear busy status on ALL team totems
+  for (const tid of allTotemIds) {
+    try {
+      await updateTotem(userId, tid, {
+        expedition: { active: false, expeditionId: null, endsAt: null },
+      });
+    }
+    catch (err) {
+      console.warn(`[Expedition] Failed to clear totem ${tid} busy status (non-critical):`, err.message);
+    }
   }
 
   // Trigger achievement check (pass totemId for XP rewards)
@@ -921,7 +933,7 @@ async function claimExpeditionReward(userId, totemId) {
       newEssenceBalance,
       runes: runesEarned,
       newRuneBalances,
-      newTotemExp: newExp,
+      totemExpUpdates,
     },
     score: {
       value: scoreResult.score,
@@ -966,14 +978,17 @@ async function cancelExpedition(userId, totemId) {
     sk: activeExpeditionSK(totemId),
   });
 
-  // Clear totem busy status
-  try {
-    await updateTotem(userId, totemId, {
-      expedition: { active: false, expeditionId: null, endsAt: null },
-    });
-  }
-  catch (err) {
-    console.warn('[Expedition] Failed to clear totem busy status (non-critical):', err.message);
+  // Clear busy status on ALL team totems
+  const allTotemIds = activeExpedition.totemIds || [totemId];
+  for (const tid of allTotemIds) {
+    try {
+      await updateTotem(userId, tid, {
+        expedition: { active: false, expeditionId: null, endsAt: null },
+      });
+    }
+    catch (err) {
+      console.warn(`[Expedition] Failed to clear totem ${tid} busy status (non-critical):`, err.message);
+    }
   }
 
   const expedition = EXPEDITIONS[activeExpedition.expeditionId];
