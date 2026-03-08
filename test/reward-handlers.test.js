@@ -570,6 +570,25 @@ describe('Reward Handlers', () => {
       });
     });
 
+    describe('Daily protection tier 1', () => {
+      it('should reject tier 1 when streak is between 7 and 13', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 10 }); // need 14
+        const result = await purchaseProtection(testUser, { tier: 1 }, 'daily');
+        expect(result.success).toBe(false);
+        expect(result.error.code).toBe('INSUFFICIENT_STREAK');
+        expect(result.error.message).toContain('14');
+      });
+
+      it('should purchase tier 1 when streak is 14+', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 14 });
+        const result = await purchaseProtection(testUser, { tier: 1 }, 'daily');
+        expect(result.success).toBe(true);
+        expect(result.data.tier).toBe(1);
+        expect(result.data.cost).toBe(250);
+        expect(result.data.durationSeconds).toBe(604800);
+      });
+    });
+
     describe('Weekly protection', () => {
       it('should purchase weekly protection at tier 0', async () => {
         dbClient.getItem.mockResolvedValue({ currentStreak: 5 }); // need 4
@@ -583,6 +602,46 @@ describe('Reward Handlers', () => {
         const result = await purchaseProtection(testUser, { tier: 1 }, 'weekly');
         expect(result.success).toBe(false);
         expect(result.error.code).toBe('INVALID_TIER');
+      });
+
+      it('should reject weekly protection when streak below 4 weeks', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 3 }); // need 4
+        const result = await purchaseProtection(testUser, { tier: 0 }, 'weekly');
+        expect(result.success).toBe(false);
+        expect(result.error.code).toBe('INSUFFICIENT_STREAK');
+        expect(result.error.message).toContain('4');
+        expect(result.error.message).toContain('week');
+      });
+
+      it('should reject weekly protection when already protected', async () => {
+        dbClient.getItem.mockResolvedValue({
+          currentStreak: 5,
+          protectionExpiry: new Date(Date.now() + 86400000).toISOString(),
+        });
+        const result = await purchaseProtection(testUser, { tier: 0 }, 'weekly');
+        expect(result.success).toBe(false);
+        expect(result.error.code).toBe('ALREADY_PROTECTED');
+      });
+
+      it('should reject weekly protection with insufficient Essence', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 5 });
+        dbClient.deductEssence.mockResolvedValue({ success: false, currentBalance: 200 });
+        const result = await purchaseProtection(testUser, { tier: 0 }, 'weekly');
+        expect(result.success).toBe(false);
+        expect(result.error.code).toBe('INSUFFICIENT_ESSENCE');
+      });
+
+      it('should update STREAK#weekly (not daily) on purchase', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 5 });
+        await purchaseProtection(testUser, { tier: 0 }, 'weekly');
+        expect(dbClient.updateItem).toHaveBeenCalledWith(
+          'TotemBound-RewardsClaims',
+          expect.objectContaining({ sk: 'STREAK#weekly' }),
+          expect.objectContaining({
+            protectionExpiry: expect.any(String),
+            protectionTier: 0,
+          })
+        );
       });
     });
   });
