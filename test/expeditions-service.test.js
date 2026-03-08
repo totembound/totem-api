@@ -367,6 +367,60 @@ describe('Expeditions Service', () => {
       expect(result.error).toBe('Totem stage too low');
     });
 
+    it('should mark ALL team totems as busy on start', async () => {
+      const totem1 = { ...mockTotem, id: 'ttm_captain', stats: { happiness: 50 } };
+
+      dbClient.getTotem.mockResolvedValue(totem1);
+      dbClient.getUserTotems.mockResolvedValue([{ id: 'ttm_captain' }, { id: 'ttm_m1' }, { id: 'ttm_m2' }]);
+      dbClient.getItem.mockResolvedValue(null); // No active expedition for any totem
+      dbClient.deductEssence.mockResolvedValue({ success: true });
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+
+      const result = await expeditionsService.startExpedition(
+        testUserId,
+        'ttm_captain',
+        'exp_lunch-delivery-mission',
+        ['ttm_captain', 'ttm_m1', 'ttm_m2']
+      );
+
+      expect(result.success).toBe(true);
+
+      // Verify ALL 3 totems marked busy (expedition.active = true)
+      const busyCalls = dbClient.updateTotem.mock.calls.filter(
+        ([, , updates]) => updates.expedition && updates.expedition.active === true
+      );
+      expect(busyCalls).toHaveLength(3);
+      const busyIds = busyCalls.map(([, tid]) => tid);
+      expect(busyIds).toContain('ttm_captain');
+      expect(busyIds).toContain('ttm_m1');
+      expect(busyIds).toContain('ttm_m2');
+    });
+
+    it('should fail when a team member totem is already on expedition', async () => {
+      dbClient.getTotem.mockResolvedValue(mockTotem);
+      dbClient.getUserTotems.mockResolvedValue([{ id: 'ttm_1' }, { id: 'ttm_2' }, { id: 'ttm_3' }]);
+      // First totem (captain) is free, second totem is busy
+      dbClient.getItem
+        .mockResolvedValueOnce(null)   // captain free
+        .mockResolvedValueOnce({       // member busy
+          id: 'uex_existing',
+          expeditionId: 'exp_lunch-delivery-mission',
+          endsAt: new Date(Date.now() + 3600000).toISOString(),
+        });
+
+      const result = await expeditionsService.startExpedition(
+        testUserId,
+        testTotemId,
+        'exp_weed-pulling-quest',
+        [testTotemId, 'ttm_busy_member', 'ttm_free_member']
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Totem is busy');
+      expect(result.activeExpedition.busyTotemId).toBe('ttm_busy_member');
+    });
+
     it('should fail when totem is already on expedition', async () => {
       dbClient.getTotem.mockResolvedValue(mockTotem);
       dbClient.getUserTotems.mockResolvedValue([{ id: 'ttm_1' }, { id: 'ttm_2' }, { id: 'ttm_3' }]);
@@ -506,6 +560,73 @@ describe('Expeditions Service', () => {
       expect(result.error).toBe('Already claimed');
     });
 
+    it('should award XP to ALL team totems on claim', async () => {
+      const teamExpedition = {
+        ...completedExpedition,
+        totemIds: [testTotemId, 'ttm_member1', 'ttm_member2'],
+      };
+      const member1 = { ...mockTotemForClaim, id: 'ttm_member1', experience: 200 };
+      const member2 = { ...mockTotemForClaim, id: 'ttm_member2', experience: 300 };
+
+      dbClient.getItem.mockResolvedValue(teamExpedition);
+      dbClient.getTotem
+        .mockResolvedValueOnce(mockTotemForClaim) // lead totem
+        .mockResolvedValueOnce(member1)           // team member 1
+        .mockResolvedValueOnce(member2);          // team member 2
+      dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 1000 });
+      dbClient.addRunes.mockResolvedValue({ success: true, newBalances: { lesser: 1, greater: 0, ancient: 0 } });
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.queryItems.mockResolvedValue([]);
+
+      const result = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+
+      expect(result.success).toBe(true);
+      expect(result.rewards.totemExpUpdates).toBeDefined();
+      // All 3 totems should have XP updates
+      expect(Object.keys(result.rewards.totemExpUpdates)).toHaveLength(3);
+      expect(result.rewards.totemExpUpdates[testTotemId]).toBe(mockTotemForClaim.experience + result.rewards.experience);
+      expect(result.rewards.totemExpUpdates['ttm_member1']).toBe(200 + result.rewards.experience);
+      expect(result.rewards.totemExpUpdates['ttm_member2']).toBe(300 + result.rewards.experience);
+
+      // Verify updateTotem was called for XP on all 3 totems
+      const xpCalls = dbClient.updateTotem.mock.calls.filter(
+        ([, , updates]) => updates.experience !== undefined
+      );
+      expect(xpCalls).toHaveLength(3);
+    });
+
+    it('should clear busy status on ALL team totems on claim', async () => {
+      const teamExpedition = {
+        ...completedExpedition,
+        totemIds: [testTotemId, 'ttm_member1', 'ttm_member2'],
+      };
+
+      dbClient.getItem.mockResolvedValue(teamExpedition);
+      dbClient.getTotem.mockResolvedValue(mockTotemForClaim);
+      dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 1000 });
+      dbClient.addRunes.mockResolvedValue({ success: true, newBalances: { lesser: 1, greater: 0, ancient: 0 } });
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.queryItems.mockResolvedValue([]);
+
+      const result = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+
+      expect(result.success).toBe(true);
+
+      // Verify busy cleared on all 3 totems
+      const busyClearCalls = dbClient.updateTotem.mock.calls.filter(
+        ([, , updates]) => updates.expedition && updates.expedition.active === false
+      );
+      expect(busyClearCalls).toHaveLength(3);
+      const clearedIds = busyClearCalls.map(([, tid]) => tid);
+      expect(clearedIds).toContain(testTotemId);
+      expect(clearedIds).toContain('ttm_member1');
+      expect(clearedIds).toContain('ttm_member2');
+    });
+
     it('should fail when expedition is not yet complete', async () => {
       const inProgressExpedition = {
         ...completedExpedition,
@@ -625,6 +746,32 @@ describe('Expeditions Service', () => {
           expedition: expect.objectContaining({ active: false }),
         })
       );
+    });
+
+    it('should clear busy on ALL team totems when cancelled', async () => {
+      const teamExpedition = {
+        id: 'uex_123',
+        expeditionId: 'exp_lunch-delivery-mission',
+        totemId: testTotemId,
+        totemIds: [testTotemId, 'ttm_m1', 'ttm_m2'],
+      };
+      dbClient.getItem.mockResolvedValue(teamExpedition);
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+
+      const result = await expeditionsService.cancelExpedition(testUserId, testTotemId);
+
+      expect(result.success).toBe(true);
+
+      // Verify busy cleared on all 3 totems
+      const busyClearCalls = dbClient.updateTotem.mock.calls.filter(
+        ([, , updates]) => updates.expedition && updates.expedition.active === false
+      );
+      expect(busyClearCalls).toHaveLength(3);
+      const clearedIds = busyClearCalls.map(([, tid]) => tid);
+      expect(clearedIds).toContain(testTotemId);
+      expect(clearedIds).toContain('ttm_m1');
+      expect(clearedIds).toContain('ttm_m2');
     });
 
     it('should fail when no active expedition', async () => {
