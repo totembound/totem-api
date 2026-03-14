@@ -152,9 +152,9 @@ describe('Totem Creation Service', () => {
       });
     });
 
-    it('should have 8 available species', () => {
-      // 0 Goose, 1 Otter, 2 Wolf, 3 Falcon, 4 Beaver, 5 Deer, 6 Woodpecker, 11 Owl
-      expect(AVAILABLE_SPECIES_IDS).toHaveLength(8);
+    it('should have 9 available species', () => {
+      // 0 Goose, 1 Otter, 2 Wolf, 3 Falcon, 4 Beaver, 5 Deer, 6 Woodpecker, 7 Turtle, 11 Owl
+      expect(AVAILABLE_SPECIES_IDS).toHaveLength(9);
     });
 
     it('should exclude unavailable species', () => {
@@ -317,9 +317,12 @@ describe('Totem Creation Service', () => {
       expect(isSpeciesAvailable(11)).toBe(true); // Owl
     });
 
+    it('should return true for newly activated species', () => {
+      expect(isSpeciesAvailable(7)).toBe(true);   // Turtle
+    });
+
     it('should return false for unavailable species', () => {
       expect(isSpeciesAvailable(8)).toBe(false);  // Bear
-      expect(isSpeciesAvailable(7)).toBe(false);  // Turtle
     });
   });
 
