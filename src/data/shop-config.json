@@ -263,6 +263,14 @@
         "rarity": 5
       },
       {
+        "id": "limited_series_08",
+        "month": "August",
+        "name": "Tidebound Turtle",
+        "species": 7,
+        "color": 23,
+        "rarity": 5
+      },
+      {
         "id": "limited_series_12",
         "month": "December",
         "name": "Everfrost Owl",
