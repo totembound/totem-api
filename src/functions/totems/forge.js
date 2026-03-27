@@ -27,7 +27,6 @@
 const {
   getTotem,
   getUserTotems,
-  putItem,
   updateItem,
   transactWrite,
   getUser,
