@@ -319,6 +319,35 @@ app.post('/v1/totems/purchase', authenticateJWT, async (req, res) => {
   }
 });
 
+// Totem forge route
+app.post('/v1/totems/forge', authenticateJWT, async (req, res) => {
+  try {
+    if (totemRoutes?.forgeTotem) {
+      const result = await totemRoutes.forgeTotem(req.user, req.body);
+      if (result.success) {
+        res.status(201).json(result);
+      } else {
+        const statusMap = {
+          NOT_FOUND: 404,
+          ON_EXPEDITION: 409,
+          RARITY_MISMATCH: 400,
+          MAX_RARITY: 400,
+          INVALID_IDS: 400,
+          TRANSACTION_FAILED: 409,
+          SERVICE_UNAVAILABLE: 503,
+        };
+        const statusCode = statusMap[result.error?.code] || 400;
+        res.status(statusCode).json(result);
+      }
+    } else {
+      res.json({ success: true, data: { message: 'Forge (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 // Game action routes
 app.post('/v1/totems/:id/feed', authenticateJWT, async (req, res) => {
   try {

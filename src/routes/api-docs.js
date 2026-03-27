@@ -446,6 +446,90 @@
 
 /**
  * @swagger
+ * /v1/totems/forge:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Forge (fuse) 3 totems into 1 higher rarity
+ *     description: |
+ *       Combines 3 totems of the same rarity into 1 new Stage 0 totem of the next rarity.
+ *       Pure Fusion (same species) guarantees the same species. Wild Fusion (mixed) produces random species.
+ *       Legendary and Limited totems cannot be forged. Uses DynamoDB TransactWriteItems for atomicity.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemIds]
+ *             properties:
+ *               totemIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 minItems: 3
+ *                 maxItems: 3
+ *                 description: Exactly 3 unique totem IDs to fuse
+ *                 example: ["ttm_abc123", "ttm_def456", "ttm_ghi789"]
+ *     responses:
+ *       201:
+ *         description: Fusion successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     action:
+ *                       type: string
+ *                       example: forge
+ *                     fusionType:
+ *                       type: string
+ *                       enum: [pure, wild]
+ *                     consumedTotemIds:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     newTotem:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         speciesId:
+ *                           type: integer
+ *                         speciesName:
+ *                           type: string
+ *                         colorId:
+ *                           type: integer
+ *                         rarityId:
+ *                           type: integer
+ *                         stage:
+ *                           type: integer
+ *                           example: 0
+ *                         image:
+ *                           type: string
+ *                     newEssenceBalance:
+ *                       type: integer
+ *                     achievements:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       400:
+ *         description: Invalid input (INVALID_IDS, RARITY_MISMATCH, MAX_RARITY)
+ *       404:
+ *         description: Totem not found (NOT_FOUND)
+ *       409:
+ *         description: Conflict (ON_EXPEDITION, TRANSACTION_FAILED)
+ */
+
+/**
+ * @swagger
  * /v1/totems/purchase:
  *   post:
  *     tags: [Totems]

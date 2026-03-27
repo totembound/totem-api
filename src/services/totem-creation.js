@@ -205,6 +205,7 @@ function calculateInitialStats(baseStats, statBonus = 0) {
  * @param {number} [options.luckBonus=0] - Luck bonus for rarity roll
  * @param {boolean} [options.isLimited=false] - Is this a limited/special totem
  * @param {number} [options.limitedColorId] - Specific limited color ID
+ * @param {number} [options.forcedRarityId] - Force a specific rarity (used by Forge fusion)
  *
  * @returns {object} - Complete totem data ready for DynamoDB
  */
@@ -215,6 +216,7 @@ function createTotem({
   luckBonus = 0,
   isLimited = false,
   limitedColorId,
+  forcedRarityId,
 }) {
   // 1. Select or validate species
   let species;
@@ -230,7 +232,14 @@ function createTotem({
 
   // 2. Determine rarity
   let rarity;
-  if (isLimited) {
+  if (forcedRarityId !== undefined) {
+    const forcedRarity = RARITIES[forcedRarityId];
+    if (!forcedRarity) {
+      throw new Error(`Invalid forced rarity ID: ${forcedRarityId}`);
+    }
+    rarity = { rarityId: forcedRarityId, rarityName: forcedRarity.name, statBonus: forcedRarity.statBonus || 0 };
+  }
+  else if (isLimited) {
     rarity = { rarityId: 5, rarityName: 'Limited', statBonus: 2 };
   }
   else {
