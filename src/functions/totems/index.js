@@ -212,6 +212,7 @@ async function getTotem(user, totemId) {
 // ============================================
 
 const { purchaseTotem, getPurchaseInfo } = require('./purchase');
+const { forgeTotem } = require('./forge');
 
 // ============================================
 // Exports
@@ -223,4 +224,5 @@ module.exports = {
   transformTotemForApi,
   purchaseTotem,
   getPurchaseInfo,
+  forgeTotem,
 };
