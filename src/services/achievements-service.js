@@ -46,6 +46,10 @@ const ACHIEVEMENT_IDS = {
   EXPEDITION_PROGRESSION: 'ach_expedition-progression',
   FUSION_PROGRESSION: 'ach_fusion-progression',
   PURE_FUSION: 'ach_pure-fusion',
+  WILD_FUSION: 'ach_wild-fusion',
+  RARE_FORGER: 'ach_rare-forger',
+  EPIC_FORGER: 'ach_epic-forger',
+  LEGENDARY_FORGER: 'ach_legendary-forger',
 };
 
 // =============================================================================
@@ -76,6 +80,10 @@ const TRIGGER_TO_ACHIEVEMENTS = {
   TOTEM_FUSED: [
     ACHIEVEMENT_IDS.FUSION_PROGRESSION,
     ACHIEVEMENT_IDS.PURE_FUSION,
+    ACHIEVEMENT_IDS.WILD_FUSION,
+    ACHIEVEMENT_IDS.RARE_FORGER,
+    ACHIEVEMENT_IDS.EPIC_FORGER,
+    ACHIEVEMENT_IDS.LEGENDARY_FORGER,
     ACHIEVEMENT_IDS.RARE_COLLECTOR,
     ACHIEVEMENT_IDS.EPIC_COLLECTOR,
     ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR,
@@ -96,8 +104,9 @@ const ACHIEVEMENT_MILESTONES = {
   [ACHIEVEMENT_IDS.TREAT_PROGRESSION]: [100, 500, 1000, 5000, 10000],
   [ACHIEVEMENT_IDS.CHALLENGE_PROGRESSION]: [10, 100, 1000, 5000, 10000],
   [ACHIEVEMENT_IDS.EXPEDITION_PROGRESSION]: [10, 50, 250, 1000, 10000],
-  [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [1, 5, 10, 25, 50],
-  [ACHIEVEMENT_IDS.PURE_FUSION]: [1, 3, 5],
+  [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [1, 5, 10, 25, 50, 100, 250],
+  [ACHIEVEMENT_IDS.PURE_FUSION]: [1, 3, 5, 10, 25],
+  [ACHIEVEMENT_IDS.WILD_FUSION]: [1, 3, 5, 10, 25],
 };
 
 const ONETIME_ACHIEVEMENTS = [
@@ -106,6 +115,9 @@ const ONETIME_ACHIEVEMENTS = [
   ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR,
   ACHIEVEMENT_IDS.CHALLENGE_INITIATE,
   ACHIEVEMENT_IDS.EXPEDITION_EXPLORER,
+  ACHIEVEMENT_IDS.RARE_FORGER,
+  ACHIEVEMENT_IDS.EPIC_FORGER,
+  ACHIEVEMENT_IDS.LEGENDARY_FORGER,
 ];
 
 // Rarity IDs (from totem data)
@@ -152,6 +164,21 @@ const ONE_TIME_REWARDS = {
     essence: 25,
     xp: 50,
     name: 'Expedition Explorer',
+  },
+  [ACHIEVEMENT_IDS.RARE_FORGER]: {
+    essence: 200,
+    xp: 100,
+    name: 'Rare Forger',
+  },
+  [ACHIEVEMENT_IDS.EPIC_FORGER]: {
+    essence: 500,
+    xp: 150,
+    name: 'Epic Forger',
+  },
+  [ACHIEVEMENT_IDS.LEGENDARY_FORGER]: {
+    essence: 1000,
+    xp: 250,
+    name: 'Legendary Forger',
   },
 };
 
@@ -220,16 +247,27 @@ const MILESTONE_REWARDS = {
     { essence: 500, xp: 750, name: 'Expedition Legend' },  // 10000 expeditions
   ],
   [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [
-    { essence: 100, xp: 150, name: 'First Forge' },          // 1 fusion
-    { essence: 250, xp: 300, name: 'Apprentice Smith' },     // 5 fusions
-    { essence: 500, xp: 500, name: 'Journeyman Forger' },    // 10 fusions
-    { essence: 1000, xp: 750, name: 'Master Forger' },       // 25 fusions
-    { essence: 2500, xp: 1000, name: 'Legendary Smith' },    // 50 fusions
+    { essence: 100, xp: 50, name: 'First Forge' },           // 1 fusion
+    { essence: 250, xp: 75, name: 'Apprentice Smith' },      // 5 fusions
+    { essence: 500, xp: 100, name: 'Journeyman Forger' },    // 10 fusions
+    { essence: 1000, xp: 150, name: 'Master Forger' },       // 25 fusions
+    { essence: 2500, xp: 200, name: 'Legendary Smith' },     // 50 fusions
+    { essence: 5000, xp: 250, name: 'Eternal Artisan' },     // 100 fusions
+    { essence: 10000, xp: 500, name: 'Forge Transcendent' }, // 250 fusions
   ],
   [ACHIEVEMENT_IDS.PURE_FUSION]: [
-    { essence: 150, xp: 200, name: 'Purebred' },             // 1 pure fusion
-    { essence: 300, xp: 400, name: 'Species Master' },       // 3 pure fusions
-    { essence: 750, xp: 600, name: 'Bloodline Keeper' },     // 5 pure fusions
+    { essence: 150, xp: 50, name: 'Purebred' },              // 1 pure fusion
+    { essence: 300, xp: 75, name: 'Species Master' },        // 3 pure fusions
+    { essence: 750, xp: 100, name: 'Bloodline Keeper' },     // 5 pure fusions
+    { essence: 1500, xp: 150, name: 'Lineage Guardian' },    // 10 pure fusions
+    { essence: 3000, xp: 200, name: 'Ancestral Forger' },    // 25 pure fusions
+  ],
+  [ACHIEVEMENT_IDS.WILD_FUSION]: [
+    { essence: 150, xp: 50, name: 'First Experiment' },      // 1 wild fusion
+    { essence: 300, xp: 75, name: 'Chaos Mixer' },           // 3 wild fusions
+    { essence: 750, xp: 100, name: 'Wild Alchemist' },       // 5 wild fusions
+    { essence: 1500, xp: 150, name: 'Entropy Weaver' },      // 10 wild fusions
+    { essence: 3000, xp: 200, name: 'Primordial Shaper' },   // 25 wild fusions
   ],
 };
 
@@ -658,6 +696,18 @@ async function checkAchievement(userId, trigger, data = {}) {
           else if (achievementId === ACHIEVEMENT_IDS.PURE_FUSION) {
             value = data.isPureFusion ? (data.totalPureFusionCount || 0) : 0;
           }
+          else if (achievementId === ACHIEVEMENT_IDS.WILD_FUSION) {
+            value = !data.isPureFusion ? (data.totalWildFusionCount || 0) : 0;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.RARE_FORGER && data.newRarityId === RARITY.RARE) {
+            value = 1;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.EPIC_FORGER && data.newRarityId === RARITY.EPIC) {
+            value = 1;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.LEGENDARY_FORGER && data.newRarityId === RARITY.LEGENDARY) {
+            value = 1;
+          }
           else if (achievementId === ACHIEVEMENT_IDS.RARE_COLLECTOR && data.newRarityId === RARITY.RARE) {
             value = 1;
           }
@@ -793,15 +843,17 @@ async function onExpeditionCompleted(userId, totalExpeditionCount, totemId = nul
  * @param {number} options.newRarityId - Rarity of the resulting totem
  * @param {number} options.totalFusionCount - Total fusions performed by user
  * @param {number} options.totalPureFusionCount - Total pure fusions performed by user
+ * @param {number} options.totalWildFusionCount - Total wild fusions performed by user
  * @param {number} options.totalTotemCount - Total totems owned after fusion
  * @param {string} [options.totemId] - New totem ID for XP rewards
  */
-async function onTotemFused(userId, { isPureFusion, newRarityId, totalFusionCount, totalPureFusionCount, totalTotemCount, totemId = null }) {
+async function onTotemFused(userId, { isPureFusion, newRarityId, totalFusionCount, totalPureFusionCount, totalWildFusionCount, totalTotemCount, totemId = null }) {
   return checkAchievement(userId, 'TOTEM_FUSED', {
     isPureFusion,
     newRarityId,
     totalFusionCount,
     totalPureFusionCount,
+    totalWildFusionCount,
     totemCount: totalTotemCount,
     totemId,
   });

@@ -267,11 +267,11 @@ async function forgeTotem(user, body = {}) {
   // ── Trigger achievements ──
   let achievements = [];
   try {
-    // Get user's fusion stats (count from transactions)
+    // Get user's fusion stats from existing achievement progress
     let totalFusionCount = 1;
     let totalPureFusionCount = fusionType === 'pure' ? 1 : 0;
+    let totalWildFusionCount = fusionType === 'wild' ? 1 : 0;
 
-    // We'll use a simple approach: query existing achievement progress for fusion counts
     const { getAchievementProgress } = require('../../services/achievements-service');
     const fusionProgress = await getAchievementProgress(userId, 'ach_fusion-progression');
     if (fusionProgress) {
@@ -281,12 +281,17 @@ async function forgeTotem(user, body = {}) {
     if (pureProgress && fusionType === 'pure') {
       totalPureFusionCount = (pureProgress.currentValue || 0) + 1;
     }
+    const wildProgress = await getAchievementProgress(userId, 'ach_wild-fusion');
+    if (wildProgress && fusionType === 'wild') {
+      totalWildFusionCount = (wildProgress.currentValue || 0) + 1;
+    }
 
     const achResults = await onTotemFused(userId, {
       isPureFusion: allSameSpecies,
       newRarityId,
       totalFusionCount,
       totalPureFusionCount,
+      totalWildFusionCount,
       totalTotemCount,
       totemId: newTotemData.id,
     });
