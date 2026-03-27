@@ -44,6 +44,8 @@ const ACHIEVEMENT_IDS = {
   CHALLENGE_PROGRESSION: 'ach_challenge-progression',
   EXPEDITION_EXPLORER: 'ach_expedition-explorer',
   EXPEDITION_PROGRESSION: 'ach_expedition-progression',
+  FUSION_PROGRESSION: 'ach_fusion-progression',
+  PURE_FUSION: 'ach_pure-fusion',
 };
 
 // =============================================================================
@@ -71,6 +73,14 @@ const TRIGGER_TO_ACHIEVEMENTS = {
     ACHIEVEMENT_IDS.EXPEDITION_EXPLORER,
     ACHIEVEMENT_IDS.EXPEDITION_PROGRESSION,
   ],
+  TOTEM_FUSED: [
+    ACHIEVEMENT_IDS.FUSION_PROGRESSION,
+    ACHIEVEMENT_IDS.PURE_FUSION,
+    ACHIEVEMENT_IDS.RARE_COLLECTOR,
+    ACHIEVEMENT_IDS.EPIC_COLLECTOR,
+    ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR,
+    ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION,
+  ],
 };
 
 // =============================================================================
@@ -86,6 +96,8 @@ const ACHIEVEMENT_MILESTONES = {
   [ACHIEVEMENT_IDS.TREAT_PROGRESSION]: [100, 500, 1000, 5000, 10000],
   [ACHIEVEMENT_IDS.CHALLENGE_PROGRESSION]: [10, 100, 1000, 5000, 10000],
   [ACHIEVEMENT_IDS.EXPEDITION_PROGRESSION]: [10, 50, 250, 1000, 10000],
+  [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [1, 5, 10, 25, 50],
+  [ACHIEVEMENT_IDS.PURE_FUSION]: [1, 3, 5],
 };
 
 const ONETIME_ACHIEVEMENTS = [
@@ -206,6 +218,18 @@ const MILESTONE_REWARDS = {
     { essence: 100, xp: 200, name: 'Expedition Pathfinder' }, // 250 expeditions
     { essence: 200, xp: 400, name: 'Expedition Explorer' }, // 1000 expeditions
     { essence: 500, xp: 750, name: 'Expedition Legend' },  // 10000 expeditions
+  ],
+  [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [
+    { essence: 100, xp: 150, name: 'First Forge' },          // 1 fusion
+    { essence: 250, xp: 300, name: 'Apprentice Smith' },     // 5 fusions
+    { essence: 500, xp: 500, name: 'Journeyman Forger' },    // 10 fusions
+    { essence: 1000, xp: 750, name: 'Master Forger' },       // 25 fusions
+    { essence: 2500, xp: 1000, name: 'Legendary Smith' },    // 50 fusions
+  ],
+  [ACHIEVEMENT_IDS.PURE_FUSION]: [
+    { essence: 150, xp: 200, name: 'Purebred' },             // 1 pure fusion
+    { essence: 300, xp: 400, name: 'Species Master' },       // 3 pure fusions
+    { essence: 750, xp: 600, name: 'Bloodline Keeper' },     // 5 pure fusions
   ],
 };
 
@@ -627,6 +651,27 @@ async function checkAchievement(userId, trigger, data = {}) {
           }
           break;
 
+        case 'TOTEM_FUSED':
+          if (achievementId === ACHIEVEMENT_IDS.FUSION_PROGRESSION) {
+            value = data.totalFusionCount || 0;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.PURE_FUSION) {
+            value = data.isPureFusion ? (data.totalPureFusionCount || 0) : 0;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.RARE_COLLECTOR && data.newRarityId === RARITY.RARE) {
+            value = 1;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.EPIC_COLLECTOR && data.newRarityId === RARITY.EPIC) {
+            value = 1;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR && data.newRarityId === RARITY.LEGENDARY) {
+            value = 1;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION) {
+            value = data.totemCount || 0;
+          }
+          break;
+
         default:
           value = data.value || 0;
       }
@@ -740,6 +785,28 @@ async function onExpeditionCompleted(userId, totalExpeditionCount, totemId = nul
   return checkAchievement(userId, 'EXPEDITION_COMPLETED', { totalExpeditionCount, totemId });
 }
 
+/**
+ * Call when totems are fused in the Forge
+ * @param {string} userId - User ID
+ * @param {object} options - Options
+ * @param {boolean} options.isPureFusion - Whether this was a same-species fusion
+ * @param {number} options.newRarityId - Rarity of the resulting totem
+ * @param {number} options.totalFusionCount - Total fusions performed by user
+ * @param {number} options.totalPureFusionCount - Total pure fusions performed by user
+ * @param {number} options.totalTotemCount - Total totems owned after fusion
+ * @param {string} [options.totemId] - New totem ID for XP rewards
+ */
+async function onTotemFused(userId, { isPureFusion, newRarityId, totalFusionCount, totalPureFusionCount, totalTotemCount, totemId = null }) {
+  return checkAchievement(userId, 'TOTEM_FUSED', {
+    isPureFusion,
+    newRarityId,
+    totalFusionCount,
+    totalPureFusionCount,
+    totemCount: totalTotemCount,
+    totemId,
+  });
+}
+
 // =============================================================================
 // EXPORTS
 // =============================================================================
@@ -775,4 +842,5 @@ module.exports = {
   onLoginStreak,
   onChallengeCompleted,
   onExpeditionCompleted,
+  onTotemFused,
 };

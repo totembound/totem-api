@@ -77,8 +77,8 @@ describe('Achievements Service', () => {
   // =============================================================================
 
   describe('Achievement Constants', () => {
-    it('should define 13 achievement IDs', () => {
-      expect(Object.keys(ACHIEVEMENT_IDS)).toHaveLength(13);
+    it('should define 15 achievement IDs', () => {
+      expect(Object.keys(ACHIEVEMENT_IDS)).toHaveLength(15);
     });
 
     it('should have all achievement IDs prefixed with ach_', () => {
@@ -96,8 +96,8 @@ describe('Achievements Service', () => {
       expect(ONETIME_ACHIEVEMENTS).toContain(ACHIEVEMENT_IDS.EXPEDITION_EXPLORER);
     });
 
-    it('should define milestone thresholds for 8 progression achievements', () => {
-      expect(Object.keys(ACHIEVEMENT_MILESTONES)).toHaveLength(8);
+    it('should define milestone thresholds for 10 progression achievements', () => {
+      expect(Object.keys(ACHIEVEMENT_MILESTONES)).toHaveLength(10);
     });
 
     it('should have ascending milestone thresholds', () => {
