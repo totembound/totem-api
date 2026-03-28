@@ -152,14 +152,14 @@ describe('Achievements Service', () => {
     it('should award correct one-time Rare Collector rewards', () => {
       const reward = ONE_TIME_REWARDS[ACHIEVEMENT_IDS.RARE_COLLECTOR];
       expect(reward.essence).toBe(50);
-      expect(reward.xp).toBe(100);
+      expect(reward.xp).toBe(50);
       expect(reward.name).toBe('Rare Collector');
     });
 
     it('should award correct one-time Legendary Collector rewards', () => {
       const reward = ONE_TIME_REWARDS[ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR];
       expect(reward.essence).toBe(250);
-      expect(reward.xp).toBe(500);
+      expect(reward.xp).toBe(150);
     });
   });
 
@@ -170,7 +170,7 @@ describe('Achievements Service', () => {
   describe('getRewardConfig', () => {
     it('should return one-time reward when milestoneIndex is null', () => {
       const config = getRewardConfig(ACHIEVEMENT_IDS.RARE_COLLECTOR, null);
-      expect(config).toEqual({ essence: 50, xp: 100, name: 'Rare Collector' });
+      expect(config).toEqual({ essence: 50, xp: 50, name: 'Rare Collector' });
     });
 
     it('should return null for unknown achievement ID', () => {
@@ -490,7 +490,7 @@ describe('Achievements Service', () => {
         );
 
         expect(result.unlocked).toBe(true);
-        expect(result.rewards.xp).toBe(100); // First Evolution = 100 XP
+        expect(result.rewards.xp).toBe(25); // First Evolution = 25 XP
         expect(result.rewards.essence).toBe(25);
       });
     });
