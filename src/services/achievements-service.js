@@ -142,17 +142,17 @@ const RARITY = {
 const ONE_TIME_REWARDS = {
   [ACHIEVEMENT_IDS.RARE_COLLECTOR]: {
     essence: 50,
-    xp: 100,
+    xp: 50,
     name: 'Rare Collector',
   },
   [ACHIEVEMENT_IDS.EPIC_COLLECTOR]: {
     essence: 100,
-    xp: 250,
+    xp: 100,
     name: 'Epic Collector',
   },
   [ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR]: {
     essence: 250,
-    xp: 500,
+    xp: 150,
     name: 'Legendary Collector',
   },
   [ACHIEVEMENT_IDS.CHALLENGE_INITIATE]: {
@@ -167,17 +167,17 @@ const ONE_TIME_REWARDS = {
   },
   [ACHIEVEMENT_IDS.RARE_FORGER]: {
     essence: 200,
-    xp: 100,
+    xp: 75,
     name: 'Rare Forger',
   },
   [ACHIEVEMENT_IDS.EPIC_FORGER]: {
     essence: 500,
-    xp: 150,
+    xp: 100,
     name: 'Epic Forger',
   },
   [ACHIEVEMENT_IDS.LEGENDARY_FORGER]: {
     essence: 1000,
-    xp: 250,
+    xp: 150,
     name: 'Legendary Forger',
   },
 };
@@ -199,10 +199,10 @@ const MILESTONE_REWARDS = {
     { essence: 500, xp: 0, name: 'Legendary Sage' },       // 256 totems
   ],
   [ACHIEVEMENT_IDS.EVOLUTION_PROGRESSION]: [
-    { essence: 25, xp: 100, name: 'First Evolution' },     // Stage 1
-    { essence: 50, xp: 200, name: 'Adept Evolution' },     // Stage 2
-    { essence: 100, xp: 300, name: 'Master Evolution' },   // Stage 3
-    { essence: 200, xp: 500, name: 'Elder Evolution' },    // Stage 4
+    { essence: 25, xp: 25, name: 'First Evolution' },      // Stage 1
+    { essence: 50, xp: 50, name: 'Adept Evolution' },      // Stage 2
+    { essence: 100, xp: 75, name: 'Master Evolution' },    // Stage 3
+    { essence: 200, xp: 100, name: 'Elder Evolution' },    // Stage 4
   ],
   [ACHIEVEMENT_IDS.LOGIN_PROGRESSION]: [
     { essence: 50, xp: 0, name: 'Week Warrior' },          // 7 days
@@ -214,37 +214,37 @@ const MILESTONE_REWARDS = {
   [ACHIEVEMENT_IDS.FEED_PROGRESSION]: [
     { essence: 25, xp: 25, name: 'Caring Keeper' },        // 100 feeds
     { essence: 50, xp: 50, name: 'Diligent Caretaker' },   // 500 feeds
-    { essence: 100, xp: 100, name: 'Devoted Guardian' },   // 1000 feeds
-    { essence: 200, xp: 200, name: 'Everlasting Nurturer' }, // 5000 feeds
-    { essence: 400, xp: 400, name: 'Eternal Provider' },   // 10000 feeds
+    { essence: 100, xp: 75, name: 'Devoted Guardian' },    // 1000 feeds
+    { essence: 200, xp: 150, name: 'Everlasting Nurturer' }, // 5000 feeds
+    { essence: 400, xp: 200, name: 'Eternal Provider' },   // 10000 feeds
   ],
   [ACHIEVEMENT_IDS.TRAIN_PROGRESSION]: [
     { essence: 25, xp: 25, name: 'Aspiring Trainer' },     // 100 trains
     { essence: 50, xp: 50, name: 'Skilled Instructor' },   // 500 trains
-    { essence: 100, xp: 100, name: 'Master Mentor' },      // 1000 trains
-    { essence: 200, xp: 200, name: 'Legendary Sensei' },   // 5000 trains
-    { essence: 400, xp: 400, name: 'Totem Whisperer' },    // 10000 trains
+    { essence: 100, xp: 75, name: 'Master Mentor' },       // 1000 trains
+    { essence: 200, xp: 150, name: 'Legendary Sensei' },   // 5000 trains
+    { essence: 400, xp: 200, name: 'Totem Whisperer' },    // 10000 trains
   ],
   [ACHIEVEMENT_IDS.TREAT_PROGRESSION]: [
     { essence: 25, xp: 25, name: 'Gentle Healer' },        // 100 treats
     { essence: 50, xp: 50, name: 'Soothing Spirit' },      // 500 treats
-    { essence: 100, xp: 100, name: 'Compassionate Guardian' }, // 1000 treats
-    { essence: 200, xp: 200, name: 'Blessed Medic' },      // 5000 treats
-    { essence: 400, xp: 400, name: 'Divine Healer' },      // 10000 treats
+    { essence: 100, xp: 75, name: 'Compassionate Guardian' }, // 1000 treats
+    { essence: 200, xp: 150, name: 'Blessed Medic' },      // 5000 treats
+    { essence: 400, xp: 200, name: 'Divine Healer' },      // 10000 treats
   ],
   [ACHIEVEMENT_IDS.CHALLENGE_PROGRESSION]: [
     { essence: 25, xp: 50, name: 'Challenge Seeker' },     // 10 challenges
-    { essence: 75, xp: 150, name: 'Challenge Apprentice' }, // 100 challenges
-    { essence: 150, xp: 300, name: 'Challenge Adept' },    // 1000 challenges
-    { essence: 300, xp: 500, name: 'Challenge Expert' },   // 5000 challenges
-    { essence: 500, xp: 750, name: 'Challenge Master' },   // 10000 challenges
+    { essence: 75, xp: 75, name: 'Challenge Apprentice' }, // 100 challenges
+    { essence: 150, xp: 150, name: 'Challenge Adept' },    // 1000 challenges
+    { essence: 300, xp: 200, name: 'Challenge Expert' },   // 5000 challenges
+    { essence: 500, xp: 400, name: 'Challenge Master' },   // 10000 challenges
   ],
   [ACHIEVEMENT_IDS.EXPEDITION_PROGRESSION]: [
     { essence: 25, xp: 50, name: 'Expedition Seeker' },    // 10 expeditions
-    { essence: 50, xp: 100, name: 'Expedition Scout' },    // 50 expeditions
-    { essence: 100, xp: 200, name: 'Expedition Pathfinder' }, // 250 expeditions
-    { essence: 200, xp: 400, name: 'Expedition Explorer' }, // 1000 expeditions
-    { essence: 500, xp: 750, name: 'Expedition Legend' },  // 10000 expeditions
+    { essence: 50, xp: 75, name: 'Expedition Scout' },     // 50 expeditions
+    { essence: 100, xp: 100, name: 'Expedition Pathfinder' }, // 250 expeditions
+    { essence: 200, xp: 200, name: 'Expedition Explorer' }, // 1000 expeditions
+    { essence: 500, xp: 400, name: 'Expedition Legend' },   // 10000 expeditions
   ],
   [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [
     { essence: 100, xp: 50, name: 'First Forge' },           // 1 fusion
@@ -253,7 +253,7 @@ const MILESTONE_REWARDS = {
     { essence: 1000, xp: 150, name: 'Master Forger' },       // 25 fusions
     { essence: 2500, xp: 200, name: 'Legendary Smith' },     // 50 fusions
     { essence: 5000, xp: 250, name: 'Eternal Artisan' },     // 100 fusions
-    { essence: 10000, xp: 500, name: 'Forge Transcendent' }, // 250 fusions
+    { essence: 10000, xp: 250, name: 'Forge Transcendent' }, // 250 fusions
   ],
   [ACHIEVEMENT_IDS.PURE_FUSION]: [
     { essence: 150, xp: 50, name: 'Purebred' },              // 1 pure fusion
