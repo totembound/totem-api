@@ -2180,6 +2180,329 @@
  */
 
 // ============================================
+// Sanctum Endpoints (8)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/sanctum:
+ *   get:
+ *     tags: [Sanctum]
+ *     summary: Get sanctum state
+ *     description: Returns the user's Elder Sanctum state including seated totems, passive accumulation, and active missions
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Sanctum state
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     seats:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           seatIndex: { type: number }
+ *                           totemId: { type: string }
+ *                           totemName: { type: string }
+ *                           species: { type: string }
+ *                           seatedAt: { type: string }
+ *                           lastClaimedAt: { type: string }
+ *                           earnings: { type: number }
+ *                           tenureHours: { type: number }
+ *                           tenureMultiplier: { type: number }
+ *                           onMission: { type: boolean }
+ *                     maxSeats: { type: number }
+ *                     totalAccumulated: { type: number }
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/seat:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Seat a totem in the sanctum
+ *     description: Place a Stage 4+ totem in an available sanctum seat to begin passive Essence accumulation. Totem cannot be on an expedition.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of Stage 4+ totem to seat
+ *               seatIndex:
+ *                 type: number
+ *                 description: Optional specific seat index (auto-assigned if omitted)
+ *     responses:
+ *       200:
+ *         description: Totem seated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     seats: { type: array, items: { type: object } }
+ *                     maxSeats: { type: number }
+ *                     totalAccumulated: { type: number }
+ *       400:
+ *         description: Totem not found, below Stage 4, already seated, on expedition, or no available seat
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/unseat:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Unseat a totem from the sanctum
+ *     description: Remove a seated totem from the sanctum. Resets tenure multiplier. Cannot unseat while totem is on a council mission.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the seated totem to remove
+ *     responses:
+ *       200:
+ *         description: Totem unseated successfully
+ *       400:
+ *         description: Totem not seated or currently on a mission
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/claim:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Claim accumulated Essence
+ *     description: Claim all passively accumulated Essence from seated totems. Earnings are based on time since last claim and tenure multiplier (up to 1.5x at 30 days). Accumulation caps at 168 hours.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Essence claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalClaimed: { type: number }
+ *                     newEssenceBalance: { type: number }
+ *                     breakdown:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           seatIndex: { type: number }
+ *                           totemName: { type: string }
+ *                           earned: { type: number }
+ *                     claimedAt: { type: string }
+ *       400:
+ *         description: No seats or nothing to claim (less than 1 Essence)
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions:
+ *   get:
+ *     tags: [Sanctum]
+ *     summary: List available council missions
+ *     description: Returns all 9 council missions grouped by tier (governance, diplomacy, legacy) with costs, durations, and rewards
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Council missions grouped by tier
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     governance:
+ *                       type: array
+ *                       description: "Stage 4+ missions (2-4hr, low cost)"
+ *                       items: { $ref: '#/components/schemas/CouncilMission' }
+ *                     diplomacy:
+ *                       type: array
+ *                       description: "Stage 5 missions (6-8hr, medium cost)"
+ *                       items: { $ref: '#/components/schemas/CouncilMission' }
+ *                     legacy:
+ *                       type: array
+ *                       description: "Stage 5 missions (12-24hr, high cost)"
+ *                       items: { $ref: '#/components/schemas/CouncilMission' }
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions/start:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Start a council mission
+ *     description: Send a seated totem on a council mission. Costs Essence and happiness. Totem earns XP and rune drops on completion.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId, missionType]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the seated totem
+ *               missionType:
+ *                 type: string
+ *                 description: "Mission ID (e.g., cm_decree-of-wisdom, cm_peace-summit)"
+ *                 example: cm_decree-of-wisdom
+ *     responses:
+ *       200:
+ *         description: Mission started
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     mission:
+ *                       type: object
+ *                       properties:
+ *                         missionType: { type: string }
+ *                         name: { type: string }
+ *                         tier: { type: string }
+ *                         duration: { type: number, description: "Duration in seconds" }
+ *                         startedAt: { type: string }
+ *                         endsAt: { type: string }
+ *                     newEssenceBalance: { type: number }
+ *       400:
+ *         description: Invalid mission, totem not seated, already on mission, insufficient stage/Essence/happiness
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions/claim:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Claim completed council mission
+ *     description: Claim rewards from a completed council mission. Awards XP to totem and rolls for rune drops based on mission tier.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the totem with a completed mission
+ *     responses:
+ *       200:
+ *         description: Mission rewards claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     rewards:
+ *                       type: object
+ *                       properties:
+ *                         xp: { type: number }
+ *                         runesEarned:
+ *                           type: object
+ *                           properties:
+ *                             lesser: { type: number }
+ *                             greater: { type: number }
+ *                             ancient: { type: number }
+ *                     missionType: { type: string }
+ *                     missionName: { type: string }
+ *                     totemId: { type: string }
+ *                     newRuneBalances: { type: object, nullable: true }
+ *       400:
+ *         description: No active mission or mission not yet complete
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions/cancel:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Cancel an active council mission
+ *     description: Cancel a council mission in progress. No Essence refund and no rewards are given. Totem remains seated.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the totem with an active mission to cancel
+ *     responses:
+ *       200:
+ *         description: Mission cancelled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     cancelled: { type: boolean, example: true }
+ *                     missionType: { type: string }
+ *                     totemId: { type: string }
+ *       400:
+ *         description: No active mission found
+ */
+
+// ============================================
 // Health Check (1)
 // ============================================
 

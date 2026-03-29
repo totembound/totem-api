@@ -299,6 +299,110 @@ async function main() {
     }
   }
 
+  // ============================================
+  // Seed Dev Test User (matches cognito-client.js test credentials)
+  // ============================================
+
+  const TEST_USER_ID = 'usr_a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+  const TEST_USER_EMAIL = 'testplayer1@example.com';
+  const TEST_USER_NAME = 'TestPlayer1';
+  const now = new Date().toISOString();
+  const today = now.slice(0, 10);
+
+  // Check if test user already exists
+  let userExists = false;
+  try {
+    const result = await dynamoRequest('GetItem', {
+      TableName: 'TotemBound-Users',
+      Key: { pk: { S: `USER#${TEST_USER_ID}` }, sk: { S: 'PROFILE' } },
+    });
+    userExists = !!result.Item;
+  } catch (e) { /* table may be empty */ }
+
+  if (userExists) {
+    console.log(`✓ Dev test user already seeded (${TEST_USER_EMAIL})`);
+  } else {
+    console.log('');
+    console.log('🌱 Seeding dev test user...');
+
+    const lootId = `lot_seed-uncommon-box-001`;
+    const txnId = `txn_seed-signup-bonus-001`;
+
+    // 1. User profile record (2000 Essence, 0 Gems — same as runtime signup)
+    await dynamoRequest('PutItem', {
+      TableName: 'TotemBound-Users',
+      Item: {
+        pk: { S: `USER#${TEST_USER_ID}` },
+        sk: { S: 'PROFILE' },
+        id: { S: TEST_USER_ID },
+        email: { S: TEST_USER_EMAIL },
+        displayName: { S: TEST_USER_NAME },
+        tier: { S: 'free' },
+        currencies: { M: {
+          essence: { N: '2000' },
+          gems: { N: '0' },
+        }},
+        stats: { M: {
+          totalTotems: { N: '0' },
+          totalChallengesCompleted: { N: '0' },
+          loginStreak: { N: '0' },
+          lastLoginDate: { S: today },
+        }},
+        settings: { M: {
+          notifications: { BOOL: true },
+          darkMode: { S: 'dark' },
+        }},
+        createdAt: { S: now },
+        updatedAt: { S: now },
+      },
+    });
+    console.log(`  ✓ User profile (${TEST_USER_EMAIL}, 2000 Essence)`);
+
+    // 2. Uncommon Totem Box loot item (unclaimed — matches runtime grantLootItem() exactly)
+    await dynamoRequest('PutItem', {
+      TableName: 'TotemBound-RewardState',
+      Item: {
+        pk: { S: `USER#${TEST_USER_ID}` },
+        sk: { S: `LOOT#${lootId}` },
+        id: { S: lootId },
+        userId: { S: TEST_USER_ID },
+        boxId: { S: 'uncommon_totem_box' },
+        source: { S: 'signup' },
+        status: { S: 'unclaimed' },
+        grantedAt: { S: now },
+        claimedAt: { NULL: true },
+        claimResult: { NULL: true },
+      },
+    });
+    console.log('  ✓ Uncommon Totem Box (unclaimed loot)');
+
+    // 3. Signup bonus transaction log (matches runtime logTransaction() exactly)
+    const shortId = 'seed01';
+    await dynamoRequest('PutItem', {
+      TableName: 'TotemBound-Transactions',
+      Item: {
+        pk: { S: `TXN#${now}#${shortId}` },
+        sk: { S: `USER#${TEST_USER_ID}` },
+        id: { S: txnId },
+        userId: { S: TEST_USER_ID },
+        type: { S: 'reward_signup' },
+        currency: { S: 'essence' },
+        amount: { N: '2000' },
+        balanceBefore: { N: '0' },
+        balanceAfter: { N: '2000' },
+        ts: { S: now },
+        refType: { S: 'reward' },
+        refName: { S: 'Welcome Bonus' },
+      },
+    });
+    console.log('  ✓ Signup bonus transaction (2000 Essence)');
+
+    // 4. No achievements on signup — they fire when loot box is claimed (onTotemAcquired)
+    console.log('  ℹ  No achievements seeded (fire on first totem claim, not signup)');
+
+    console.log(`  ✅ Dev test user ready! Login: ${TEST_USER_EMAIL} / TestPassword123!`);
+  }
+
   console.log('');
   console.log('✅ Tables initialized!');
   console.log('');

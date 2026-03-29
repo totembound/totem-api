@@ -50,6 +50,12 @@ const ACHIEVEMENT_IDS = {
   RARE_FORGER: 'ach_rare-forger',
   EPIC_FORGER: 'ach_epic-forger',
   LEGENDARY_FORGER: 'ach_legendary-forger',
+  FIRST_ELDER: 'ach_first-elder',
+  FULL_COUNCIL: 'ach_full-council',
+  SANCTUM_CLAIM: 'ach_sanctum-claim',
+  TENURE_MASTER: 'ach_tenure-master',
+  COUNCIL_MISSIONS: 'ach_council-missions',
+  FOUNDING_RITUAL: 'ach_founding-ritual',
 };
 
 // =============================================================================
@@ -89,6 +95,10 @@ const TRIGGER_TO_ACHIEVEMENTS = {
     ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR,
     ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION,
   ],
+  ELDER_SEATED: [ACHIEVEMENT_IDS.FIRST_ELDER, ACHIEVEMENT_IDS.FULL_COUNCIL],
+  SANCTUM_CLAIMED: [ACHIEVEMENT_IDS.SANCTUM_CLAIM],
+  TENURE_CHECK: [ACHIEVEMENT_IDS.TENURE_MASTER],
+  MISSION_COMPLETED: [ACHIEVEMENT_IDS.COUNCIL_MISSIONS, ACHIEVEMENT_IDS.FOUNDING_RITUAL],
 };
 
 // =============================================================================
@@ -107,6 +117,10 @@ const ACHIEVEMENT_MILESTONES = {
   [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [1, 5, 10, 25, 50, 100, 250],
   [ACHIEVEMENT_IDS.PURE_FUSION]: [1, 3, 5, 10, 25],
   [ACHIEVEMENT_IDS.WILD_FUSION]: [1, 3, 5, 10, 25],
+  [ACHIEVEMENT_IDS.FULL_COUNCIL]: [3],
+  [ACHIEVEMENT_IDS.SANCTUM_CLAIM]: [1, 10, 50, 100, 500],
+  [ACHIEVEMENT_IDS.TENURE_MASTER]: [7, 14, 30],
+  [ACHIEVEMENT_IDS.COUNCIL_MISSIONS]: [5, 25, 50, 100, 500],
 };
 
 const ONETIME_ACHIEVEMENTS = [
@@ -118,6 +132,8 @@ const ONETIME_ACHIEVEMENTS = [
   ACHIEVEMENT_IDS.RARE_FORGER,
   ACHIEVEMENT_IDS.EPIC_FORGER,
   ACHIEVEMENT_IDS.LEGENDARY_FORGER,
+  ACHIEVEMENT_IDS.FIRST_ELDER,
+  ACHIEVEMENT_IDS.FOUNDING_RITUAL,
 ];
 
 // Rarity IDs (from totem data)
@@ -179,6 +195,16 @@ const ONE_TIME_REWARDS = {
     essence: 1000,
     xp: 150,
     name: 'Legendary Forger',
+  },
+  [ACHIEVEMENT_IDS.FIRST_ELDER]: {
+    essence: 50,
+    xp: 100,
+    name: 'First Among Equals',
+  },
+  [ACHIEVEMENT_IDS.FOUNDING_RITUAL]: {
+    essence: 100,
+    xp: 150,
+    name: 'World Founder',
   },
 };
 
@@ -268,6 +294,28 @@ const MILESTONE_REWARDS = {
     { essence: 750, xp: 100, name: 'Wild Alchemist' },       // 5 wild fusions
     { essence: 1500, xp: 150, name: 'Entropy Weaver' },      // 10 wild fusions
     { essence: 3000, xp: 200, name: 'Primordial Shaper' },   // 25 wild fusions
+  ],
+  [ACHIEVEMENT_IDS.FULL_COUNCIL]: [
+    { essence: 100, xp: 200, name: 'Full Council' },          // 3 seats filled
+  ],
+  [ACHIEVEMENT_IDS.SANCTUM_CLAIM]: [
+    { essence: 25, xp: 25, name: 'First Tithe' },             // 1 claim
+    { essence: 50, xp: 50, name: 'Tithe Collector' },         // 10 claims
+    { essence: 100, xp: 100, name: 'Sanctum Treasurer' },     // 50 claims
+    { essence: 200, xp: 200, name: 'Grand Treasurer' },       // 100 claims
+    { essence: 500, xp: 400, name: 'Eternal Treasurer' },     // 500 claims
+  ],
+  [ACHIEVEMENT_IDS.TENURE_MASTER]: [
+    { essence: 50, xp: 0, name: 'Week Watch' },               // 7 days
+    { essence: 100, xp: 0, name: 'Fortnight Keeper' },        // 14 days
+    { essence: 200, xp: 0, name: 'Long Reign' },              // 30 days
+  ],
+  [ACHIEVEMENT_IDS.COUNCIL_MISSIONS]: [
+    { essence: 25, xp: 50, name: 'Mission Initiate' },        // 5 missions
+    { essence: 50, xp: 100, name: 'Council Veteran' },        // 25 missions
+    { essence: 100, xp: 200, name: 'Elder Diplomat' },        // 50 missions
+    { essence: 200, xp: 400, name: 'Grand Elder' },           // 100 missions
+    { essence: 500, xp: 750, name: 'Eternal Elder' },         // 500 missions
   ],
 };
 
@@ -722,6 +770,33 @@ async function checkAchievement(userId, trigger, data = {}) {
           }
           break;
 
+        case 'ELDER_SEATED':
+          if (achievementId === ACHIEVEMENT_IDS.FIRST_ELDER) {
+            value = 1; // One-time: first totem seated
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.FULL_COUNCIL) {
+            value = data.totalSeatedCount || 0;
+          }
+          break;
+
+        case 'SANCTUM_CLAIMED':
+          value = data.totalClaimCount || 0;
+          break;
+
+        case 'TENURE_CHECK':
+          value = data.tenureDays || 0;
+          break;
+
+        case 'MISSION_COMPLETED':
+          if (achievementId === ACHIEVEMENT_IDS.FOUNDING_RITUAL) {
+            // Only triggers for the founding-ritual mission
+            value = data.missionType === 'cm_founding-ritual' ? 1 : 0;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.COUNCIL_MISSIONS) {
+            value = data.totalMissionCount || 0;
+          }
+          break;
+
         default:
           value = data.value || 0;
       }
@@ -859,6 +934,37 @@ async function onTotemFused(userId, { isPureFusion, newRarityId, totalFusionCoun
   });
 }
 
+/**
+ * Call when an elder totem is seated in the sanctum
+ * @param {string} userId - User ID
+ * @param {object} options - Options object
+ * @param {number} options.totalSeatedCount - Total seats now occupied (after seating)
+ */
+async function onElderSeated(userId, { totalSeatedCount }) {
+  return checkAchievement(userId, 'ELDER_SEATED', { totalSeatedCount });
+}
+
+/**
+ * Call when sanctum Essence is claimed
+ * @param {string} userId - User ID
+ * @param {object} options - Options object
+ * @param {number} options.totalClaimCount - Total sanctum claims by the user
+ */
+async function onSanctumClaimed(userId, { totalClaimCount }) {
+  return checkAchievement(userId, 'SANCTUM_CLAIMED', { totalClaimCount });
+}
+
+/**
+ * Call when a council mission is completed and claimed
+ * @param {string} userId - User ID
+ * @param {object} options - Options object
+ * @param {string} options.missionType - Mission type ID (e.g. 'cm_founding-ritual')
+ * @param {number} options.totalMissionCount - Total council missions completed by user
+ */
+async function onMissionCompleted(userId, { missionType, totalMissionCount }) {
+  return checkAchievement(userId, 'MISSION_COMPLETED', { missionType, totalMissionCount });
+}
+
 // =============================================================================
 // EXPORTS
 // =============================================================================
@@ -895,4 +1001,7 @@ module.exports = {
   onChallengeCompleted,
   onExpeditionCompleted,
   onTotemFused,
+  onElderSeated,
+  onSanctumClaimed,
+  onMissionCompleted,
 };

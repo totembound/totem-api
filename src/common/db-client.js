@@ -471,7 +471,7 @@ async function addEssence(userId, amount, { type = 'reward', ref = null } = {}) 
  * @param {string} userId
  * @param {{ lesser?: number, greater?: number, ancient?: number }} runes
  */
-async function addRunes(userId, runes) {
+async function addRunes(userId, runes, { type = 'reward', ref = null } = {}) {
   const lesser = runes.lesser || 0;
   const greater = runes.greater || 0;
   const ancient = runes.ancient || 0;
@@ -508,6 +508,9 @@ async function addRunes(userId, runes) {
 
     const response = await docClient.send(command);
     const newBalances = response.Attributes?.currencies?.runes || { lesser: 0, greater: 0, ancient: 0 };
+
+    await logRuneTransaction(userId, { lesser, greater, ancient }, newBalances, type, ref);
+
     return { success: true, newBalances };
   }
   catch (err) {
@@ -529,9 +532,32 @@ async function addRunes(userId, runes) {
       });
       const response = await docClient.send(initCommand);
       const newBalances = response.Attributes?.currencies?.runes || { lesser: 0, greater: 0, ancient: 0 };
+
+      await logRuneTransaction(userId, { lesser, greater, ancient }, newBalances, type, ref);
+
       return { success: true, newBalances };
     }
     throw err;
+  }
+}
+
+/**
+ * Log individual rune transactions (one per rune type that was awarded)
+ */
+async function logRuneTransaction(userId, runesAdded, newBalances, type, ref) {
+  const runeTypes = ['lesser', 'greater', 'ancient'];
+  for (const runeType of runeTypes) {
+    const amount = runesAdded[runeType] || 0;
+    if (amount > 0) {
+      await logTransaction(userId, {
+        type,
+        currency: `rune_${runeType}`,
+        amount,
+        balanceBefore: (newBalances[runeType] || 0) - amount,
+        balanceAfter: newBalances[runeType] || 0,
+        ref,
+      });
+    }
   }
 }
 
