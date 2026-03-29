@@ -57,7 +57,14 @@ async function feed(user, totemId) {
     };
   }
 
-  // 3. Check time window (feed uses 8-hour UTC windows, not cooldown)
+  // 3. Check totem availability (blocks if on Council Mission)
+  const { checkActionAvailability } = require('../../common/totem-utils');
+  const availability = checkActionAvailability(totem);
+  if (!availability.available) {
+    return { success: false, error: availability.error };
+  }
+
+  // 4. Check time window (feed uses 8-hour UTC windows, not cooldown)
   const feedHistory = totem.feedHistory || [];
   const windowStatus = checkFeedTimeWindow(feedHistory);
 

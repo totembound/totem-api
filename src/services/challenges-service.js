@@ -35,6 +35,7 @@ const {
 
 const { onChallengeCompleted } = require('./achievements-service');
 const { checkEvolutionRequirements } = require('../functions/game-actions/helpers');
+const { checkActionAvailability } = require('../common/totem-utils');
 
 // =============================================================================
 // CHALLENGE DEFINITIONS (10 Challenges - synced from frontend challenges.json)
@@ -411,7 +412,13 @@ async function completeChallenge(userId, challengeId, totemId, score) {
     };
   }
 
-  // 5. Check requirements (stage + stats)
+  // 5. Check if totem is available (not on council mission)
+  const availCheck = checkActionAvailability(totem);
+  if (!availCheck.available) {
+    return { success: false, error: availCheck.error };
+  }
+
+  // 6. Check requirements (stage + stats)
   const reqCheck = checkRequirements(totem, challenge);
   if (!reqCheck.qualified) {
     return {

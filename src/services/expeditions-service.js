@@ -650,10 +650,22 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
       };
     }
   }
+
+  // Resolve all team totems and check sanctum availability
+  const { checkExpeditionAvailability, checkActionAvailability } = require('../common/totem-utils');
   const teamTotems = [];
   for (const tid of allTotemIds) {
     const t = tid === totemId ? totem : await getTotem(userId, tid);
-    if (t) teamTotems.push({ id: tid, totem: t });
+    if (!t) continue;
+    const councilCheck = checkExpeditionAvailability(t);
+    if (!councilCheck.available) {
+      return { success: false, error: councilCheck.error };
+    }
+    const missionCheck = checkActionAvailability(t);
+    if (!missionCheck.available) {
+      return { success: false, error: missionCheck.error };
+    }
+    teamTotems.push({ id: tid, totem: t });
   }
 
   // Check happiness cost requirement for ALL team totems (validate before deducting anything)
@@ -845,7 +857,10 @@ async function claimExpeditionReward(userId, totemId) {
   let newRuneBalances = null;
   const hasRunes = (runesEarned.lesser || 0) + (runesEarned.greater || 0) + (runesEarned.ancient || 0) > 0;
   if (hasRunes) {
-    const runeResult = await addRunes(userId, runesEarned);
+    const runeResult = await addRunes(userId, runesEarned, {
+      type: 'reward_expedition',
+      ref: activeExpedition.expeditionId,
+    });
     if (runeResult.success) {
       newRuneBalances = runeResult.newBalances;
     }

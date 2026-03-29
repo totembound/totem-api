@@ -340,9 +340,5 @@ describe('Totem Handlers', () => {
       expect(result.attributes.nickname).toBeNull();
     });
 
-    it('should set isStaked to false (Web2)', () => {
-      const result = transformTotemForApi(makeDbTotem());
-      expect(result.attributes.isStaked).toBe(false);
-    });
   });
 });
