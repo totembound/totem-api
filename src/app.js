@@ -169,7 +169,7 @@ app.get('/v1/auth/me', authenticateJWT, handleGetMe);
 
 // Import route handlers
 let userRoutes, totemRoutes, gameActionRoutes, challengeRoutes,
-  expeditionRoutes, rewardRoutes, achievementRoutes, shopRoutes;
+  expeditionRoutes, rewardRoutes, achievementRoutes, shopRoutes, sanctumRoutes;
 
 const loadRoutes = () => {
   const tryRequire = (path, name) => {
@@ -190,6 +190,7 @@ const loadRoutes = () => {
   rewardRoutes = tryRequire('./functions/rewards', 'rewards');
   achievementRoutes = tryRequire('./functions/achievements', 'achievements');
   shopRoutes = tryRequire('./functions/shop', 'shop');
+  sanctumRoutes = tryRequire('./functions/sanctum', 'sanctum');
 
   console.log('Loaded routes:', {
     user: !!userRoutes,
@@ -200,6 +201,7 @@ const loadRoutes = () => {
     rewards: !!rewardRoutes,
     achievements: !!achievementRoutes,
     shop: !!shopRoutes,
+    sanctum: !!sanctumRoutes,
   });
 };
 
@@ -591,6 +593,170 @@ app.post('/v1/expeditions/:id/claim', authenticateJWT, async (req, res) => {
     }
     else {
       res.json({ success: true, data: { message: 'Expedition claimed (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Sanctum routes
+const SANCTUM_ERROR_STATUS = {
+  NO_STAGE4_TOTEMS: 403,
+  NOT_FOUND: 404,
+  NOT_ASCENDED: 400,
+  NO_AVAILABLE_SEAT: 400,
+  NOT_SEATED: 400,
+  NOTHING_TO_CLAIM: 400,
+  ALREADY_SEATED: 409,
+  ON_EXPEDITION: 409,
+  ON_MISSION: 409,
+  INVALID_MISSION: 400,
+  INSUFFICIENT_ESSENCE: 400,
+  INSUFFICIENT_HAPPINESS: 400,
+  ALREADY_ON_MISSION: 409,
+  MISSION_NOT_FOUND: 404,
+  MISSION_NOT_COMPLETE: 400,
+  INSUFFICIENT_STAGE: 400,
+};
+
+app.get('/v1/sanctum', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.getSanctum) {
+      const result = await sanctumRoutes.getSanctum(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { seats: [], filledSeats: 0, maxSeats: 0, totalPendingEarnings: 0 } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/sanctum/seat', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.seatTotem) {
+      const result = await sanctumRoutes.seatTotem(req.user, req.body);
+      if (!result.success && result.error?.code) {
+        const status = SANCTUM_ERROR_STATUS[result.error.code] || 400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Seat totem (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/sanctum/unseat', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.unseatTotem) {
+      const result = await sanctumRoutes.unseatTotem(req.user, req.body);
+      if (!result.success && result.error?.code) {
+        const status = SANCTUM_ERROR_STATUS[result.error.code] || 400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Unseat totem (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/sanctum/claim', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.claimSanctum) {
+      const result = await sanctumRoutes.claimSanctum(req.user);
+      if (!result.success && result.error?.code) {
+        const status = SANCTUM_ERROR_STATUS[result.error.code] || 400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Claim sanctum (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.get('/v1/sanctum/missions', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.getCouncilMissions) {
+      const result = await sanctumRoutes.getCouncilMissions(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Council missions (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/sanctum/missions/start', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.startCouncilMission) {
+      const result = await sanctumRoutes.startCouncilMission(req.user, req.body);
+      if (!result.success && result.error?.code) {
+        const status = SANCTUM_ERROR_STATUS[result.error.code] || 400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Start mission (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/sanctum/missions/claim', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.claimCouncilMission) {
+      const result = await sanctumRoutes.claimCouncilMission(req.user, req.body);
+      if (!result.success && result.error?.code) {
+        const status = SANCTUM_ERROR_STATUS[result.error.code] || 400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Claim mission (stub)' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/sanctum/missions/cancel', authenticateJWT, async (req, res) => {
+  try {
+    if (sanctumRoutes?.cancelCouncilMission) {
+      const result = await sanctumRoutes.cancelCouncilMission(req.user, req.body);
+      if (!result.success && result.error?.code) {
+        const status = SANCTUM_ERROR_STATUS[result.error.code] || 400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.json({ success: true, data: { message: 'Cancel mission (stub)' } });
     }
   }
   catch (error) {

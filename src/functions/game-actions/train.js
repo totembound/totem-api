@@ -55,7 +55,14 @@ async function train(user, totemId) {
     };
   }
 
-  // 3. Check cooldown (train has cooldown: 0, so this should always pass)
+  // 3. Check totem availability (blocks if on Council Mission)
+  const { checkActionAvailability } = require('../../common/totem-utils');
+  const availability = checkActionAvailability(totem);
+  if (!availability.available) {
+    return { success: false, error: availability.error };
+  }
+
+  // 4. Check cooldown (train has cooldown: 0, so this should always pass)
   const cooldownStatus = checkCooldown(totem.cooldowns?.train, actionType);
 
   if (cooldownStatus.onCooldown) {

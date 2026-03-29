@@ -105,7 +105,7 @@ function transformTotemForApi(totem) {
       wisdom: totem.stats?.wisdom || 5,
       nickname: totem.nickname || null,  // User-customizable name (optional)
       prestigeLevel: totem.prestigeLevel || 0,
-      isStaked: false, // Web2 doesn't have staking
+      ...(totem.sanctum && { sanctum: totem.sanctum }),
     },
 
     // Action tracking (used for cooldowns)
