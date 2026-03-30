@@ -10,5 +10,7 @@
     "StripePriceVip": "price_1Sy32PB9v7dW9snFMI14R3pA",
     "IoTEndpoint": "a2qxr7qrf28xz2-ats.iot.us-west-2.amazonaws.com",
     "IoTIdentityPoolId": "us-west-2:f394b734-442f-4ee9-88fd-6b4928cb46e0",
-    "IoTBrowserPolicyName": "totemboundci-browser-iot-policy"
+    "IoTBrowserPolicyName": "totemboundci-browser-iot-policy",
+    "GoogleClientIdParam": "/totemboundci/oauth/google/client-id",
+    "GoogleClientSecretParam": "/totemboundci/oauth/google/client-secret"
 }

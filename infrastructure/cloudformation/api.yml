@@ -94,6 +94,16 @@ Parameters:
     Description: Email address for notifications (must match a verified SES identity)
     Default: ''
 
+  GoogleClientIdParam:
+    Type: String
+    Description: SSM parameter name for Google OAuth Client ID
+    Default: ''
+
+  GoogleClientSecretParam:
+    Type: String
+    Description: SSM parameter name for Google OAuth Client Secret
+    Default: ''
+
 Conditions:
   UseDefaultFromEmail: !Equals [!Ref FromEmail, '']
 
@@ -147,6 +157,9 @@ Resources:
           IOT_ENDPOINT: !Ref IoTEndpoint
           IOT_IDENTITY_POOL_ID: !Ref IoTIdentityPoolId
           IOT_BROWSER_POLICY_NAME: !Ref IoTBrowserPolicyName
+          GOOGLE_CLIENT_ID_PARAM: !Ref GoogleClientIdParam
+          GOOGLE_CLIENT_SECRET_PARAM: !Ref GoogleClientSecretParam
+          OAUTH_REDIRECT_BASE: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
       Code:
         S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
         S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"

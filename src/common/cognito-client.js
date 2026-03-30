@@ -603,6 +603,84 @@ function awsGetUserById() {
   return null;
 }
 
+// ============================================
+// OAuth User Creation (passwordless)
+// ============================================
+
+async function localCreateOAuthUser({ email, displayName, provider, providerId }) {
+  const normalizedEmail = email.toLowerCase();
+
+  // Check if user already exists by email
+  const existing = localUserStore.get(normalizedEmail);
+  if (existing) {
+    return {
+      userId: existing.id,
+      email: existing.email,
+      displayName: existing.displayName,
+    };
+  }
+
+  const userId = generateId('user');
+  const user = {
+    id: userId,
+    email: normalizedEmail,
+    passwordHash: hashPassword(uuidv4()), // Random password — user never needs it
+    displayName: displayName || email.split('@')[0],
+    emailVerified: true, // OAuth emails are pre-verified
+    oauthProvider: provider,
+    oauthProviderId: providerId,
+    createdAt: new Date().toISOString(),
+  };
+
+  localUserStore.set(normalizedEmail, user);
+
+  return {
+    userId,
+    email: normalizedEmail,
+    displayName: user.displayName,
+  };
+}
+
+async function awsCreateOAuthUser({ email, displayName, _provider, _providerId }) {
+  const {
+    AdminCreateUserCommand,
+    AdminSetUserPasswordCommand,
+  } = require('@aws-sdk/client-cognito-identity-provider');
+
+  const normalizedEmail = email.toLowerCase();
+  const name = displayName || email.split('@')[0];
+  const tempPassword = `Temp${uuidv4().replace(/-/g, '').slice(0, 16)}!1`;
+
+  // Create user with suppressed welcome message
+  const createResult = await getCognitoClient().send(new AdminCreateUserCommand({
+    UserPoolId: _USER_POOL_ID,
+    Username: normalizedEmail,
+    UserAttributes: [
+      { Name: 'email', Value: normalizedEmail },
+      { Name: 'email_verified', Value: 'true' },
+      { Name: 'custom:displayName', Value: name },
+    ],
+    MessageAction: 'SUPPRESS',
+    TemporaryPassword: tempPassword,
+  }));
+
+  const userId = createResult.User?.Attributes?.find(a => a.Name === 'sub')?.Value || createResult.User?.Username;
+
+  // Set permanent password (so user isn't in FORCE_CHANGE_PASSWORD state)
+  await getCognitoClient().send(new AdminSetUserPasswordCommand({
+    UserPoolId: _USER_POOL_ID,
+    Username: normalizedEmail,
+    Password: tempPassword,
+    Permanent: true,
+  }));
+
+  return {
+    userId,
+    email: normalizedEmail,
+    displayName: name,
+  };
+}
+
 function awsGenerateTokens() {
   throw new Error('generateTokens not available in AWS mode - use signIn()');
 }
@@ -626,6 +704,9 @@ module.exports = {
   forgotPassword: isLocal ? localForgotPassword : awsForgotPassword,
   confirmForgotPassword: isLocal ? localConfirmForgotPassword : awsConfirmForgotPassword,
   getUserById: isLocal ? localGetUserById : awsGetUserById,
+
+  // OAuth user creation (passwordless)
+  createOAuthUser: isLocal ? localCreateOAuthUser : awsCreateOAuthUser,
 
   // Password utilities (local only)
   hashPassword,
