@@ -184,8 +184,8 @@ describe('Purchase Bundle', () => {
     });
 
     it('should return null for months with no series defined', () => {
-      // September is not yet configured
-      const restore = mockUTCDate('2026-09-15T12:00:00.000Z');
+      // October is not yet configured
+      const restore = mockUTCDate('2026-10-15T12:00:00.000Z');
       try {
         const special = getCurrentMonthlySpecial();
         expect(special).toBeNull();
@@ -292,7 +292,7 @@ describe('Purchase Bundle', () => {
     });
 
     it('should return MONTHLY_SPECIAL_NOT_AVAILABLE for unconfigured month', async () => {
-      const restore = mockUTCDate('2026-09-10T15:00:00.000Z');
+      const restore = mockUTCDate('2026-10-10T15:00:00.000Z');
       try {
         dbClient.getBundlePurchasesToday.mockResolvedValue(0);
         dbClient.getUser.mockResolvedValue(makeUserRecord(10000));
