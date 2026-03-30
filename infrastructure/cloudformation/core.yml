@@ -44,6 +44,10 @@ Resources:
           AttributeType: S
         - AttributeName: email
           AttributeType: S
+        - AttributeName: oauthProvider
+          AttributeType: S
+        - AttributeName: oauthProviderId
+          AttributeType: S
       KeySchema:
         - AttributeName: pk
           KeyType: HASH
@@ -54,6 +58,14 @@ Resources:
           KeySchema:
             - AttributeName: email
               KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: provider-index
+          KeySchema:
+            - AttributeName: oauthProvider
+              KeyType: HASH
+            - AttributeName: oauthProviderId
+              KeyType: RANGE
           Projection:
             ProjectionType: ALL
       PointInTimeRecoverySpecification:
@@ -365,6 +377,9 @@ Resources:
               - Effect: Allow
                 Action:
                   - cognito-idp:AdminConfirmSignUp
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:AdminUpdateUserAttributes
                 Resource:
                   - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
         - PolicyName: ParameterStoreAccess

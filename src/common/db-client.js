@@ -245,6 +245,24 @@ async function getUserByEmail(email) {
   return items[0] || null;
 }
 
+async function getUserByProviderId(provider, providerId) {
+  try {
+    const items = await queryItems(TABLES.USERS, 'oauthProvider', provider, {
+      indexName: 'provider-index',
+      limit: 1,
+      skPrefix: null,
+      filterExpression: 'oauthProviderId = :pid',
+      filterValues: { ':pid': providerId },
+    });
+    return items[0] || null;
+  }
+  catch (err) {
+    // GSI may not exist yet in local dev
+    console.warn('[DB] provider-index GSI query failed, falling back to scan:', err.message);
+    return null;
+  }
+}
+
 async function getUser(userId) {
   return getItem(TABLES.USERS, {
     pk: userPK(userId),
@@ -842,6 +860,7 @@ module.exports = {
 
   // User operations
   getUserByEmail,
+  getUserByProviderId,
   getUserByStripeCustomerId,
   getUser,
   createUser,

@@ -95,6 +95,61 @@
 
 /**
  * @swagger
+ * /v1/auth/oauth/callback:
+ *   post:
+ *     tags: [Auth]
+ *     summary: OAuth social login callback
+ *     description: Exchange an OAuth authorization code for JWT tokens. Handles find-or-create for new users and account linking for existing email users.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [provider, code, redirectUri]
+ *             properties:
+ *               provider:
+ *                 type: string
+ *                 enum: [google]
+ *                 example: google
+ *               code:
+ *                 type: string
+ *                 description: Authorization code from OAuth provider redirect
+ *               redirectUri:
+ *                 type: string
+ *                 description: Redirect URI used in the authorize request
+ *                 example: http://localhost:3000/auth/callback
+ *     responses:
+ *       200:
+ *         description: Login successful (new or returning user)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 isNewUser: { type: boolean, example: false }
+ *                 user: { $ref: '#/components/schemas/User' }
+ *                 tokens:
+ *                   type: object
+ *                   properties:
+ *                     accessToken: { type: string }
+ *                     refreshToken: { type: string }
+ *                     idToken: { type: string }
+ *                     expiresIn: { type: number, example: 86400 }
+ *                     tokenType: { type: string, example: Bearer }
+ *                 lootItem:
+ *                   type: object
+ *                   nullable: true
+ *                   description: Starter loot box (only for new users)
+ *       400:
+ *         description: Invalid provider or missing email
+ *       401:
+ *         description: Failed to authenticate with provider
+ */
+
+/**
+ * @swagger
  * /v1/auth/verify:
  *   post:
  *     tags: [Auth]

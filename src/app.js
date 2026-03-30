@@ -163,6 +163,10 @@ app.post('/v1/auth/logout', handleLogout);
 app.post('/v1/auth/refresh', handleRefresh);
 app.get('/v1/auth/me', authenticateJWT, handleGetMe);
 
+// OAuth social login
+const { handleOAuthCallback } = require('./auth/oauth');
+app.post('/v1/auth/oauth/callback', handleOAuthCallback);
+
 // ============================================
 // Protected Routes
 // ============================================

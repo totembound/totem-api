@@ -28,6 +28,8 @@ const tables = [
       { AttributeName: 'pk', AttributeType: 'S' },
       { AttributeName: 'sk', AttributeType: 'S' },
       { AttributeName: 'email', AttributeType: 'S' },
+      { AttributeName: 'oauthProvider', AttributeType: 'S' },
+      { AttributeName: 'oauthProviderId', AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'pk', KeyType: 'HASH' },
@@ -37,6 +39,14 @@ const tables = [
       {
         IndexName: 'email-index',
         KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
+        Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        IndexName: 'provider-index',
+        KeySchema: [
+          { AttributeName: 'oauthProvider', KeyType: 'HASH' },
+          { AttributeName: 'oauthProviderId', KeyType: 'RANGE' },
+        ],
         Projection: { ProjectionType: 'ALL' },
       },
     ],
