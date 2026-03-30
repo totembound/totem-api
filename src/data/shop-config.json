@@ -271,6 +271,14 @@
         "rarity": 5
       },
       {
+        "id": "limited_series_09",
+        "month": "September",
+        "name": "Autumnfang Bear",
+        "species": 8,
+        "color": 24,
+        "rarity": 5
+      },
+      {
         "id": "limited_series_12",
         "month": "December",
         "name": "Everfrost Owl",
