@@ -220,7 +220,7 @@ describe('handleOAuthCallback', () => {
       await handleOAuthCallback(req, res);
 
       expect(adminGetTokensForOAuth).toHaveBeenCalledWith(
-        'dave@example.com', 'google', 'google_12345', 'usr_abc123',
+        'dave@example.com', 'google', 'google_12345', 'usr_abc123', 'user',
       );
     });
   });

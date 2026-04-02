@@ -144,6 +144,7 @@ async function handleOAuthCallback(req, res) {
             lastLoginDate: new Date().toISOString().split('T')[0],
           },
           settings: { notifications: true, darkMode: 'dark' },
+          role: 'user',
           signupMethod: 'oauth',
           oauthProvider: provider,
           oauthProviderId: profile.providerId,
@@ -178,8 +179,9 @@ async function handleOAuthCallback(req, res) {
     }
 
     // 5. Generate tokens (admin auth — no user password needed for OAuth)
+    const userRole = userProfile.role || 'user';
     const tokens = await adminGetTokensForOAuth(
-      userProfile.email, provider, profile.providerId, userProfile.id,
+      userProfile.email, provider, profile.providerId, userProfile.id, userRole,
     );
 
     // 6. Update login streak (fire-and-forget)
@@ -214,6 +216,7 @@ async function handleOAuthCallback(req, res) {
         email: userProfile.email,
         displayName: userProfile.displayName,
         tier: userProfile.tier || 'free',
+        role: userRole,
         currencies: userProfile.currencies || { essence: 0, gems: 0 },
         stats: userProfile.stats || { totalTotems: 0, totalChallengesCompleted: 0, loginStreak: 1 },
         settings: userProfile.settings || { notifications: true, darkMode: 'dark' },

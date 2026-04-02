@@ -51,6 +51,7 @@ async function getProfile(user) {
       email: userRecord.email,
       displayName: userRecord.displayName,
       tier: userRecord.tier || 'free',
+      role: userRecord.role || 'user',
       currencies: {
         essence: userRecord.currencies?.essence || 0,
         gems: userRecord.currencies?.gems || 0,
