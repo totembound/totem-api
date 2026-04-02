@@ -167,9 +167,13 @@ async function handleOAuthCallback(req, res) {
           refName: 'Welcome Bonus',
         });
 
-        // Send welcome email (fire-and-forget)
-        sendNewUserWelcomeEmail(profile.email, profile.displayName, null)
-          .catch(err => console.error('Failed to send welcome email:', err));
+        // Send welcome email (await to ensure Lambda doesn't freeze before send completes)
+        try {
+          await sendNewUserWelcomeEmail(profile.email, profile.displayName, null);
+        }
+        catch (err) {
+          console.error('Failed to send welcome email:', err);
+        }
       }
     }
 
