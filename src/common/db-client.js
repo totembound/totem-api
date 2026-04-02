@@ -247,14 +247,24 @@ async function getUserByEmail(email) {
 
 async function getUserByProviderId(provider, providerId) {
   try {
-    const items = await queryItems(TABLES.USERS, 'oauthProvider', provider, {
-      indexName: 'provider-index',
-      limit: 1,
-      skPrefix: null,
-      filterExpression: 'oauthProviderId = :pid',
-      filterValues: { ':pid': providerId },
+    // provider-index GSI: oauthProvider (HASH) + oauthProviderId (RANGE)
+    // Both are key attributes, so both go in KeyConditionExpression
+    const command = new QueryCommand({
+      TableName: TABLES.USERS,
+      IndexName: 'provider-index',
+      KeyConditionExpression: '#provider = :provider AND #pid = :pid',
+      ExpressionAttributeNames: {
+        '#provider': 'oauthProvider',
+        '#pid': 'oauthProviderId',
+      },
+      ExpressionAttributeValues: {
+        ':provider': provider,
+        ':pid': providerId,
+      },
+      Limit: 1,
     });
-    return items[0] || null;
+    const response = await docClient.send(command);
+    return (response.Items && response.Items[0]) || null;
   }
   catch (err) {
     // GSI may not exist yet in local dev
