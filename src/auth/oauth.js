@@ -144,6 +144,7 @@ async function handleOAuthCallback(req, res) {
             lastLoginDate: new Date().toISOString().split('T')[0],
           },
           settings: { notifications: true, darkMode: 'dark' },
+          signupMethod: 'oauth',
           oauthProvider: provider,
           oauthProviderId: profile.providerId,
           avatarUrl: profile.avatarUrl,
