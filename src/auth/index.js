@@ -112,6 +112,7 @@ async function handleSignup(req, res) {
         lastLoginDate: new Date().toISOString().split('T')[0],
       },
       settings: { notifications: true, darkMode: 'dark' },
+      role: 'user',
     };
 
     await createUser(userData);
@@ -215,6 +216,7 @@ async function handleLogin(req, res) {
           email: result.email,
           displayName: result.displayName,
           tier: 'free',
+          role: 'user',
           currencies: { essence: 5000, gems: 500 },
           stats: {
             totalTotems: 0,
@@ -266,6 +268,24 @@ async function handleLogin(req, res) {
       console.warn('Failed to get/update user profile:', dbError.message);
     }
 
+    // Generate tokens with role included (local mode only — Cognito uses custom:role attribute)
+    const userRole = userProfile?.role || 'user';
+    let tokens = {
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      idToken: result.idToken,
+      expiresIn: result.expiresIn,
+      tokenType: result.tokenType,
+    };
+
+    // In local mode, re-generate tokens with role claim
+    if (process.env.IS_LOCAL === 'true') {
+      const { generateTokensWithRole } = require('../common/cognito-client');
+      if (generateTokensWithRole) {
+        tokens = { ...tokens, ...generateTokensWithRole(result.userId, result.email, userRole) };
+      }
+    }
+
     // Return full user profile with currencies
     return res.status(200).json({
       success: true,
@@ -274,17 +294,12 @@ async function handleLogin(req, res) {
         email: result.email,
         displayName: result.displayName,
         tier: userProfile?.tier || 'free',
+        role: userRole,
         currencies: userProfile?.currencies || { essence: 0, gems: 0 },
         stats: userProfile?.stats || { totalTotems: 0, totalChallengesCompleted: 0, loginStreak: 1 },
         settings: userProfile?.settings || { notifications: true, darkMode: 'dark' },
       },
-      tokens: {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        idToken: result.idToken,
-        expiresIn: result.expiresIn,
-        tokenType: result.tokenType,
-      },
+      tokens,
     });
   }
   catch (error) {
@@ -419,6 +434,7 @@ async function handleGetMe(req, res) {
         email: user.email,
         displayName: user.displayName,
         tier: user.tier,
+        role: user.role || 'user',
         currencies: user.currencies,
         stats: user.stats,
         settings: user.settings,
@@ -524,6 +540,7 @@ async function handleVerify(req, res) {
         email: user.email,
         displayName: user.displayName,
         tier: user.tier,
+        role: user.role || 'user',
         currencies: user.currencies,
         stats: user.stats,
         settings: user.settings,
@@ -531,6 +548,7 @@ async function handleVerify(req, res) {
         id: loginResult.userId,
         email: loginResult.email,
         displayName: loginResult.displayName,
+        role: 'user',
       },
       tokens: {
         accessToken: loginResult.accessToken,

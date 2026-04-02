@@ -348,6 +348,7 @@ async function main() {
         email: { S: TEST_USER_EMAIL },
         displayName: { S: TEST_USER_NAME },
         tier: { S: 'free' },
+        role: { S: 'user' },
         currencies: { M: {
           essence: { N: '2000' },
           gems: { N: '0' },
@@ -411,6 +412,61 @@ async function main() {
     console.log('  ℹ  No achievements seeded (fire on first totem claim, not signup)');
 
     console.log(`  ✅ Dev test user ready! Login: ${TEST_USER_EMAIL} / TestPassword123!`);
+  }
+
+  // ============================================
+  // Seed Admin Test User
+  // ============================================
+
+  const ADMIN_USER_ID = 'usr_d4e5f6a7-b8c9-0123-defa-234567890123';
+  const ADMIN_USER_EMAIL = 'admin@example.com';
+  const ADMIN_USER_NAME = 'AdminUser';
+
+  let adminExists = false;
+  try {
+    const result = await dynamoRequest('GetItem', {
+      TableName: 'TotemBound-Users',
+      Key: { pk: { S: `USER#${ADMIN_USER_ID}` }, sk: { S: 'PROFILE' } },
+    });
+    adminExists = !!result.Item;
+  } catch (e) { /* table may be empty */ }
+
+  if (adminExists) {
+    console.log(`✓ Admin test user already seeded (${ADMIN_USER_EMAIL})`);
+  } else {
+    console.log('');
+    console.log('🌱 Seeding admin test user...');
+
+    await dynamoRequest('PutItem', {
+      TableName: 'TotemBound-Users',
+      Item: {
+        pk: { S: `USER#${ADMIN_USER_ID}` },
+        sk: { S: 'PROFILE' },
+        id: { S: ADMIN_USER_ID },
+        email: { S: ADMIN_USER_EMAIL },
+        displayName: { S: ADMIN_USER_NAME },
+        tier: { S: 'free' },
+        role: { S: 'admin' },
+        currencies: { M: {
+          essence: { N: '99999' },
+          gems: { N: '9999' },
+        }},
+        stats: { M: {
+          totalTotems: { N: '0' },
+          totalChallengesCompleted: { N: '0' },
+          loginStreak: { N: '0' },
+          lastLoginDate: { S: today },
+        }},
+        settings: { M: {
+          notifications: { BOOL: true },
+          darkMode: { S: 'dark' },
+        }},
+        createdAt: { S: now },
+        updatedAt: { S: now },
+      },
+    });
+
+    console.log(`  ✅ Admin test user ready! Login: ${ADMIN_USER_EMAIL} / AdminPass123!`);
   }
 
   console.log('');

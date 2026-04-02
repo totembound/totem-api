@@ -64,6 +64,12 @@ Resources:
           StringAttributeConstraints:
             MinLength: '1'
             MaxLength: '20'
+        - Name: role
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '20'
 
       # Email configuration
       EmailConfiguration:
@@ -116,11 +122,13 @@ Resources:
         - custom:userId
         - custom:displayName
         - custom:tier
+        - custom:role
       WriteAttributes:
         - email
         - custom:userId
         - custom:displayName
         - custom:tier
+        - custom:role
 
 Outputs:
   UserPoolId:

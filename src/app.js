@@ -96,6 +96,7 @@ const authenticateJWT = (req, res, next) => {
       email: email,
       displayName: claims['custom:displayName'] || (email ? email.split('@')[0] : 'Player'),
       tier: claims['custom:tier'] || 'free',
+      role: claims['custom:role'] || 'user',
     };
     return next();
   }
@@ -124,8 +125,9 @@ const authenticateJWT = (req, res, next) => {
       email: decoded.email,
       displayName: decoded['custom:displayName'] || decoded.username || (decoded.email ? decoded.email.split('@')[0] : 'Player'),
       tier: decoded['custom:tier'] || 'free',
+      role: decoded.role || decoded['custom:role'] || 'user',
     };
-    console.log(`[auth] ${req.method} ${req.path} - userId: ${req.user.userId}`);
+    console.log(`[auth] ${req.method} ${req.path} - userId: ${req.user.userId} role: ${req.user.role}`);
 
     next();
   }
@@ -137,6 +139,21 @@ const authenticateJWT = (req, res, next) => {
     });
   }
 };
+
+// ============================================
+// Role-Based Access Control Middleware
+// ============================================
+function requireRole(...roles) {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'FORBIDDEN', message: 'Insufficient permissions' }
+      });
+    }
+    next();
+  };
+}
 
 // ============================================
 // Health

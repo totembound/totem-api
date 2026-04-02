@@ -78,6 +78,13 @@ const testUsers = [
     displayName: 'VIPPlayer',
     emailVerified: true,
   },
+  {
+    id: 'usr_d4e5f6a7-b8c9-0123-defa-234567890123',
+    email: 'admin@example.com',
+    passwordHash: hashPassword('AdminPass123!'),
+    displayName: 'AdminUser',
+    emailVerified: true,
+  },
 ];
 
 testUsers.forEach((user) => {
@@ -86,9 +93,9 @@ testUsers.forEach((user) => {
 
 // --- Local Token Operations ---
 
-function localGenerateTokens(userId, email) {
+function localGenerateTokens(userId, email, role) {
   const accessToken = jwt.sign(
-    { sub: userId, email, token_use: 'access', iat: Math.floor(Date.now() / 1000) },
+    { sub: userId, email, role: role || 'user', token_use: 'access', iat: Math.floor(Date.now() / 1000) },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
@@ -100,7 +107,7 @@ function localGenerateTokens(userId, email) {
   );
 
   const idToken = jwt.sign(
-    { sub: userId, email, email_verified: true, token_use: 'id', iat: Math.floor(Date.now() / 1000) },
+    { sub: userId, email, email_verified: true, role: role || 'user', token_use: 'id', iat: Math.floor(Date.now() / 1000) },
     JWT_SECRET,
     { expiresIn: JWT_EXPIRES_IN }
   );
@@ -760,8 +767,11 @@ module.exports = {
 
   // OAuth token generation (admin auth flow — no user password needed)
   adminGetTokensForOAuth: isLocal
-    ? (email, _provider, _providerId, userId) => Promise.resolve(localGenerateTokens(userId, email))
+    ? (email, _provider, _providerId, userId, role) => Promise.resolve(localGenerateTokens(userId, email, role))
     : (email) => awsAdminGetTokensForOAuth(email),
+
+  // Re-generate tokens with role claim (local dev only)
+  generateTokensWithRole: isLocal ? localGenerateTokens : null,
 
   // Password utilities (local only)
   hashPassword,
