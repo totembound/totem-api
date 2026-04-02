@@ -179,10 +179,14 @@ async function fulfillGemPurchase(user, body) {
 
     console.log(`[Gems] Fulfilled purchase for user ${userId}: +${pkg.gems} gems (${isDev ? 'dev mode' : 'stripe'}, session: ${sessionId || 'n/a'})`);
 
-    // Send receipt email (non-blocking)
+    // Send receipt email (await to ensure Lambda doesn't freeze before send completes)
     if (currentUser.email) {
-      sendGemPurchaseReceiptEmail(currentUser.email, pkg.name, pkg.gems, gemsResult.newBalance)
-        .catch(err => console.error('[Gems] Receipt email failed:', err.message));
+      try {
+        await sendGemPurchaseReceiptEmail(currentUser.email, pkg.name, pkg.gems, gemsResult.newBalance);
+      }
+      catch (err) {
+        console.error('[Gems] Receipt email failed:', err.message);
+      }
     }
 
     // Push real-time balance update via IoT (non-blocking)

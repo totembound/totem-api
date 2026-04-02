@@ -95,12 +95,16 @@ async function createSubscriptionCheckout(user, body) {
       details: { from: previousTier, to: tier, devMode: true },
     });
 
-    // Send subscription confirmed email (non-blocking)
+    // Send subscription confirmed email (await to ensure Lambda doesn't freeze before send completes)
     if (user.email) {
-      const nextBilling = new Date();
-      nextBilling.setMonth(nextBilling.getMonth() + 1);
-      sendSubscriptionConfirmedEmail(user.email, tier, nextBilling.toISOString())
-        .catch(err => console.error('[Subscription] Confirmed email failed:', err.message));
+      try {
+        const nextBilling = new Date();
+        nextBilling.setMonth(nextBilling.getMonth() + 1);
+        await sendSubscriptionConfirmedEmail(user.email, tier, nextBilling.toISOString());
+      }
+      catch (err) {
+        console.error('[Subscription] Confirmed email failed:', err.message);
+      }
     }
 
     // Push real-time tier update via IoT (non-blocking)
@@ -274,10 +278,14 @@ async function cancelSubscription(user) {
       },
     });
 
-    // Send cancellation email (non-blocking)
+    // Send cancellation email (await to ensure Lambda doesn't freeze before send completes)
     if (currentUser.email) {
-      sendSubscriptionCanceledEmail(currentUser.email, periodEnd, currentUser.tier)
-        .catch(err => console.error('[Subscription] Cancel email failed:', err.message));
+      try {
+        await sendSubscriptionCanceledEmail(currentUser.email, periodEnd, currentUser.tier);
+      }
+      catch (err) {
+        console.error('[Subscription] Cancel email failed:', err.message);
+      }
     }
 
     return {
@@ -313,10 +321,14 @@ async function cancelSubscription(user) {
 
     console.log(`[Subscription] Canceled at period end for user ${userId}`);
 
-    // Send cancellation email (non-blocking)
+    // Send cancellation email (await to ensure Lambda doesn't freeze before send completes)
     if (user.email || currentUser.email) {
-      sendSubscriptionCanceledEmail(user.email || currentUser.email, periodEndDate, currentUser.tier || user.tier)
-        .catch(err => console.error('[Subscription] Cancel email failed:', err.message));
+      try {
+        await sendSubscriptionCanceledEmail(user.email || currentUser.email, periodEndDate, currentUser.tier || user.tier);
+      }
+      catch (err) {
+        console.error('[Subscription] Cancel email failed:', err.message);
+      }
     }
 
     return {
@@ -364,12 +376,16 @@ async function reactivateSubscription(user) {
       'subscription.cancelAtPeriodEnd': false,
     });
 
-    // Send reactivation email (non-blocking)
+    // Send reactivation email (await to ensure Lambda doesn't freeze before send completes)
     if (currentUser.email) {
-      const nextMonth = new Date();
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      sendSubscriptionReactivatedEmail(currentUser.email, nextMonth, currentUser.tier)
-        .catch(err => console.error('[Subscription] Reactivation email failed:', err.message));
+      try {
+        const nextMonth = new Date();
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        await sendSubscriptionReactivatedEmail(currentUser.email, nextMonth, currentUser.tier);
+      }
+      catch (err) {
+        console.error('[Subscription] Reactivation email failed:', err.message);
+      }
     }
 
     return {
@@ -398,13 +414,18 @@ async function reactivateSubscription(user) {
 
     console.log(`[Subscription] Reactivated for user ${userId}`);
 
-    // Send reactivation email (non-blocking)
+    // Send reactivation email (await to ensure Lambda doesn't freeze before send completes)
     if (user.email || currentUser.email) {
-      sendSubscriptionReactivatedEmail(
-        user.email || currentUser.email,
-        new Date(subscription.current_period_end * 1000),
-        currentUser.tier || user.tier
-      ).catch(err => console.error('[Subscription] Reactivation email failed:', err.message));
+      try {
+        await sendSubscriptionReactivatedEmail(
+          user.email || currentUser.email,
+          new Date(subscription.current_period_end * 1000),
+          currentUser.tier || user.tier
+        );
+      }
+      catch (err) {
+        console.error('[Subscription] Reactivation email failed:', err.message);
+      }
     }
 
     return {
@@ -522,14 +543,17 @@ async function handleSubscriptionWebhook(event) {
         refName: `${finalTier} subscription activated`,
       });
 
-      // Send subscription confirmed email (non-blocking)
+      // Send subscription confirmed email (await to ensure Lambda doesn't freeze before send completes)
       const subscriberEmail = session.customer_email || session.customer_details?.email;
       if (subscriberEmail) {
-        // Next billing is ~1 month from now for new subscriptions
-        const nextBilling = new Date();
-        nextBilling.setMonth(nextBilling.getMonth() + 1);
-        sendSubscriptionConfirmedEmail(subscriberEmail, finalTier, nextBilling.toISOString())
-          .catch(err => console.error('[Subscription] Confirmed email failed:', err.message));
+        try {
+          const nextBilling = new Date();
+          nextBilling.setMonth(nextBilling.getMonth() + 1);
+          await sendSubscriptionConfirmedEmail(subscriberEmail, finalTier, nextBilling.toISOString());
+        }
+        catch (err) {
+          console.error('[Subscription] Confirmed email failed:', err.message);
+        }
       }
 
       // Push real-time tier update via IoT (non-blocking)
