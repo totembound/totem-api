@@ -24,6 +24,7 @@ const {
 const {
   createUser,
   getUser,
+  getUserByEmail,
   updateUser,
 } = require('../common/db-client');
 
@@ -185,6 +186,15 @@ async function handleLogin(req, res) {
       return res.status(400).json({
         success: false,
         error: 'Email and password are required',
+      });
+    }
+
+    // Block password login for OAuth-only accounts (no email/password signup)
+    const existingUser = await getUserByEmail(email);
+    if (existingUser && existingUser.oauthProvider && existingUser.signupMethod === 'oauth') {
+      return res.status(400).json({
+        success: false,
+        error: `This account uses ${existingUser.oauthProvider} sign-in. Please use the "${existingUser.oauthProvider}" button to log in.`,
       });
     }
 

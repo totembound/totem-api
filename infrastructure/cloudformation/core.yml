@@ -378,6 +378,7 @@ Resources:
                 Action:
                   - cognito-idp:AdminConfirmSignUp
                   - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminInitiateAuth
                   - cognito-idp:AdminSetUserPassword
                   - cognito-idp:AdminUpdateUserAttributes
                 Resource:

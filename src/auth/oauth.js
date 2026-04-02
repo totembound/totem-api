@@ -27,8 +27,7 @@ const {
   logTransaction,
 } = require('../common/db-client');
 
-const { generateTokens } = require('../common/cognito-client');
-const { createOAuthUser } = require('../common/cognito-client');
+const { adminGetTokensForOAuth, createOAuthUser } = require('../common/cognito-client');
 const { sendNewUserWelcomeEmail } = require('../common/email');
 const { onLoginStreak } = require('../services/achievements-service');
 const { grantLootItem } = require('../services/loot-service');
@@ -145,6 +144,7 @@ async function handleOAuthCallback(req, res) {
             lastLoginDate: new Date().toISOString().split('T')[0],
           },
           settings: { notifications: true, darkMode: 'dark' },
+          signupMethod: 'oauth',
           oauthProvider: provider,
           oauthProviderId: profile.providerId,
           avatarUrl: profile.avatarUrl,
@@ -173,8 +173,10 @@ async function handleOAuthCallback(req, res) {
       }
     }
 
-    // 5. Generate tokens
-    const tokens = generateTokens(userProfile.id, userProfile.email);
+    // 5. Generate tokens (admin auth — no user password needed for OAuth)
+    const tokens = await adminGetTokensForOAuth(
+      userProfile.email, provider, profile.providerId, userProfile.id,
+    );
 
     // 6. Update login streak (fire-and-forget)
     const today = new Date().toISOString().split('T')[0];
