@@ -682,7 +682,57 @@ async function awsCreateOAuthUser({ email, displayName, _provider, _providerId }
 }
 
 function awsGenerateTokens() {
-  throw new Error('generateTokens not available in AWS mode - use signIn()');
+  throw new Error('generateTokens not available in AWS mode - use adminGetTokensForOAuth()');
+}
+
+/**
+ * Get Cognito tokens for an OAuth user using admin auth flow.
+ * Generates a cryptographically random password each time (never stored,
+ * never deterministic) — set it, sign in, done. The password is ephemeral
+ * and cannot be reconstructed from source code or env vars.
+ */
+async function awsAdminGetTokensForOAuth(email) {
+  const crypto = require('crypto');
+  const {
+    AdminSetUserPasswordCommand,
+    AdminInitiateAuthCommand,
+  } = require('@aws-sdk/client-cognito-identity-provider');
+
+  const normalizedEmail = email.toLowerCase();
+
+  // Random password — used once, never stored, not computable
+  const password = `Oa!${crypto.randomBytes(24).toString('base64url')}`;
+
+  // Set the ephemeral password
+  await getCognitoClient().send(new AdminSetUserPasswordCommand({
+    UserPoolId: _USER_POOL_ID,
+    Username: normalizedEmail,
+    Password: password,
+    Permanent: true,
+  }));
+
+  // Sign in immediately to get real Cognito tokens
+  const result = await getCognitoClient().send(new AdminInitiateAuthCommand({
+    AuthFlow: 'ADMIN_USER_PASSWORD_AUTH',
+    UserPoolId: _USER_POOL_ID,
+    ClientId: CLIENT_ID,
+    AuthParameters: {
+      USERNAME: normalizedEmail,
+      PASSWORD: password,
+    },
+  }));
+
+  const auth = result.AuthenticationResult;
+  const decoded = jwt.decode(auth.IdToken);
+
+  return {
+    userId: decoded.sub,
+    accessToken: auth.AccessToken,
+    refreshToken: auth.RefreshToken,
+    idToken: auth.IdToken,
+    expiresIn: auth.ExpiresIn,
+    tokenType: 'Bearer',
+  };
 }
 
 // ============================================
@@ -707,6 +757,11 @@ module.exports = {
 
   // OAuth user creation (passwordless)
   createOAuthUser: isLocal ? localCreateOAuthUser : awsCreateOAuthUser,
+
+  // OAuth token generation (admin auth flow — no user password needed)
+  adminGetTokensForOAuth: isLocal
+    ? (email, _provider, _providerId, userId) => Promise.resolve(localGenerateTokens(userId, email))
+    : (email) => awsAdminGetTokensForOAuth(email),
 
   // Password utilities (local only)
   hashPassword,
