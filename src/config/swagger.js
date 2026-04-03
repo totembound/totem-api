@@ -162,6 +162,8 @@ const options = {
       { name: 'Achievements', description: 'Achievement tracking and progress' },
       { name: 'IoT', description: 'Real-time push notification setup (MQTT over IoT Core)' },
       { name: 'Loot', description: 'Loot box inventory and claiming' },
+      { name: 'Sanctum', description: 'Elder totem sanctum seating, missions, and passive earnings' },
+      { name: 'Admin', description: 'Admin-only endpoints (requires admin role)' },
       { name: 'Webhooks', description: 'Stripe webhook handlers' },
       { name: 'System', description: 'Health check and system status' },
     ],

@@ -11,8 +11,8 @@
 
 const express = require('express');
 const cors = require('cors');
-const jwt = require('jsonwebtoken');
 const { getSecret } = require('./common/ssm-loader');
+const { verifyAccessToken } = require('./common/cognito-client');
 
 // Import auth handlers
 const {
@@ -114,30 +114,25 @@ const authenticateJWT = (req, res, next) => {
   // Accept both raw token and Bearer-prefixed token (deployed uses raw, some tools use Bearer)
   const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : authHeader;
 
-  try {
-    const decoded = jwt.decode(token);
-    if (!decoded) {
-      throw new Error('Invalid token');
-    }
-
-    req.user = {
-      userId: decoded['custom:userId'] || decoded.userId || decoded.sub,
-      email: decoded.email,
-      displayName: decoded['custom:displayName'] || decoded.username || (decoded.email ? decoded.email.split('@')[0] : 'Player'),
-      tier: decoded['custom:tier'] || 'free',
-      role: decoded.role || decoded['custom:role'] || 'user',
-    };
-    console.log(`[auth] ${req.method} ${req.path} - userId: ${req.user.userId} role: ${req.user.role}`);
-
-    next();
-  }
-  catch (error) {
-    console.error('JWT verification failed:', error.message);
+  const result = verifyAccessToken(token);
+  if (!result.valid) {
+    console.error('JWT verification failed:', result.error);
     return res.status(401).json({
       success: false,
       error: { code: 'UNAUTHORIZED', message: 'Invalid or expired token' }
     });
   }
+
+  req.user = {
+    userId: result.userId,
+    email: result.email,
+    displayName: result.email ? result.email.split('@')[0] : 'Player',
+    tier: 'free',
+    role: result.role || 'user',
+  };
+  console.log(`[auth] ${req.method} ${req.path} - userId: ${req.user.userId} role: ${req.user.role}`);
+
+  next();
 };
 
 // ============================================
@@ -349,7 +344,8 @@ app.post('/v1/totems/forge', authenticateJWT, async (req, res) => {
       const result = await totemRoutes.forgeTotem(req.user, req.body);
       if (result.success) {
         res.status(201).json(result);
-      } else {
+      }
+      else {
         const statusMap = {
           NOT_FOUND: 404,
           ON_EXPEDITION: 409,
@@ -362,7 +358,8 @@ app.post('/v1/totems/forge', authenticateJWT, async (req, res) => {
         const statusCode = statusMap[result.error?.code] || 400;
         res.status(statusCode).json(result);
       }
-    } else {
+    }
+    else {
       res.json({ success: true, data: { message: 'Forge (stub)' } });
     }
   }
@@ -1406,6 +1403,20 @@ app.post('/v1/shop/exchange', authenticateJWT, async (req, res) => {
     res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
   }
 });
+
+// ============================================
+// Admin Routes — require authentication + admin role
+// ============================================
+const adminUsers = require('./functions/admin/users');
+const adminStats = require('./functions/admin/stats');
+const adminTransactions = require('./functions/admin/transactions');
+
+app.get('/v1/admin/stats', authenticateJWT, requireRole('admin'), adminStats.get);
+app.get('/v1/admin/users', authenticateJWT, requireRole('admin'), adminUsers.list);
+app.get('/v1/admin/users/:id', authenticateJWT, requireRole('admin'), adminUsers.getDetail);
+app.put('/v1/admin/users/:id/currencies', authenticateJWT, requireRole('admin'), adminUsers.adjustCurrencies);
+app.put('/v1/admin/users/:id/status', authenticateJWT, requireRole('admin'), adminUsers.setStatus);
+app.get('/v1/admin/transactions', authenticateJWT, requireRole('admin'), adminTransactions.list);
 
 // ============================================
 // Finalize - adds error/404 handlers (must be called last)

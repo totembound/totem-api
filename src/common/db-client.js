@@ -828,6 +828,148 @@ async function updateChallengeProgress(userId, challengeId, updates) {
 // Stripe Lookup
 // ============================================
 
+/**
+ * List all users (admin)
+ * Scans Users table for all PROFILE records with optional search filter.
+ * Returns the full array — caller handles pagination slicing.
+ * @param {object} options - { search }
+ */
+async function listUsers({ search } = {}) {
+  const baseFilter = 'sk = :profile';
+  const exprValues = { ':profile': 'PROFILE' };
+  let filterExpression = baseFilter;
+
+  if (search) {
+    filterExpression += ' AND (contains(email, :search) OR contains(displayName, :search))';
+    exprValues[':search'] = search.toLowerCase();
+  }
+
+  const allItems = [];
+  let lastKey = undefined;
+
+  do {
+    const params = {
+      TableName: TABLES.USERS,
+      FilterExpression: filterExpression,
+      ExpressionAttributeValues: exprValues,
+    };
+    if (lastKey) {
+      params.ExclusiveStartKey = lastKey;
+    }
+
+    const response = await docClient.send(new ScanCommand(params));
+    allItems.push(...(response.Items || []));
+    lastKey = response.LastEvaluatedKey;
+  } while (lastKey);
+
+  return allItems;
+}
+
+/**
+ * Count all totems (admin stats)
+ */
+async function countTotems() {
+  let count = 0;
+  let lastKey = undefined;
+
+  do {
+    const params = {
+      TableName: TABLES.TOTEMS,
+      Select: 'COUNT',
+    };
+    if (lastKey) params.ExclusiveStartKey = lastKey;
+    const response = await docClient.send(new ScanCommand(params));
+    count += response.Count || 0;
+    lastKey = response.LastEvaluatedKey;
+  } while (lastKey);
+
+  return count;
+}
+
+/**
+ * List recent transactions across all users (admin)
+ * Scans Transactions table, returns most recent first.
+ */
+async function listAllTransactions({ limit = 50, userId, type, startTime, endTime } = {}) {
+  // If filtering by userId, use the user-ts-index GSI
+  if (userId) {
+    let keyCondition = 'userId = :userId';
+    const exprValues = { ':userId': userId };
+
+    if (startTime && endTime) {
+      keyCondition += ' AND ts BETWEEN :start AND :end';
+      exprValues[':start'] = startTime;
+      exprValues[':end'] = endTime;
+    }
+    else if (startTime) {
+      keyCondition += ' AND ts >= :start';
+      exprValues[':start'] = startTime;
+    }
+
+    const params = {
+      TableName: TABLES.TRANSACTIONS,
+      IndexName: 'user-ts-index',
+      KeyConditionExpression: keyCondition,
+      ExpressionAttributeValues: exprValues,
+      Limit: limit,
+      ScanIndexForward: false,
+    };
+
+    // Add type filter if specified
+    if (type) {
+      params.FilterExpression = '#type = :type';
+      params.ExpressionAttributeNames = { '#type': 'type' };
+      params.ExpressionAttributeValues[':type'] = type;
+    }
+
+    const response = await docClient.send(new QueryCommand(params));
+    return response.Items || [];
+  }
+
+  // If filtering by type, use type-ts-index GSI
+  if (type) {
+    return getTransactionsByType(type, { startTime, endTime, limit });
+  }
+
+  // No filters — full scan (limited)
+  const allItems = [];
+  let lastKey = undefined;
+  let remaining = limit;
+
+  do {
+    const params = {
+      TableName: TABLES.TRANSACTIONS,
+      Limit: Math.min(remaining, 100),
+    };
+
+    if (startTime || endTime) {
+      const filters = [];
+      const exprValues = {};
+      if (startTime) {
+        filters.push('ts >= :start');
+        exprValues[':start'] = startTime;
+      }
+      if (endTime) {
+        filters.push('ts <= :end');
+        exprValues[':end'] = endTime;
+      }
+      params.FilterExpression = filters.join(' AND ');
+      params.ExpressionAttributeValues = exprValues;
+    }
+
+    if (lastKey) params.ExclusiveStartKey = lastKey;
+
+    const response = await docClient.send(new ScanCommand(params));
+    allItems.push(...(response.Items || []));
+    remaining -= (response.Items || []).length;
+    lastKey = response.LastEvaluatedKey;
+  } while (lastKey && remaining > 0);
+
+  // Sort by ts descending (scan doesn't guarantee order)
+  allItems.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
+  return allItems.slice(0, limit);
+}
+
 async function getUserByStripeCustomerId(stripeCustomerId) {
   const command = new ScanCommand({
     TableName: TABLES.USERS,
@@ -902,4 +1044,9 @@ module.exports = {
   getChallengeProgress,
   getAllChallengeProgress,
   updateChallengeProgress,
+
+  // Admin operations
+  listUsers,
+  countTotems,
+  listAllTransactions,
 };

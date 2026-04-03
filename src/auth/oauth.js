@@ -178,6 +178,15 @@ async function handleOAuthCallback(req, res) {
       }
     }
 
+    // Block banned users
+    if (userProfile.status === 'banned') {
+      return res.status(403).json({
+        success: false,
+        error: 'ACCOUNT_BANNED',
+        message: 'Your account has been suspended. Contact support for assistance.',
+      });
+    }
+
     // 5. Generate tokens (admin auth — no user password needed for OAuth)
     const userRole = userProfile.role || 'user';
     const tokens = await adminGetTokensForOAuth(
