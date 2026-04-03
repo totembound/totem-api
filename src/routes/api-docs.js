@@ -2558,6 +2558,400 @@
  */
 
 // ============================================
+// Admin Endpoints (6)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/admin/stats:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Dashboard overview metrics (admin only)
+ *     description: Aggregated stats — user counts, totem counts, transaction volume. Requires admin role.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard metrics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer, example: 150 }
+ *                         activeToday: { type: integer, example: 12 }
+ *                         activeThisWeek: { type: integer, example: 45 }
+ *                         newToday: { type: integer, example: 3 }
+ *                         banned: { type: integer, example: 1 }
+ *                     totems:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer, example: 320 }
+ *                     transactions:
+ *                       type: object
+ *                       properties:
+ *                         today: { type: object, properties: { count: { type: integer } } }
+ *                         thisWeek: { type: object, properties: { count: { type: integer } } }
+ *                         byType: { type: object }
+ *                     generatedAt: { type: string, format: date-time }
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List all users (admin only)
+ *     description: Paginated user list with search. Requires admin role.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Page number (1-based)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 25
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Filter by email or display name (contains match)
+ *     responses:
+ *       200:
+ *         description: Paginated user list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           email: { type: string }
+ *                           displayName: { type: string }
+ *                           role: { type: string, enum: [user, admin] }
+ *                           tier: { type: string, enum: [free, premium, vip] }
+ *                           essence: { type: number }
+ *                           gems: { type: number }
+ *                           loginStreak: { type: number }
+ *                           lastLoginDate: { type: string, format: date, nullable: true }
+ *                           createdAt: { type: string, format: date-time }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page: { type: integer, example: 1 }
+ *                     limit: { type: integer, example: 25 }
+ *                     total: { type: integer, example: 150 }
+ *                     totalPages: { type: integer, example: 6 }
+ *       403:
+ *         description: Insufficient permissions (not admin)
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get full user detail (admin only)
+ *     description: Returns user profile, totems, and recent transactions. Requires admin role.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Full user detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         email: { type: string }
+ *                         displayName: { type: string }
+ *                         role: { type: string, enum: [user, admin] }
+ *                         tier: { type: string }
+ *                         currencies:
+ *                           type: object
+ *                           properties:
+ *                             essence: { type: number }
+ *                             gems: { type: number }
+ *                         stats: { type: object }
+ *                         settings: { type: object }
+ *                         createdAt: { type: string, format: date-time }
+ *                         updatedAt: { type: string, format: date-time }
+ *                     totems:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           speciesId: { type: number }
+ *                           colorId: { type: number }
+ *                           rarityId: { type: number }
+ *                           nickname: { type: string, nullable: true }
+ *                           stage: { type: number }
+ *                           experience: { type: number }
+ *                           stats: { type: object }
+ *                           createdAt: { type: string, format: date-time }
+ *                     recentTransactions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           type: { type: string }
+ *                           currency: { type: string }
+ *                           amount: { type: number }
+ *                           balanceBefore: { type: number }
+ *                           balanceAfter: { type: number }
+ *                           refType: { type: string, nullable: true }
+ *                           refName: { type: string, nullable: true }
+ *                           ts: { type: string, format: date-time }
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/currencies:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Adjust user currencies (admin only)
+ *     description: Grant or deduct essence/gems. Positive amount grants, negative deducts. Creates a transaction ledger entry with admin ID and reason.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currency, amount, reason]
+ *             properties:
+ *               currency:
+ *                 type: string
+ *                 enum: [essence, gems]
+ *                 example: essence
+ *               amount:
+ *                 type: integer
+ *                 example: 500
+ *                 description: Positive to grant, negative to deduct
+ *               reason:
+ *                 type: string
+ *                 minLength: 3
+ *                 example: CS refund for lost totem
+ *     responses:
+ *       200:
+ *         description: Currency adjusted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId: { type: string }
+ *                     currency: { type: string }
+ *                     amount: { type: integer }
+ *                     newBalance: { type: number }
+ *                     reason: { type: string }
+ *       400:
+ *         description: Invalid input or insufficient balance
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/status:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Ban or unban a user (admin only)
+ *     description: Set user status to "banned" or "active". Banned users cannot log in. Creates an audit trail entry.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status, reason]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [banned, active]
+ *                 example: banned
+ *               reason:
+ *                 type: string
+ *                 minLength: 3
+ *                 example: Exploiting currency bug
+ *     responses:
+ *       200:
+ *         description: Status updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId: { type: string }
+ *                     status: { type: string, enum: [banned, active] }
+ *                     reason: { type: string }
+ *       400:
+ *         description: Invalid input or no change
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/transactions:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List transactions (admin only)
+ *     description: Paginated transaction log with optional filters by user, type, and date range.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number (1-based)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 25
+ *           maximum: 100
+ *         description: Items per page
+ *       - in: query
+ *         name: userId
+ *         schema:
+ *           type: string
+ *         description: Filter by user ID
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         description: "Filter by transaction type (e.g. admin_grant, action_feed, reward_signup)"
+ *       - in: query
+ *         name: startTime
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: Start of date range (inclusive)
+ *       - in: query
+ *         name: endTime
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: End of date range (inclusive)
+ *     responses:
+ *       200:
+ *         description: Paginated transaction list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     transactions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           userId: { type: string }
+ *                           type: { type: string }
+ *                           currency: { type: string }
+ *                           amount: { type: number }
+ *                           balanceBefore: { type: number }
+ *                           balanceAfter: { type: number }
+ *                           refType: { type: string, nullable: true }
+ *                           refName: { type: string, nullable: true }
+ *                           ts: { type: string, format: date-time }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page: { type: integer }
+ *                     limit: { type: integer }
+ *                     total: { type: integer }
+ *                     totalPages: { type: integer }
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+// ============================================
 // Health Check (1)
 // ============================================
 

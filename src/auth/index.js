@@ -228,6 +228,15 @@ async function handleLogin(req, res) {
         });
       }
 
+      // Block banned users
+      if (userProfile && userProfile.status === 'banned') {
+        return res.status(403).json({
+          success: false,
+          error: 'ACCOUNT_BANNED',
+          message: 'Your account has been suspended. Contact support for assistance.',
+        });
+      }
+
       if (userProfile) {
         // Calculate login streak
         const lastLogin = userProfile.stats?.lastLoginDate;
@@ -482,6 +491,7 @@ function authMiddleware(req, res, next) {
   // Attach user info to request
   req.userId = result.userId;
   req.userEmail = result.email;
+  req.userRole = result.role || 'user';
 
   next();
 }

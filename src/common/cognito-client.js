@@ -123,7 +123,7 @@ function localVerifyAccessToken(token) {
     if (decoded.token_use !== 'access') {
       throw new Error('Invalid token type');
     }
-    return { valid: true, userId: decoded.sub, email: decoded.email };
+    return { valid: true, userId: decoded.sub, email: decoded.email, role: decoded.role || 'user' };
   }
   catch (error) {
     return { valid: false, error: error.message };
@@ -540,6 +540,7 @@ function awsVerifyAccessToken(token) {
       valid: true,
       userId: decoded.sub,
       email: decoded.email || decoded.username || '',
+      role: decoded['custom:role'] || decoded.role || 'user',
     };
   }
   catch (error) {
