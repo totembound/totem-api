@@ -2558,7 +2558,7 @@
  */
 
 // ============================================
-// Admin Endpoints (6)
+// Admin Endpoints (11)
 // ============================================
 
 /**
@@ -2947,6 +2947,231 @@
  *                     limit: { type: integer }
  *                     total: { type: integer }
  *                     totalPages: { type: integer }
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/broadcast/notification:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Broadcast a notification to all connected users (admin only)
+ *     description: Publishes a `notification` command to the global IoT topic. All connected clients receive a toast with title and message.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, message]
+ *             properties:
+ *               title:    { type: string, minLength: 1, maxLength: 80, example: Server maintenance }
+ *               message:  { type: string, minLength: 1, maxLength: 500, example: "We'll be performing a quick database upgrade in 10 minutes." }
+ *               priority: { type: string, enum: [low, medium, high], default: medium }
+ *               sound:    { type: boolean, default: true }
+ *               data:     { type: object, description: Free-form passthrough data }
+ *     responses:
+ *       200:
+ *         description: Broadcast published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: global }
+ *                     commandId: { type: string, example: msg_abc123 }
+ *                     type:      { type: string, example: notification }
+ *       400:
+ *         description: Invalid input
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/broadcast/app-reload:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Broadcast an app-reload command to all connected users (admin only)
+ *     description: Publishes an `app_reload` command to the global IoT topic. Use after deploying a critical frontend fix.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Critical bugfix deployed" }
+ *     responses:
+ *       200:
+ *         description: App reload published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: global }
+ *                     type:      { type: string, example: app_reload }
+ *                     reason:    { type: string }
+ *       400:
+ *         description: Invalid reason
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/broadcast/force-logout:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Force all connected users to log out (admin only)
+ *     description: Publishes a `force_logout` command to the global IoT topic. Use for security incidents or after rotating token-signing keys.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Security patch — key rotation" }
+ *     responses:
+ *       200:
+ *         description: Force logout published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: global }
+ *                     type:      { type: string, example: force_logout }
+ *                     reason:    { type: string }
+ *       400:
+ *         description: Invalid reason
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/notification:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Send a notification to a single user (admin only)
+ *     description: "Publishes a notification command to the target user's IoT topic. Returns delivered=false with undeliveredReason=user_not_registered if the user has never called /v1/iot/register."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Target user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, message]
+ *             properties:
+ *               title:    { type: string, minLength: 1, maxLength: 80 }
+ *               message:  { type: string, minLength: 1, maxLength: 500 }
+ *               priority: { type: string, enum: [low, medium, high], default: medium }
+ *               sound:    { type: boolean, default: true }
+ *               data:     { type: object }
+ *     responses:
+ *       200:
+ *         description: Notification published (delivered may be false if user not registered for IoT)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: "user:usr_abc" }
+ *                     type:      { type: string, example: notification }
+ *                     undeliveredReason: { type: string, example: user_not_registered }
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/force-logout:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Force a single user to log out (admin only)
+ *     description: Publishes a `force_logout` command to the target user's IoT topic. Use after account suspension or password reset.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Target user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Account suspended for ToS violation" }
+ *     responses:
+ *       200:
+ *         description: Force logout published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: "user:usr_abc" }
+ *                     type:      { type: string, example: force_logout }
+ *                     reason:    { type: string }
+ *                     undeliveredReason: { type: string, example: user_not_registered }
+ *       400:
+ *         description: Invalid reason
+ *       404:
+ *         description: User not found
  *       403:
  *         description: Insufficient permissions
  */
