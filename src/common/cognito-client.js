@@ -120,7 +120,9 @@ function localGenerateTokens(userId, email, role) {
 function localVerifyAccessToken(token) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    if (decoded.token_use !== 'access') {
+    // Accept both access and id tokens — frontend sends idToken for API Gateway
+    // Cognito Authorizer compatibility, local mode accepts either
+    if (decoded.token_use !== 'access' && decoded.token_use !== 'id') {
       throw new Error('Invalid token type');
     }
     return { valid: true, userId: decoded.sub, email: decoded.email, role: decoded.role || 'user' };
