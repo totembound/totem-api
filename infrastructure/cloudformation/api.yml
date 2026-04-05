@@ -114,6 +114,16 @@ Parameters:
     Description: SSM parameter name for Twitch OAuth Client Secret
     Default: ''
 
+  DiscordClientIdParam:
+    Type: String
+    Description: SSM parameter name for Discord OAuth Client ID
+    Default: ''
+
+  DiscordClientSecretParam:
+    Type: String
+    Description: SSM parameter name for Discord OAuth Client Secret
+    Default: ''
+
 Conditions:
   UseDefaultFromEmail: !Equals [!Ref FromEmail, '']
 
@@ -171,6 +181,8 @@ Resources:
           GOOGLE_CLIENT_SECRET_PARAM: !Ref GoogleClientSecretParam
           TWITCH_CLIENT_ID_PARAM: !Ref TwitchClientIdParam
           TWITCH_CLIENT_SECRET_PARAM: !Ref TwitchClientSecretParam
+          DISCORD_CLIENT_ID_PARAM: !Ref DiscordClientIdParam
+          DISCORD_CLIENT_SECRET_PARAM: !Ref DiscordClientSecretParam
           OAUTH_REDIRECT_BASE: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
       Code:
         S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]

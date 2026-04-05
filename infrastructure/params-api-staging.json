@@ -14,5 +14,7 @@
     "GoogleClientIdParam": "/totemboundci/oauth/google/client-id",
     "GoogleClientSecretParam": "/totemboundci/oauth/google/client-secret",
     "TwitchClientIdParam": "/totemboundci/oauth/twitch/client-id",
-    "TwitchClientSecretParam": "/totemboundci/oauth/twitch/client-secret"
+    "TwitchClientSecretParam": "/totemboundci/oauth/twitch/client-secret",
+    "DiscordClientIdParam": "/totemboundci/oauth/discord/client-id",
+    "DiscordClientSecretParam": "/totemboundci/oauth/discord/client-secret"
 }
