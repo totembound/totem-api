@@ -58,25 +58,27 @@ const PROVIDERS = {
     },
   },
 
+  discord: {
+    tokenUrl: 'https://discord.com/api/oauth2/token',
+    userInfoUrl: 'https://discord.com/api/users/@me',
+    scopes: 'identify email',
+    getClientId: () => getSecret('DISCORD_CLIENT_ID'),
+    getClientSecret: () => getSecret('DISCORD_CLIENT_SECRET'),
+    // Discord requires form-encoded token exchange
+    tokenContentType: 'form',
+    userInfoHeaders: null,
+    normalizeUser: (data) => ({
+      providerId: data.id,
+      email: data.email || null,
+      emailVerified: data.verified || false,
+      displayName: data.global_name || data.username,
+      avatarUrl: data.avatar
+        ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
+        : null,
+    }),
+  },
+
   // --- Add future providers here ---
-  // discord: {
-  //   tokenUrl: 'https://discord.com/api/oauth2/token',
-  //   userInfoUrl: 'https://discord.com/api/users/@me',
-  //   scopes: 'identify email',
-  //   getClientId: () => getSecret('DISCORD_CLIENT_ID'),
-  //   getClientSecret: () => getSecret('DISCORD_CLIENT_SECRET'),
-  //   tokenContentType: 'form',
-  //   userInfoHeaders: null,
-  //   normalizeUser: (data) => ({
-  //     providerId: data.id,
-  //     email: data.email || null,
-  //     emailVerified: data.verified || false,
-  //     displayName: data.username,
-  //     avatarUrl: data.avatar
-  //       ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
-  //       : null,
-  //   }),
-  // },
 };
 
 // ============================================
