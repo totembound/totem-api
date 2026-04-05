@@ -32,14 +32,40 @@ const PROVIDERS = {
     }),
   },
 
+  twitch: {
+    tokenUrl: 'https://id.twitch.tv/oauth2/token',
+    userInfoUrl: 'https://api.twitch.tv/helix/users',
+    scopes: 'user:read:email',
+    getClientId: () => getSecret('TWITCH_CLIENT_ID'),
+    getClientSecret: () => getSecret('TWITCH_CLIENT_SECRET'),
+    // Twitch accepts form-encoded or JSON for token exchange; form is safest
+    tokenContentType: 'form',
+    // Twitch Helix API requires Client-Id header alongside Bearer token
+    userInfoHeaders: async (config) => ({ 'Client-Id': await config.getClientId() }),
+    normalizeUser: (data) => {
+      const user = data && data.data && data.data[0];
+      if (!user) {
+        throw new Error('Twitch returned no user data');
+      }
+      return {
+        providerId: user.id,
+        email: user.email || null,
+        // Twitch only returns email for users who have verified it
+        emailVerified: !!user.email,
+        displayName: user.display_name || user.login,
+        avatarUrl: user.profile_image_url || null,
+      };
+    },
+  },
+
   // --- Add future providers here ---
   // discord: {
   //   tokenUrl: 'https://discord.com/api/oauth2/token',
   //   userInfoUrl: 'https://discord.com/api/users/@me',
   //   scopes: 'identify email',
-  //   getClientId: () => process.env.DISCORD_CLIENT_ID,
+  //   getClientId: () => getSecret('DISCORD_CLIENT_ID'),
   //   getClientSecret: () => getSecret('DISCORD_CLIENT_SECRET'),
-  //   tokenContentType: 'form', // Discord requires form-encoded
+  //   tokenContentType: 'form',
   //   userInfoHeaders: null,
   //   normalizeUser: (data) => ({
   //     providerId: data.id,
@@ -49,22 +75,6 @@ const PROVIDERS = {
   //     avatarUrl: data.avatar
   //       ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.png`
   //       : null,
-  //   }),
-  // },
-  // twitch: {
-  //   tokenUrl: 'https://id.twitch.tv/oauth2/token',
-  //   userInfoUrl: 'https://api.twitch.tv/helix/users',
-  //   scopes: 'user:read:email',
-  //   getClientId: () => process.env.TWITCH_CLIENT_ID,
-  //   getClientSecret: () => getSecret('TWITCH_CLIENT_SECRET'),
-  //   tokenContentType: 'json',
-  //   userInfoHeaders: (config) => ({ 'Client-Id': config.getClientId() }),
-  //   normalizeUser: (data) => ({
-  //     providerId: data.data[0].id,
-  //     email: data.data[0].email || null,
-  //     emailVerified: true, // Twitch only returns verified emails
-  //     displayName: data.data[0].display_name || data.data[0].login,
-  //     avatarUrl: data.data[0].profile_image_url || null,
   //   }),
   // },
 };
@@ -157,7 +167,7 @@ async function fetchUserProfile(provider, accessToken) {
 
   // Some providers (Twitch) need extra headers
   if (config.userInfoHeaders) {
-    Object.assign(headers, config.userInfoHeaders(config));
+    Object.assign(headers, await config.userInfoHeaders(config));
   }
 
   const response = await fetch(config.userInfoUrl, { headers });

@@ -104,6 +104,16 @@ Parameters:
     Description: SSM parameter name for Google OAuth Client Secret
     Default: ''
 
+  TwitchClientIdParam:
+    Type: String
+    Description: SSM parameter name for Twitch OAuth Client ID
+    Default: ''
+
+  TwitchClientSecretParam:
+    Type: String
+    Description: SSM parameter name for Twitch OAuth Client Secret
+    Default: ''
+
 Conditions:
   UseDefaultFromEmail: !Equals [!Ref FromEmail, '']
 
@@ -159,6 +169,8 @@ Resources:
           IOT_BROWSER_POLICY_NAME: !Ref IoTBrowserPolicyName
           GOOGLE_CLIENT_ID_PARAM: !Ref GoogleClientIdParam
           GOOGLE_CLIENT_SECRET_PARAM: !Ref GoogleClientSecretParam
+          TWITCH_CLIENT_ID_PARAM: !Ref TwitchClientIdParam
+          TWITCH_CLIENT_SECRET_PARAM: !Ref TwitchClientSecretParam
           OAUTH_REDIRECT_BASE: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
       Code:
         S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
