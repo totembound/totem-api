@@ -1410,6 +1410,7 @@ app.post('/v1/shop/exchange', authenticateJWT, async (req, res) => {
 const adminUsers = require('./functions/admin/users');
 const adminStats = require('./functions/admin/stats');
 const adminTransactions = require('./functions/admin/transactions');
+const adminMessaging = require('./functions/admin/messaging');
 
 app.get('/v1/admin/stats', authenticateJWT, requireRole('admin'), adminStats.get);
 app.get('/v1/admin/users', authenticateJWT, requireRole('admin'), adminUsers.list);
@@ -1417,6 +1418,11 @@ app.get('/v1/admin/users/:id', authenticateJWT, requireRole('admin'), adminUsers
 app.put('/v1/admin/users/:id/currencies', authenticateJWT, requireRole('admin'), adminUsers.adjustCurrencies);
 app.put('/v1/admin/users/:id/status', authenticateJWT, requireRole('admin'), adminUsers.setStatus);
 app.get('/v1/admin/transactions', authenticateJWT, requireRole('admin'), adminTransactions.list);
+app.post('/v1/admin/broadcast/notification', authenticateJWT, requireRole('admin'), adminMessaging.broadcastNotification);
+app.post('/v1/admin/broadcast/app-reload',   authenticateJWT, requireRole('admin'), adminMessaging.broadcastAppReload);
+app.post('/v1/admin/broadcast/force-logout', authenticateJWT, requireRole('admin'), adminMessaging.broadcastForceLogout);
+app.post('/v1/admin/users/:id/notification', authenticateJWT, requireRole('admin'), adminMessaging.userNotification);
+app.post('/v1/admin/users/:id/force-logout', authenticateJWT, requireRole('admin'), adminMessaging.userForceLogout);
 
 // ============================================
 // Finalize - adds error/404 handlers (must be called last)
