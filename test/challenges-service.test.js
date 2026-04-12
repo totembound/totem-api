@@ -156,26 +156,28 @@ describe('checkRequirements', () => {
   });
 
   test('should fail when totem stage is too low', () => {
+    // Totem Wrestling requires data stage 1 (display Stage 2)
+    const wrestlingChallenge = getChallengeById('chl_totem-wrestling');
     const totem = {
-      stage: 0, // Stage 1, but boulder requires stage 2
+      stage: 0, // Hatchling — wrestling requires stage 1
       stats: { strength: 20, agility: 20, wisdom: 20 },
     };
 
-    const result = checkRequirements(totem, boulderChallenge);
+    const result = checkRequirements(totem, wrestlingChallenge);
     expect(result.qualified).toBe(false);
     expect(result.requirement).toBe('stage');
   });
 
   test('should fail when totem lacks required strength', () => {
     const totem = {
-      stage: 1, // Stage 2
+      stage: 1, // Juvenile — meets boulder stage 0 requirement
       stats: { strength: 5, agility: 10, wisdom: 10 },
     };
 
     const result = checkRequirements(totem, boulderChallenge);
     expect(result.qualified).toBe(false);
     expect(result.requirement).toBe('strength');
-    expect(result.required).toBe(10);
+    expect(result.required).toBe(10);  // Boulder breaker primary stat
     expect(result.current).toBe(5);
   });
 
@@ -205,6 +207,7 @@ describe('checkRequirements', () => {
     const totem = { stage: 0, stats: {} };
     const result = checkRequirements(totem, gardenChallenge);
 
+    // Garden requires stage 0, stats 1/1/1 — empty stats treated as 0 fails strength
     expect(result.qualified).toBe(false);
   });
 });
@@ -495,11 +498,11 @@ describe('completeChallenge', () => {
     mockDbClient.getTotem.mockResolvedValue({
       id: 'ttm_456',
       userId: 'usr_123',
-      stage: 0, // Stage 1, but boulder requires stage 2
+      stage: 0, // Hatchling — wrestling requires data stage 1
       stats: { strength: 20, agility: 20, wisdom: 20 },
     });
 
-    const result = await completeChallenge('usr_123', 'chl_boulder-breaker', 'ttm_456', 500);
+    const result = await completeChallenge('usr_123', 'chl_totem-wrestling', 'ttm_456', 500);
 
     expect(result.success).toBe(false);
     expect(result.error.code).toBe('REQUIREMENT_NOT_MET');
