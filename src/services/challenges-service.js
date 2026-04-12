@@ -48,11 +48,11 @@ const CHALLENGES = [
     description: 'Start your totem\'s journey by protecting the garden. Use your instinct and reflexes to smack down those pesky moles.',
     type: 'balance',
     affinity: 'balance',
-    requirements: { stage: 1, strength: 1, agility: 1, wisdom: 1 },
+    requirements: { stage: 0, strength: 1, agility: 1, wisdom: 1 },
     maxDailyAttempts: 5,
     maxScore: 1000,
     xpReward: { base: 10, perPoint: 0.01 },
-    essenceReward: 5,  // Stage 1 challenge
+    essenceReward: 5,  // Trial (display Stage 1)
     enabled: true,
   },
   {
@@ -61,11 +61,11 @@ const CHALLENGES = [
     description: 'Break a massive rock by timing your strikes correctly. Strength determines power and speed.',
     type: 'strength',
     affinity: 'strength',
-    requirements: { stage: 2, strength: 10, agility: 5, wisdom: 5 },
+    requirements: { stage: 0, strength: 10, agility: 5, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
-    essenceReward: 10,  // Stage 2 challenge
+    essenceReward: 10,  // Tier 1 (display Stage 1)
     enabled: true,
   },
   {
@@ -74,11 +74,11 @@ const CHALLENGES = [
     description: 'Push against a guardian spirit in a strength duel. Tap rapidly to overpower it.',
     type: 'strength',
     affinity: 'strength',
-    requirements: { stage: 3, strength: 13, agility: 8, wisdom: 8 },
+    requirements: { stage: 1, strength: 13, agility: 5, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
-    essenceReward: 15,  // Stage 3 challenge
+    essenceReward: 15,  // Tier 2 (display Stage 2)
     enabled: true,
   },
   {
@@ -87,11 +87,11 @@ const CHALLENGES = [
     description: 'Block falling boulders by clicking in the right zones. Strength increases stamina.',
     type: 'strength',
     affinity: 'strength',
-    requirements: { stage: 4, strength: 16, agility: 10, wisdom: 10 },
+    requirements: { stage: 2, strength: 16, agility: 5, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 3000,
     xpReward: { base: 30, perPoint: 0.01 },
-    essenceReward: 20,  // Stage 4 challenge
+    essenceReward: 20,  // Tier 3 (display Stage 3)
     enabled: true,
   },
   {
@@ -100,11 +100,11 @@ const CHALLENGES = [
     description: 'Navigate a magical path of vanishing tiles, racing from start to finish.',
     type: 'agility',
     affinity: 'agility',
-    requirements: { stage: 2, strength: 5, agility: 10, wisdom: 5 },
+    requirements: { stage: 0, strength: 5, agility: 10, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
-    essenceReward: 10,  // Stage 2 challenge
+    essenceReward: 10,  // Tier 1 (display Stage 1)
     enabled: true,
   },
   {
@@ -113,11 +113,11 @@ const CHALLENGES = [
     description: 'Fly through shifting rings in the air. Agility improves control.',
     type: 'agility',
     affinity: 'agility',
-    requirements: { stage: 3, strength: 8, agility: 13, wisdom: 8 },
+    requirements: { stage: 1, strength: 5, agility: 13, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
-    essenceReward: 15,  // Stage 3 challenge
+    essenceReward: 15,  // Tier 2 (display Stage 2)
     enabled: true,
   },
   {
@@ -126,11 +126,11 @@ const CHALLENGES = [
     description: 'Tap in rhythm with spirit drum beats. Agility determines timing accuracy.',
     type: 'agility',
     affinity: 'agility',
-    requirements: { stage: 4, strength: 10, agility: 16, wisdom: 10 },
+    requirements: { stage: 2, strength: 5, agility: 16, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 3000,
     xpReward: { base: 30, perPoint: 0.01 },
-    essenceReward: 20,  // Stage 4 challenge
+    essenceReward: 20,  // Tier 3 (display Stage 3)
     enabled: true,
   },
   {
@@ -139,11 +139,11 @@ const CHALLENGES = [
     description: 'Memorize and repeat glowing rune patterns. Wisdom increases memory retention.',
     type: 'wisdom',
     affinity: 'wisdom',
-    requirements: { stage: 2, strength: 5, agility: 5, wisdom: 10 },
+    requirements: { stage: 0, strength: 5, agility: 5, wisdom: 10 },
     maxDailyAttempts: 5,
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
-    essenceReward: 10,  // Stage 2 challenge
+    essenceReward: 10,  // Tier 1 (display Stage 1)
     enabled: true,
   },
   {
@@ -152,11 +152,11 @@ const CHALLENGES = [
     description: 'Connect stars to form constellations. Wisdom provides hints and reduces errors.',
     type: 'wisdom',
     affinity: 'wisdom',
-    requirements: { stage: 3, strength: 8, agility: 8, wisdom: 13 },
+    requirements: { stage: 1, strength: 5, agility: 5, wisdom: 13 },
     maxDailyAttempts: 5,
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
-    essenceReward: 15,  // Stage 3 challenge
+    essenceReward: 15,  // Tier 2 (display Stage 2)
     enabled: true,
   },
   {
@@ -165,11 +165,11 @@ const CHALLENGES = [
     description: 'Align magical runes in the correct order. Wisdom slows instability.',
     type: 'wisdom',
     affinity: 'wisdom',
-    requirements: { stage: 4, strength: 10, agility: 10, wisdom: 16 },
+    requirements: { stage: 2, strength: 5, agility: 5, wisdom: 16 },
     maxDailyAttempts: 5,
     maxScore: 3000,
     xpReward: { base: 30, perPoint: 0.01 },
-    essenceReward: 20,  // Stage 4 challenge
+    essenceReward: 20,  // Tier 3 (display Stage 3)
     enabled: true,
   },
 ];
@@ -257,16 +257,15 @@ function checkRequirements(totem, challenge) {
   const totemStats = totem.stats || {};
   const totemStage = totem.stage || 0;
 
-  // Check stage requirement (stage is 0-indexed in totem, 1-indexed in requirements)
-  // Stage 0 = Hatchling (stage 1 in requirements)
-  const effectiveStage = totemStage + 1;
-  if (effectiveStage < requirements.stage) {
+  // Check stage requirement (both totem stage and requirements use 0-indexed data values)
+  // Stage 0 = Hatchling, 1 = Juvenile, 2 = Adult, 3 = Elder, 4 = Ascended
+  if (totemStage < requirements.stage) {
     return {
       qualified: false,
-      reason: `Totem must be stage ${requirements.stage} or higher (currently stage ${effectiveStage})`,
+      reason: `Totem must be stage ${requirements.stage} or higher (currently stage ${totemStage})`,
       requirement: 'stage',
       required: requirements.stage,
-      current: effectiveStage,
+      current: totemStage,
     };
   }
 
