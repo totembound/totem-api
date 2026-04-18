@@ -258,6 +258,23 @@ async function listTables() {
   return result.TableNames || [];
 }
 
+async function waitForDynamo(maxAttempts = 30, delayMs = 1000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      await dynamoRequest('ListTables', {});
+      if (attempt > 1) console.log(`✓ DynamoDB ready after ${attempt} attempts`);
+      return;
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw new Error(`DynamoDB not reachable at ${ENDPOINT} after ${maxAttempts}s: ${error.message}`);
+      }
+      if (attempt === 1) process.stdout.write('⏳ Waiting for DynamoDB to become ready');
+      process.stdout.write('.');
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 async function createTable(definition) {
   return dynamoRequest('CreateTable', definition);
 }
@@ -273,20 +290,25 @@ async function main() {
   console.log(`Endpoint: ${ENDPOINT}`);
   console.log('');
 
-  // Check existing tables
-  let existingTables = [];
+  // Wait for DynamoDB to finish starting up (docker-compose up -d returns before the
+  // container is actually accepting requests). Retries for up to 30s.
   try {
-    existingTables = await listTables();
-    console.log('Existing tables:', existingTables.length > 0 ? existingTables.join(', ') : 'none');
-    console.log('');
+    await waitForDynamo();
+    if (process.stdout.write('')) console.log(''); // newline after dots if we printed any
   } catch (error) {
-    console.error('❌ Cannot connect to DynamoDB Local:', error.message);
+    console.error('');
+    console.error(`❌ ${error.message}`);
     console.error('');
     console.error('Make sure Docker services are running:');
     console.error('  cd docker && docker compose up -d');
     console.error('');
     process.exit(1);
   }
+
+  // Check existing tables
+  const existingTables = await listTables();
+  console.log('Existing tables:', existingTables.length > 0 ? existingTables.join(', ') : 'none');
+  console.log('');
 
   // Create tables
   for (const tableDefinition of tables) {
