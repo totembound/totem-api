@@ -449,7 +449,7 @@ async function reactivateSubscription(user) {
 /**
  * Get Stripe billing portal URL
  */
-async function getBillingPortal(user) {
+async function getBillingPortal(user, query = {}) {
   const userId = user.userId;
   const currentUser = await getUser(userId);
 
@@ -468,10 +468,16 @@ async function getBillingPortal(user) {
     };
   }
 
+  // Same-origin relative path only — prevents open-redirect (Stripe appends it to APP_URL)
+  const rawReturnPath = typeof query.returnPath === 'string' ? query.returnPath : '';
+  const safeReturnPath = /^\/[^/\\]/.test(rawReturnPath) && !rawReturnPath.includes('://')
+    ? rawReturnPath
+    : '/account/settings';
+
   try {
     const session = await stripeClient.billingPortal.sessions.create({
       customer: currentUser.stripeCustomerId,
-      return_url: `${process.env.APP_URL || 'http://localhost:3000'}/plans`,
+      return_url: `${process.env.APP_URL || 'http://localhost:3000'}${safeReturnPath}`,
     });
 
     return {
