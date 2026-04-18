@@ -14,6 +14,13 @@ function getSesClient() {
   return sesClient;
 }
 
+// RFC 2606 / RFC 6761 reserved non-routable domains — never attempt real delivery.
+// Prevents SES MessageRejected errors from CI/synthetic accounts (e.g. testplayer1@example.com).
+const NON_ROUTABLE_EMAIL_PATTERN = /@(example\.(com|net|org)|[^@]+\.(test|invalid|localhost|local))$/i;
+function isNonRoutableEmail(address) {
+  return typeof address === 'string' && NON_ROUTABLE_EMAIL_PATTERN.test(address);
+}
+
 // Nodemailer transport (lazy-loaded, only used locally)
 let localTransport = null;
 function getLocalTransport() {
@@ -108,7 +115,13 @@ async function sendEmail(to, subject, htmlContent, textContent) {
     }
   }
 
-  // Lambda: send via SES
+  // Lambda: send via SES — but short-circuit non-routable test addresses
+  // (SES sandbox would reject these anyway; skipping avoids log noise + quota waste)
+  if (isNonRoutableEmail(to)) {
+    console.log(`[Email-Skip] Non-routable test address, skipping SES send of "${subject}" to ${to}`);
+    return { skipped: true, reason: 'non-routable', to };
+  }
+
   const params = {
     Source: from,
     Destination: { ToAddresses: [to] },
