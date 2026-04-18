@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const chalk = require('chalk');
 
 const FUNCTION_NAME = 'totembound-api';
@@ -58,9 +58,15 @@ function packageFunction() {
     }
 
     if (process.platform === 'win32') {
-      execSync(`powershell Compress-Archive -Path "${functionDir}\\*" -DestinationPath "${zipFilePath}" -Force`);
+      execFileSync('powershell', [
+        '-Command',
+        'Compress-Archive',
+        '-Path', `${functionDir}\\*`,
+        '-DestinationPath', zipFilePath,
+        '-Force',
+      ]);
     } else {
-      execSync(`cd "${functionDir}" && zip -r "${zipFilePath}" ./*`);
+      execFileSync('zip', ['-r', zipFilePath, '.'], { cwd: functionDir });
     }
 
     const stats = fs.statSync(zipFilePath);
