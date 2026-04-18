@@ -37,6 +37,10 @@ const { grantLootItem } = require('../services/loot-service');
 // ============================================
 
 function validateEmail(email) {
+  // RFC 5321 caps addresses at 254 chars; enforcing before regex prevents polynomial backtracking.
+  if (typeof email !== 'string' || email.length > 254) {
+    return false;
+  }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
