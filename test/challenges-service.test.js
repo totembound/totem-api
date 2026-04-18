@@ -328,15 +328,25 @@ describe('calculateXpReward', () => {
     expect(calculateXpReward(3000, 3000)).toBe(30);
   });
 
-  test('should use correct maxXP tier for each maxScore', () => {
-    // maxScore 1000 -> maxXP 10
+  test('should scale maxXP linearly with maxScore (maxXP = maxScore / 100)', () => {
     expect(calculateXpReward(1000, 1000)).toBe(10);
-    // maxScore 2000 -> maxXP 20
     expect(calculateXpReward(2000, 2000)).toBe(20);
-    // maxScore 3000 -> maxXP 30
     expect(calculateXpReward(3000, 3000)).toBe(30);
-    // Unknown maxScore defaults to maxXP 10
-    expect(calculateXpReward(5000, 5000)).toBe(10);
+    // Non-standard maxScore values scale instead of silently capping at 10
+    expect(calculateXpReward(5000, 5000)).toBe(50);
+    expect(calculateXpReward(1500, 1500)).toBe(15);
+  });
+
+  test('should return 0 for non-finite scores (NaN, Infinity)', () => {
+    expect(calculateXpReward(1000, NaN)).toBe(0);
+    expect(calculateXpReward(1000, Infinity)).toBe(0);
+    expect(calculateXpReward(1000, -Infinity)).toBe(0);
+  });
+
+  test('should return 0 for invalid maxScore', () => {
+    expect(calculateXpReward(0, 500)).toBe(0);
+    expect(calculateXpReward(-1000, 500)).toBe(0);
+    expect(calculateXpReward(NaN, 500)).toBe(0);
   });
 });
 
@@ -483,6 +493,27 @@ describe('completeChallenge', () => {
     expect(result.success).toBe(false);
     expect(result.error.code).toBe('INVALID_SCORE');
     expect(result.error.message).toBe('Score must be a positive number');
+  });
+
+  test('should reject NaN score (would otherwise corrupt totem XP)', async () => {
+    const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', NaN);
+
+    expect(result.success).toBe(false);
+    expect(result.error.code).toBe('INVALID_SCORE');
+  });
+
+  test('should reject Infinity score', async () => {
+    const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', Infinity);
+
+    expect(result.success).toBe(false);
+    expect(result.error.code).toBe('INVALID_SCORE');
+  });
+
+  test('should reject non-numeric score (string)', async () => {
+    const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', '500');
+
+    expect(result.success).toBe(false);
+    expect(result.error.code).toBe('INVALID_SCORE');
   });
 
   test('should reject when totem not found', async () => {
