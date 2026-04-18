@@ -1187,7 +1187,7 @@ app.post('/v1/subscription/reactivate', authenticateJWT, async (req, res) => {
 
 app.get('/v1/subscription/portal', authenticateJWT, async (req, res) => {
   try {
-    const result = await subscriptionRoutes.getBillingPortal(req.user);
+    const result = await subscriptionRoutes.getBillingPortal(req.user, req.query);
     res.json(result);
   }
   catch (error) {

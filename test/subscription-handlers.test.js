@@ -1547,6 +1547,51 @@ describe('Subscription Handlers (Stripe-enabled)', () => {
       expect(result.error.message).toBe('Stripe API error');
     });
 
+    it('should swap price on existing active subscription instead of creating a new checkout', async () => {
+      dbClient.getUser.mockResolvedValue({
+        userId: 'usr_upgrade',
+        tier: 'premium',
+        subscription: {
+          status: 'active',
+          tier: 'premium',
+          subscriptionId: 'sub_existing_123',
+        },
+      });
+      mockSubscriptionsRetrieve.mockResolvedValueOnce({
+        items: { data: [{ id: 'si_existing', price: { id: 'price_premium_stripe' } }] },
+      });
+
+      const result = await stripeSubs.createSubscriptionCheckout(
+        { userId: 'usr_upgrade', email: 'upgrade@example.com' },
+        { tier: 'vip' }
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({
+        tier: 'vip',
+        previousTier: 'premium',
+        upgraded: true,
+      });
+
+      expect(mockSubscriptionsRetrieve).toHaveBeenCalledWith('sub_existing_123');
+      expect(mockSubscriptionsUpdate).toHaveBeenCalledWith('sub_existing_123', {
+        items: [{ id: 'si_existing', price: 'price_vip_stripe' }],
+        proration_behavior: 'create_prorations',
+        metadata: { userId: 'usr_upgrade', tier: 'vip' },
+      });
+      // Must NOT create a new checkout session for an in-place upgrade
+      expect(mockCheckoutCreate).not.toHaveBeenCalled();
+
+      expect(dbClient.updateUser).toHaveBeenCalledWith('usr_upgrade', {
+        tier: 'vip',
+        'subscription.tier': 'vip',
+      });
+      expect(dbClient.logTransaction).toHaveBeenCalledWith('usr_upgrade', expect.objectContaining({
+        type: 'subscription_upgraded',
+        details: { from: 'premium', to: 'vip', subscriptionId: 'sub_existing_123' },
+      }));
+    });
+
     it('should include success and cancel URLs from APP_URL', async () => {
       process.env.APP_URL = 'https://myapp.com';
       dbClient.getUser.mockResolvedValue({ userId: 'usr_url', tier: 'free' });
@@ -1747,8 +1792,48 @@ describe('Subscription Handlers (Stripe-enabled)', () => {
 
       expect(mockBillingPortalCreate).toHaveBeenCalledWith({
         customer: 'cus_portal',
+        return_url: expect.stringContaining('/account/settings'),
+      });
+    });
+
+    it('should honor a safe returnPath query param', async () => {
+      dbClient.getUser.mockResolvedValue({
+        userId: 'usr_portal',
+        stripeCustomerId: 'cus_portal',
+      });
+
+      await stripeSubs.getBillingPortal({ userId: 'usr_portal' }, { returnPath: '/plans' });
+
+      expect(mockBillingPortalCreate).toHaveBeenCalledWith({
+        customer: 'cus_portal',
         return_url: expect.stringContaining('/plans'),
       });
+    });
+
+    it('should reject protocol-relative returnPath and fall back to default', async () => {
+      dbClient.getUser.mockResolvedValue({
+        userId: 'usr_portal',
+        stripeCustomerId: 'cus_portal',
+      });
+
+      await stripeSubs.getBillingPortal({ userId: 'usr_portal' }, { returnPath: '//evil.com/steal' });
+
+      const call = mockBillingPortalCreate.mock.calls.slice(-1)[0][0];
+      expect(call.return_url).not.toContain('evil.com');
+      expect(call.return_url).toContain('/account/settings');
+    });
+
+    it('should reject absolute-URL returnPath and fall back to default', async () => {
+      dbClient.getUser.mockResolvedValue({
+        userId: 'usr_portal',
+        stripeCustomerId: 'cus_portal',
+      });
+
+      await stripeSubs.getBillingPortal({ userId: 'usr_portal' }, { returnPath: 'https://evil.com/steal' });
+
+      const call = mockBillingPortalCreate.mock.calls.slice(-1)[0][0];
+      expect(call.return_url).not.toContain('evil.com');
+      expect(call.return_url).toContain('/account/settings');
     });
 
     it('should return PORTAL_FAILED when Stripe throws', async () => {

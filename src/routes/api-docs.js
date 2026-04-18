@@ -1970,6 +1970,12 @@
  *     description: Returns a URL to the Stripe billing portal for managing payment methods
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: returnPath
+ *         required: false
+ *         schema: { type: string, example: /account/settings }
+ *         description: Same-origin path to return to after the portal session (must start with `/`, no scheme). Defaults to `/account/settings`.
  *     responses:
  *       200:
  *         description: Billing portal URL
