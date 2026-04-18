@@ -43,7 +43,9 @@ const corsOrigins = process.env.CORS_ORIGIN
   : defaultOrigins;
 
 app.use(cors({
-  origin: corsOrigins.length > 0 ? corsOrigins : true,
+  // Fail closed: if no origins are configured, reject all cross-origin requests
+  // rather than reflecting the caller's Origin with credentials.
+  origin: corsOrigins.length > 0 ? corsOrigins : false,
   credentials: true,
   maxAge: 86400, // 24hrs - browser caches preflight, skips OPTIONS for repeat requests
 }));
