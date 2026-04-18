@@ -307,36 +307,22 @@ function checkRequirements(totem, challenge) {
 
 /**
  * Calculate XP reward based on score (matches contract formula)
- * Formula: floor((score * maxXP) / maxScore)
+ * Formula: floor((score * maxXP) / maxScore), where maxXP = maxScore / 100
+ * (tier pattern: 1000→10, 2000→20, 3000→30, etc.)
  *
- * @param {number} maxScore - Maximum possible score (determines maxXP tier)
+ * @param {number} maxScore - Maximum possible score
  * @param {number} score - The player's score
- * @returns {number} - XP to award
+ * @returns {number} - XP to award (0 if inputs are invalid or non-positive)
  */
 function calculateXpReward(maxScore, score) {
-  // Determine max XP based on challenge difficulty (matches contract)
-  let maxXP;
-  if (maxScore === 1000) {
-    maxXP = 10;
-  }
-  else if (maxScore === 2000) {
-    maxXP = 20;
-  }
-  else if (maxScore === 3000) {
-    maxXP = 30;
-  }
-  else {
-    maxXP = 10; // Default case
-  }
+  if (!Number.isFinite(maxScore) || maxScore <= 0) return 0;
+  if (!Number.isFinite(score) || score <= 0) return 0;
 
-  // Cap score at maxScore
-  const cappedScore = Math.min(Math.max(0, score), maxScore);
-
-  // Calculate XP using contract formula: (score * maxXP) / maxScore
-  // Minimum 1 XP for any positive score
+  const maxXP = Math.floor(maxScore / 100);
+  const cappedScore = Math.min(score, maxScore);
   const xp = Math.floor((cappedScore * maxXP) / maxScore);
 
-  return cappedScore > 0 ? Math.max(1, xp) : 0;
+  return Math.max(1, xp);
 }
 
 // Fixed happiness reward for challenge completion
@@ -377,8 +363,8 @@ async function completeChallenge(userId, challengeId, totemId, score) {
     };
   }
 
-  // 2. Validate score (must be > 0, cannot submit a zero score)
-  if (typeof score !== 'number' || score <= 0) {
+  // 2. Validate score (finite positive number — rejects NaN, Infinity, non-numbers, <=0)
+  if (!Number.isFinite(score) || score <= 0) {
     return {
       success: false,
       error: {
