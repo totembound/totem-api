@@ -8,6 +8,8 @@
  * - Species availability validation
  */
 
+const crypto = require('crypto');
+
 const { generateId } = require('../common/id-utils');
 
 const {
@@ -52,8 +54,8 @@ function determineRarity(luckBonus = 0) {
     normalizedChance: (r.adjustedChance / totalChance) * 100,
   }));
 
-  // Roll random number
-  const roll = Math.random() * 100;
+  // Roll random number (CSPRNG — rarity affects shop value / limited drops, so fairness matters)
+  const roll = crypto.randomInt(0, 10000) / 100;
 
   // Find matching rarity
   let cumulative = 0;
@@ -96,7 +98,7 @@ function selectColor(rarityId) {
   const rarityName = getRarityName(rarityId);
   const colorPool = COLORS_BY_RARITY[rarityName] || COLORS_BY_RARITY.common;
 
-  const randomIndex = Math.floor(Math.random() * colorPool.length);
+  const randomIndex = crypto.randomInt(0, colorPool.length);
   const selectedColor = colorPool[randomIndex];
 
   return {
@@ -130,7 +132,7 @@ function selectLimitedColor(colorId) {
  * @returns {{ speciesId: number, speciesName: string, baseStats: object }}
  */
 function selectRandomSpecies() {
-  const randomIndex = Math.floor(Math.random() * AVAILABLE_SPECIES_IDS.length);
+  const randomIndex = crypto.randomInt(0, AVAILABLE_SPECIES_IDS.length);
   const speciesId = AVAILABLE_SPECIES_IDS[randomIndex];
   const species = SPECIES[speciesId];
 

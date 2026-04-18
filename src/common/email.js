@@ -110,7 +110,7 @@ async function sendEmail(to, subject, htmlContent, textContent) {
       return result;
     }
     catch (error) {
-      console.error(`[Email-Local] Error sending "${subject}" to ${to}:`, error);
+      console.error('[Email-Local] Error sending "%s" to %s:', subject, to, error);
       throw error;
     }
   }
@@ -141,7 +141,7 @@ async function sendEmail(to, subject, htmlContent, textContent) {
     return result;
   }
   catch (error) {
-    console.error(`[Email-SES] Error sending "${subject}" to ${to}:`, error);
+    console.error('[Email-SES] Error sending "%s" to %s:', subject, to, error);
     throw error;
   }
 }
@@ -165,7 +165,7 @@ exports.sendVerificationEmail = async (email, displayName, code) => {
   }
   catch (error) {
     // Don't throw - signup should succeed even if email fails
-    console.error(`Error sending verification email to ${email}:`, error);
+    console.error('Error sending verification email to %s:', email, error);
     return null;
   }
 };
@@ -188,7 +188,7 @@ exports.sendPasswordResetEmail = async (email, displayName, code) => {
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending password reset email to ${email}:`, error);
+    console.error('Error sending password reset email to %s:', email, error);
     return null;
   }
 };

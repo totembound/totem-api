@@ -72,7 +72,7 @@ async function publish(topic, command) {
     if (io) {
       io.to(topic).emit('command', command);
     }
-    console.log(`[IoT Local] → ${topic}:`, JSON.stringify(command));
+    console.log('[IoT Local] → %s:', topic, JSON.stringify(command));
     return true;
   }
 
@@ -93,7 +93,7 @@ async function publish(topic, command) {
     return true;
   }
   catch (err) {
-    console.error(`[IoT] Failed to publish to ${topic}:`, err.message);
+    console.error('[IoT] Failed to publish to %s:', topic, err.message);
     return false;
   }
 }
@@ -116,7 +116,7 @@ async function resolveIdentityId(userId) {
     return user?.iotIdentityId || null;
   }
   catch (err) {
-    console.error(`[IoT] Failed to resolve identityId for ${userId}:`, err.message);
+    console.error('[IoT] Failed to resolve identityId for %s:', userId, err.message);
     return null;
   }
 }
