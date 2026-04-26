@@ -34,10 +34,12 @@ const {
 const {
   onElderSeated,
   onSanctumClaimed,
+  onTenureCheck,
   onMissionCompleted,
 } = require('./achievements-service');
 
 const { SPECIES_DISPLAY_NAMES } = require('./totem-creation');
+const { addTotemXp } = require('./totem-xp');
 
 // =============================================================================
 // Constants
@@ -588,6 +590,23 @@ async function claimSanctum(userId) {
     console.error('[Sanctum] Achievement check failed on claimSanctum:', err.message);
   }
 
+  // Lazy tenure check — seats are already loaded above, so zero extra reads.
+  try {
+    const tenureResults = await onTenureCheck(userId, seats);
+    for (const r of tenureResults) {
+      if (r.unlocked) {
+        achievements.push({
+          achievementId: r.achievementId,
+          milestone: r.milestone,
+          rewards: r.rewards,
+        });
+      }
+    }
+  }
+  catch (err) {
+    console.error('[Sanctum] Tenure check failed on claimSanctum:', err.message);
+  }
+
   return {
     success: true,
     data: {
@@ -828,12 +847,13 @@ async function claimCouncilMission(userId, totemId) {
     };
   }
 
-  // 3. Award XP to totem
+  // 3. Award XP to totem (via chokepoint so prestige check fires)
   const totem = await getTotem(userId, totemId);
-  const currentXP = totem?.experience || 0;
-  await updateTotem(userId, totemId, {
-    experience: currentXP + mission.rewards.xp,
-  });
+  let prestigeAchievements = [];
+  if (totem) {
+    const xpResult = await addTotemXp(userId, totem, mission.rewards.xp || 0);
+    if (xpResult.achievements?.length) prestigeAchievements = xpResult.achievements;
+  }
 
   // 4. Roll for rune drops based on mission tier chances
   const runesEarned = { lesser: 0, greater: 0, ancient: 0 };
@@ -879,16 +899,18 @@ async function claimCouncilMission(userId, totemId) {
     },
   });
 
-  // 8. Check council mission achievements (non-blocking)
-  let achievements = [];
+  // 8. Check council mission achievements (non-blocking) — seed with any
+  // prestige unlocks from the XP chokepoint above.
+  let achievements = [...prestigeAchievements];
   try {
     const { getAchievementProgress } = require('./achievements-service');
     const missionProgress = await getAchievementProgress(userId, 'ach_council-missions');
     const totalMissionCount = (missionProgress?.currentValue || 0) + 1;
-    achievements = await onMissionCompleted(userId, {
+    const missionResults = await onMissionCompleted(userId, {
       missionType: missionRecord.missionType,
       totalMissionCount,
     });
+    if (Array.isArray(missionResults)) achievements.push(...missionResults);
   }
   catch (err) {
     console.error('[Sanctum] Achievement check failed on claimCouncilMission:', err.message);

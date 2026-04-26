@@ -26,6 +26,7 @@ const {
 
 const { generateId } = require('../common/id-utils');
 const { onExpeditionCompleted } = require('./achievements-service');
+const { addTotemXp } = require('./totem-xp');
 
 // =============================================================================
 // EXPEDITION DEFINITIONS (15 total - synced with frontend expeditions.json)
@@ -866,16 +867,19 @@ async function claimExpeditionReward(userId, totemId) {
     }
   }
 
-  // Add XP to ALL team totems (all paid happiness, all earn XP)
+  // Add XP to ALL team totems (all paid happiness, all earn XP).
+  // Routes through addTotemXp so prestige threshold crossings fire the
+  // prestige-progression achievement. Collect any prestige unlocks for the
+  // response so the frontend can toast + patch state without a refresh.
   const allTotemIds = activeExpedition.totemIds || [totemId];
   const totemExpUpdates = {};
+  const prestigeAchievements = [];
   for (const tid of allTotemIds) {
     const t = tid === totemId ? leadTotem : await getTotem(userId, tid);
     if (t) {
-      const currentExp = t.experience || 0;
-      const newExp = currentExp + expReward;
-      await updateTotem(userId, tid, { experience: newExp });
-      totemExpUpdates[tid] = newExp;
+      const xpResult = await addTotemXp(userId, t, expReward);
+      totemExpUpdates[tid] = xpResult.newExperience;
+      if (xpResult.achievements?.length) prestigeAchievements.push(...xpResult.achievements);
     }
   }
 
@@ -924,14 +928,19 @@ async function claimExpeditionReward(userId, totemId) {
 
   // Trigger achievement check (pass totemId for XP rewards)
   const totalExpeditions = await getExpeditionCount(userId);
-  let achievements = [];
+  // Seed with any prestige unlocks from the XP chokepoint above.
+  let achievements = [...prestigeAchievements];
   try {
     const achResults = await onExpeditionCompleted(userId, totalExpeditions, totemId);
-    achievements = (achResults || []).filter(a => a.unlocked).map(a => ({
-      achievementId: a.achievementId,
-      milestone: a.milestone,
-      rewards: a.rewards,
-    }));
+    for (const a of (achResults || [])) {
+      if (a.unlocked) {
+        achievements.push({
+          achievementId: a.achievementId,
+          milestone: a.milestone,
+          rewards: a.rewards,
+        });
+      }
+    }
   }
   catch (err) {
     console.error('[Expedition] Achievement check failed:', err.message);
