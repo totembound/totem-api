@@ -3,17 +3,19 @@
  *
  * POST /v1/rewards/:type/protection
  *
- * Allows users to purchase streak protection to prevent losing their streak
- * if they miss a day/week. Protection extends the grace period.
+ * Allows users to purchase streak protection. Protection is now a consumable
+ * charge model rather than a time-window: each purchase grants N charges that
+ * are spent only when a streak would actually reset. No expiry.
  *
- * Migrated from TotemRewards.sol purchaseProtection(rewardId, tier)
- *
- * Protection Tiers (from phase-10-rewards-config.ts):
+ * Protection Tiers:
  * Daily:
- *   - Tier 0: 50 Essence, 1 day (86400s), requires 7-day streak
- *   - Tier 1: 250 Essence, 7 days (604800s), requires 14-day streak
+ *   - Tier 0: 50 Essence, 1 charge,  requires 7-day streak
+ *   - Tier 1: 250 Essence, 7 charges, requires 14-day streak (bulk discount)
  * Weekly:
- *   - Tier 0: 500 Essence, 14 days (1209600s), requires 4-week streak
+ *   - Tier 0: 500 Essence, 2 charges, requires 4-week streak
+ *
+ * To prevent unbounded stockpiling, a per-type cap limits the total charges a
+ * user can hold simultaneously.
  */
 
 const { getItem, updateItem, TABLES } = require('../../common/db-client');
@@ -21,25 +23,24 @@ const { deductEssence, logTransaction } = require('../../common/db-client');
 
 const REWARDS_CLAIMS_TABLE = TABLES.REWARDS_CLAIMS;
 
-// Protection tier configuration (from contracts phase-10-rewards-config.ts)
 const PROTECTION_TIERS = {
   daily: [
-    { tier: 0, cost: 50, durationSeconds: 86400, requiredStreak: 7 },
-    { tier: 1, cost: 250, durationSeconds: 604800, requiredStreak: 14 },
+    { tier: 0, cost: 50, charges: 1, requiredStreak: 7 },
+    { tier: 1, cost: 250, charges: 7, requiredStreak: 14 },
   ],
   weekly: [
-    { tier: 0, cost: 500, durationSeconds: 1209600, requiredStreak: 4 },
+    { tier: 0, cost: 500, charges: 2, requiredStreak: 4 },
   ],
 };
 
-/**
- * Purchase streak protection
- *
- * @param {object} user - Authenticated user { userId }
- * @param {object} body - Request body { tier: number }
- * @param {string} rewardType - 'daily' or 'weekly'
- * @returns {object} - Purchase result
- */
+// Caps each user's banked charges. Matches the highest-tier capacity so a
+// single max-tier purchase always succeeds; subsequent buys must wait until
+// charges are spent.
+const MAX_CHARGES = {
+  daily: 7,
+  weekly: 2,
+};
+
 async function purchaseProtection(user, body, rewardType) {
   if (!user || !user.userId) {
     return {
@@ -51,7 +52,6 @@ async function purchaseProtection(user, body, rewardType) {
   const userId = user.userId;
   const tierIndex = body?.tier ?? 0;
 
-  // Validate reward type
   if (!['daily', 'weekly'].includes(rewardType)) {
     return {
       success: false,
@@ -59,7 +59,6 @@ async function purchaseProtection(user, body, rewardType) {
     };
   }
 
-  // Validate tier exists
   const tiers = PROTECTION_TIERS[rewardType];
   if (tierIndex < 0 || tierIndex >= tiers.length) {
     return {
@@ -72,9 +71,9 @@ async function purchaseProtection(user, body, rewardType) {
   }
 
   const tierConfig = tiers[tierIndex];
+  const maxCharges = MAX_CHARGES[rewardType];
 
   try {
-    // 1. Get current streak state
     const streakKey = {
       pk: `USER#${userId}`,
       sk: `STREAK#${rewardType}`,
@@ -88,7 +87,6 @@ async function purchaseProtection(user, body, rewardType) {
       };
     }
 
-    // 2. Check streak requirement
     const currentStreak = streakState.currentStreak || 0;
     if (currentStreak < tierConfig.requiredStreak) {
       return {
@@ -100,22 +98,28 @@ async function purchaseProtection(user, body, rewardType) {
       };
     }
 
-    // 3. Check no active protection
-    if (streakState.protectionExpiry) {
+    // Lazy migrate any legacy time-window protection to a single charge so
+    // existing players don't lose what they paid for.
+    let currentCharges = streakState.protectionCharges || 0;
+    if (!currentCharges && streakState.protectionExpiry) {
       const expiryTime = new Date(streakState.protectionExpiry).getTime();
       if (expiryTime > Date.now()) {
-        return {
-          success: false,
-          error: {
-            code: 'ALREADY_PROTECTED',
-            message: 'You already have active streak protection.',
-            protectionExpiry: streakState.protectionExpiry,
-          },
-        };
+        currentCharges = 1;
       }
     }
 
-    // 4. Deduct Essence
+    const newCharges = currentCharges + tierConfig.charges;
+    if (newCharges > maxCharges) {
+      return {
+        success: false,
+        error: {
+          code: 'CHARGES_FULL',
+          message: `You already have ${currentCharges} ${rewardType} protection charge${currentCharges === 1 ? '' : 's'} (max ${maxCharges}). Use them before buying more.`,
+          protectionCharges: currentCharges,
+        },
+      };
+    }
+
     const deductResult = await deductEssence(userId, tierConfig.cost, {
       type: 'protection_purchase',
       ref: `protection_${rewardType}_tier${tierIndex}`,
@@ -131,16 +135,14 @@ async function purchaseProtection(user, body, rewardType) {
       };
     }
 
-    // 5. Set protection expiry on streak state
-    const protectionExpiry = new Date(Date.now() + tierConfig.durationSeconds * 1000).toISOString();
-
     await updateItem(REWARDS_CLAIMS_TABLE, streakKey, {
-      protectionExpiry,
+      protectionCharges: newCharges,
       protectionTier: tierIndex,
       protectionPurchasedAt: new Date().toISOString(),
+      // Clear any legacy expiry-based protection — charges replace it.
+      protectionExpiry: null,
     });
 
-    // 6. Log transaction
     await logTransaction(userId, {
       type: 'protection_purchase',
       currency: 'essence',
@@ -152,7 +154,7 @@ async function purchaseProtection(user, body, rewardType) {
       refName: `${rewardType === 'daily' ? 'Daily' : 'Weekly'} Protection (Tier ${tierIndex})`,
     });
 
-    console.log(`[Protection] User ${userId} purchased ${rewardType} protection tier ${tierIndex} for ${tierConfig.cost} Essence. Expires: ${protectionExpiry}`);
+    console.log(`[Protection] User ${userId} purchased ${rewardType} tier ${tierIndex}: +${tierConfig.charges} charges (now ${newCharges}/${maxCharges}) for ${tierConfig.cost} Essence.`);
 
     return {
       success: true,
@@ -160,8 +162,9 @@ async function purchaseProtection(user, body, rewardType) {
         rewardType,
         tier: tierIndex,
         cost: tierConfig.cost,
-        durationSeconds: tierConfig.durationSeconds,
-        protectionExpiry,
+        chargesAdded: tierConfig.charges,
+        protectionCharges: newCharges,
+        maxCharges,
         newBalance: deductResult.newBalance,
       },
     };
@@ -175,4 +178,4 @@ async function purchaseProtection(user, body, rewardType) {
   }
 }
 
-module.exports = { purchaseProtection, PROTECTION_TIERS };
+module.exports = { purchaseProtection, PROTECTION_TIERS, MAX_CHARGES };
