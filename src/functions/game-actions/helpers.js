@@ -208,6 +208,25 @@ function calculateStage(experience) {
 }
 
 /**
+ * Calculate prestige level from experience.
+ *
+ * Prestige is XP past the Wise Elder threshold, divided by PRESTIGE_XP_REQUIREMENT.
+ * Mirrors the frontend formula in TotemStatsPanel.tsx so client display and
+ * server-side achievement triggering agree.
+ *
+ * Examples (BASE_ELDER_XP=7500, PRESTIGE_XP_REQUIREMENT=2500):
+ *   7400 -> 0   (still pre-Elder)
+ *   7500 -> 0   (just hit Elder, P0)
+ *  10000 -> 1   (P1)
+ *  22500 -> 6   (P6)
+ */
+function calculatePrestigeLevel(experience) {
+  const elderThreshold = STAGE_THRESHOLDS[MAX_STAGE];
+  if (!experience || experience <= elderThreshold) return 0;
+  return Math.floor((experience - elderThreshold) / PRESTIGE_XP_REQUIREMENT);
+}
+
+/**
  * Get XP required for next stage
  */
 function getXpToNextStage(experience, currentStage) {
@@ -347,6 +366,7 @@ module.exports = {
 
   // Stage progression
   calculateStage,
+  calculatePrestigeLevel,
   getXpToNextStage,
   checkEvolutionRequirements,
 
