@@ -713,6 +713,7 @@ describe('Sanctum Service', () => {
         status: 'in_progress',
       });
       dbClient.getTotem.mockResolvedValue({
+        id: testTotemId,
         experience: 8000,
         species: 'fox',
         sanctum: { seated: true, seatIndex: 0, onMission: true },
@@ -762,6 +763,7 @@ describe('Sanctum Service', () => {
         status: 'in_progress',
       });
       dbClient.getTotem.mockResolvedValue({
+        id: testTotemId,
         experience: 9000,
         species: 'wolf',
         sanctum: { seated: true, seatIndex: 1, onMission: true, missionEndsAt: pastEndsAt },

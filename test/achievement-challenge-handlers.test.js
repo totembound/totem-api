@@ -13,6 +13,9 @@ jest.mock('../src/common/db-client', () => ({
 // Mock achievements-service
 jest.mock('../src/services/achievements-service', () => ({
   getAllAchievementProgress: jest.fn(),
+  ACHIEVEMENT_IDS: {
+    ANTI_META_COLLECTOR: 'ach_anti-meta-collector',
+  },
   ACHIEVEMENT_MILESTONES: {
     'ach_collector-progression': [1, 5, 10],
     'ach_trainer-progression': [10, 50, 100],
