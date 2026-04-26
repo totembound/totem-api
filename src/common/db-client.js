@@ -169,6 +169,26 @@ async function updateItem(tableName, key, updates) {
 }
 
 /**
+ * Raw UpdateCommand passthrough — for conditional updates, atomic ADD,
+ * string-set operations, and other expressions the simple updateItem helper
+ * does not support.
+ *
+ * Caller supplies a fully-formed params object (UpdateExpression,
+ * ConditionExpression, ExpressionAttributeNames/Values, ReturnValues, etc.).
+ *
+ * Throws on failure. Caller should catch ConditionalCheckFailedException
+ * for idempotency cases.
+ */
+async function rawUpdate(tableName, key, params) {
+  const command = new UpdateCommand({
+    TableName: tableName,
+    Key: key,
+    ...params,
+  });
+  return docClient.send(command);
+}
+
+/**
  * Delete an item
  */
 async function deleteItem(tableName, key) {
@@ -1006,6 +1026,7 @@ module.exports = {
   getItem,
   putItem,
   updateItem,
+  rawUpdate,
   deleteItem,
   queryItems,
   transactWrite,

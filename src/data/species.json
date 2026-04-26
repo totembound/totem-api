@@ -1,0 +1,292 @@
+{
+  "species": [
+    {
+      "id": 0,
+      "name": "Goose",
+      "fullName": "Mystic Goose",
+      "title": "The Watchful Guardian",
+      "description": "The Goose represents protection, vigilance, and leadership. Known for its strong instincts and devotion to its flock, it ensures the safety of all who travel under its watchful eye.",
+      "affinity": "Wisdom",
+      "domain": "Water",
+      "locationId": 9,
+      "available": true,
+      "image": "/totems/gooseplacecard.png",
+      "baseStats": {
+        "strength": 8,
+        "agility": 6,
+        "wisdom": 10
+      },
+      "stages": [
+        "Hatchling",
+        "Gosling",
+        "Sentinel",
+        "Guardian",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "Otter",
+      "fullName": "Spirit Otter",
+      "title": "The Joyful Trickster",
+      "description": "The Otter represents adaptability, curiosity, and playfulness. It approaches challenges with an open mind, embracing creativity and joy even in difficult situations.",
+      "affinity": "Agility",
+      "domain": "Water",
+      "locationId": 10,
+      "available": true,
+      "image": "/totems/otterplacecard.png",
+      "baseStats": {
+        "strength": 8,
+        "agility": 10,
+        "wisdom": 6
+      },
+      "stages": [
+        "Pup",
+        "Splash",
+        "Glide",
+        "Guardian",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Wolf",
+      "fullName": "Shadow Wolf",
+      "title": "The Pack Leader",
+      "description": "The Wolf represents strategy, loyalty, and teamwork. As a natural pack hunter, it excels in coordination and thrives when working together with others.",
+      "affinity": "Strength",
+      "domain": "Earth",
+      "locationId": 11,
+      "available": true,
+      "image": "/totems/wolfplacecard.png",
+      "baseStats": {
+        "strength": 11,
+        "agility": 8,
+        "wisdom": 5
+      },
+      "stages": [
+        "Pup",
+        "Howler",
+        "Stalker",
+        "Alpha",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Falcon",
+      "fullName": "Swift Falcon",
+      "title": "The Swift Hunter",
+      "description": "The Falcon represents precision, agility, and speed. With unmatched vision and lightning reflexes, it never loses sight of its target.",
+      "affinity": "Agility",
+      "domain": "Air",
+      "locationId": 12,
+      "available": true,
+      "image": "/totems/falconplacecard.png",
+      "baseStats": {
+        "strength": 5,
+        "agility": 12,
+        "wisdom": 7
+      },
+      "stages": [
+        "Hatchling",
+        "Fledgling",
+        "Hunter",
+        "Raptor",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Beaver",
+      "fullName": "Steadfast Beaver",
+      "title": "The Tireless Builder",
+      "description": "The Beaver represents ingenuity, determination, and resourcefulness. It constructs solutions to any problem, always working toward long-term success.",
+      "affinity": "Strength",
+      "domain": "Water",
+      "locationId": 13,
+      "available": true,
+      "image": "/totems/beaverplacecard.png",
+      "baseStats": {
+        "strength": 10,
+        "agility": 9,
+        "wisdom": 5
+      },
+      "stages": [
+        "Kit",
+        "Youngling",
+        "Builder",
+        "Warden",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Deer",
+      "fullName": "Graceful Deer",
+      "title": "The Gentle Pathfinder",
+      "description": "The Deer represents grace, awareness, and intuition. It moves with ease through difficult terrain, staying alert to potential dangers.",
+      "affinity": "Agility",
+      "domain": "Earth",
+      "locationId": 14,
+      "available": true,
+      "image": "/totems/deerplacecard.png",
+      "baseStats": {
+        "strength": 5,
+        "agility": 11,
+        "wisdom": 8
+      },
+      "stages": [
+        "Fawn",
+        "Yearling",
+        "Stag",
+        "Warden",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Woodpecker",
+      "fullName": "Nimble Woodpecker",
+      "title": "The Relentless Worker",
+      "description": "The Woodpecker represents persistence, rhythm, and focus. It never tires in its pursuit, chiseling away at obstacles until success.",
+      "affinity": "Agility",
+      "domain": "Air",
+      "locationId": 15,
+      "available": true,
+      "image": "/totems/woodpeckerplacecard.png",
+      "baseStats": {
+        "strength": 7,
+        "agility": 11,
+        "wisdom": 6
+      },
+      "stages": [
+        "Hatchling",
+        "Fledgling",
+        "Forager",
+        "Warden",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Turtle",
+      "fullName": "Ancient Turtle",
+      "title": "The Unyielding Navigator",
+      "description": "The Turtle symbolizes resilience, grounded strength, and patient resolve. It carries its world while navigating waters with quiet, ancient wisdom.",
+      "affinity": "Strength",
+      "domain": "Water",
+      "locationId": 16,
+      "available": true,
+      "image": "/totems/turtleplacecard.png",
+      "baseStats": {
+        "strength": 10,
+        "agility": 6,
+        "wisdom": 8
+      },
+      "stages": [
+        "Hatchling",
+        "Youngling",
+        "Wayfarer",
+        "Warden",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Bear",
+      "fullName": "Mighty Bear",
+      "title": "The Unstoppable Force",
+      "description": "The Bear represents strength, resilience, and dominance. It relies on brute force to overcome adversity, clearing obstacles through sheer power.",
+      "affinity": "Strength",
+      "domain": "Earth",
+      "locationId": 17,
+      "available": true,
+      "image": "/totems/bearplacecard.png",
+      "baseStats": {
+        "strength": 12,
+        "agility": 5,
+        "wisdom": 7
+      },
+      "stages": [
+        "Cub",
+        "Yearling",
+        "Forager",
+        "Guardian",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Raven",
+      "fullName": "Clever Raven",
+      "title": "The Shadowed Trickster",
+      "description": "The Raven represents intelligence, cunning, and mystery. A master of deception, it sees paths unseen by others.",
+      "affinity": "Wisdom",
+      "domain": "Air",
+      "locationId": 18,
+      "available": false,
+      "image": "/totems/ravenplacecard.png",
+      "baseStats": {
+        "strength": 5,
+        "agility": 8,
+        "wisdom": 11
+      },
+      "stages": [
+        "Hatchling",
+        "Fledgling",
+        "Messenger",
+        "Warden",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Snake",
+      "fullName": "Wise Snake",
+      "title": "The Silent Observer",
+      "description": "The Snake represents stealth, transformation, and wisdom. It moves unnoticed, striking only when the time is right.",
+      "affinity": "Wisdom",
+      "domain": "Earth",
+      "locationId": 19,
+      "available": false,
+      "image": "/totems/snakeplacecard.png",
+      "baseStats": {
+        "strength": 7,
+        "agility": 6,
+        "wisdom": 11
+      },
+      "stages": [
+        "Hatchling",
+        "Slitherling",
+        "Striker",
+        "Warden",
+        "Wise Elder"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Owl",
+      "fullName": "Wise Owl",
+      "title": "The Eternal Watcher",
+      "description": "The Owl represents knowledge, insight, and patience. It sees beyond the present, guiding those who seek the truth.",
+      "affinity": "Wisdom",
+      "domain": "Air",
+      "locationId": 20,
+      "available": true,
+      "image": "/totems/owlplacecard.png",
+      "baseStats": {
+        "strength": 5,
+        "agility": 7,
+        "wisdom": 12
+      },
+      "stages": [
+        "Hatchling",
+        "Chick",
+        "Juvenile",
+        "Adult",
+        "Wise Elder"
+      ]
+    }
+  ]
+}
