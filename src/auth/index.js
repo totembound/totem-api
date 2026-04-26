@@ -29,7 +29,7 @@ const {
 } = require('../common/db-client');
 
 const { sendNewUserWelcomeEmail } = require('../common/email');
-const { onLoginStreak } = require('../services/achievements-service');
+const { onLoginStreak, onPersistenceCheck } = require('../services/achievements-service');
 const { grantLootItem } = require('../services/loot-service');
 
 // ============================================
@@ -271,10 +271,13 @@ async function handleLogin(req, res) {
           userProfile.stats.loginStreak = newStreak;
         }
 
-        // Process login streak achievement in background (fire-and-forget).
-        // Removes 50-150ms from login response.
+        // Process login streak + persistence achievements in background.
+        // Both are cheap: LOGIN_STREAK is one trigger; PERSISTENCE_CHECK reads
+        // the user record we already loaded, so zero extra DB reads.
         onLoginStreak(result.userId, newStreak)
           .catch(err => console.error('Background login streak achievement error:', err));
+        onPersistenceCheck(result.userId, userProfile?.createdAt)
+          .catch(err => console.error('Background persistence achievement error:', err));
       }
     }
     catch (dbError) {

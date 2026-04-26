@@ -18,6 +18,7 @@ jest.mock('../src/common/db-client', () => ({
 jest.mock('../src/services/achievements-service', () => ({
   onGameAction: jest.fn().mockResolvedValue([]),
   onTotemEvolved: jest.fn().mockResolvedValue([]),
+  checkBalancedCare: jest.fn().mockResolvedValue([]),
 }));
 
 const dbClient = require('../src/common/db-client');
@@ -390,7 +391,8 @@ describe('Game Actions', () => {
       dbClient.getTotem.mockResolvedValue(makeTotem({ experience: 600, stats: { happiness: 50, strength: 10, agility: 8, wisdom: 6 } }));
       await evolve(testUser, testTotemId);
       expect(achievementsService.onTotemEvolved).toHaveBeenCalledWith(
-        testUser.userId, { newStage: 1, totemId: testTotemId }
+        testUser.userId,
+        expect.objectContaining({ newStage: 1, totemId: testTotemId })
       );
     });
 
@@ -551,6 +553,130 @@ describe('Game Actions', () => {
       dbClient.getTotem.mockResolvedValue(makeTotem({ cooldowns: { treat: fiveHoursAgo } }));
       const result = await getCooldowns(testUser, testTotemId);
       expect(result.data.cooldowns.treat.onCooldown).toBe(false);
+    });
+  });
+
+  // =============================================================================
+  // BATCH 1: lastActionDates + balanced-care wire-up
+  // =============================================================================
+
+  describe('Batch 1 wire-up — lastActionDates + balanced-care', () => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    it('feed writes lastActionDates with feed = today UTC to the totem', async () => {
+      await feed(testUser, testTotemId);
+      expect(dbClient.updateTotem).toHaveBeenCalledWith(
+        testUser.userId, testTotemId,
+        expect.objectContaining({ lastActionDates: expect.objectContaining({ feed: today }) })
+      );
+    });
+
+    it('train writes lastActionDates with train = today UTC to the totem', async () => {
+      await train(testUser, testTotemId);
+      expect(dbClient.updateTotem).toHaveBeenCalledWith(
+        testUser.userId, testTotemId,
+        expect.objectContaining({ lastActionDates: expect.objectContaining({ train: today }) })
+      );
+    });
+
+    it('treat writes lastActionDates with treat = today UTC to the totem', async () => {
+      await treat(testUser, testTotemId);
+      expect(dbClient.updateTotem).toHaveBeenCalledWith(
+        testUser.userId, testTotemId,
+        expect.objectContaining({ lastActionDates: expect.objectContaining({ treat: today }) })
+      );
+    });
+
+    it('feed preserves existing lastActionDates entries', async () => {
+      const totem = makeTotem({ lastActionDates: { train: today, treat: today } });
+      dbClient.getTotem.mockResolvedValue(totem);
+      await feed(testUser, testTotemId);
+      expect(dbClient.updateTotem).toHaveBeenCalledWith(
+        testUser.userId, testTotemId,
+        expect.objectContaining({
+          lastActionDates: expect.objectContaining({
+            feed: today, train: today, treat: today,
+          }),
+        })
+      );
+    });
+
+    it('feed calls checkBalancedCare with the merged totem state', async () => {
+      const totem = makeTotem({
+        lastActionDates: { train: today, treat: today },
+      });
+      dbClient.getTotem.mockResolvedValue(totem);
+      await feed(testUser, testTotemId);
+      // Expect a totem-shaped argument with all 3 dates set to today.
+      expect(achievementsService.checkBalancedCare).toHaveBeenCalledWith(
+        testUser.userId,
+        expect.objectContaining({
+          lastActionDates: expect.objectContaining({
+            feed: today, train: today, treat: today,
+          }),
+        })
+      );
+    });
+
+    it('train calls checkBalancedCare with merged totem state', async () => {
+      const totem = makeTotem({
+        lastActionDates: { feed: today, treat: today },
+      });
+      dbClient.getTotem.mockResolvedValue(totem);
+      await train(testUser, testTotemId);
+      expect(achievementsService.checkBalancedCare).toHaveBeenCalled();
+    });
+
+    it('treat calls checkBalancedCare with merged totem state', async () => {
+      const totem = makeTotem({
+        lastActionDates: { feed: today, train: today },
+      });
+      dbClient.getTotem.mockResolvedValue(totem);
+      await treat(testUser, testTotemId);
+      expect(achievementsService.checkBalancedCare).toHaveBeenCalled();
+    });
+
+    it('feed/train/treat merge balanced-care unlocks into achievements response', async () => {
+      achievementsService.checkBalancedCare.mockResolvedValue([
+        { unlocked: true, achievementId: 'ach_balanced-care', milestone: 0, rewards: { essence: 25 } },
+      ]);
+      const result = await feed(testUser, testTotemId);
+      expect(result.data.achievements).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ achievementId: 'ach_balanced-care', milestone: 0 }),
+        ])
+      );
+    });
+
+    it('still succeeds if balanced-care helper throws', async () => {
+      achievementsService.checkBalancedCare.mockRejectedValue(new Error('boom'));
+      const result = await feed(testUser, testTotemId);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  // =============================================================================
+  // BATCH 1: evolve passes rarityId + speciesId
+  // =============================================================================
+
+  describe('Batch 1 wire-up — evolve passes rarityId + speciesId', () => {
+    it('evolve calls onTotemEvolved with rarityId and speciesId from totem', async () => {
+      dbClient.getTotem.mockResolvedValue(makeTotem({
+        experience: 600,
+        rarityId: 2,
+        speciesId: 0,
+        stats: { happiness: 50, strength: 10, agility: 8, wisdom: 6 },
+      }));
+      await evolve(testUser, testTotemId);
+      expect(achievementsService.onTotemEvolved).toHaveBeenCalledWith(
+        testUser.userId,
+        expect.objectContaining({
+          newStage: 1,
+          totemId: testTotemId,
+          rarityId: 2,
+          speciesId: 0,
+        })
+      );
     });
   });
 });

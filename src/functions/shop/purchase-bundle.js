@@ -385,6 +385,9 @@ async function purchaseBundle(user, body = {}) {
         rarityId,
         totalTotemCount,
         totemId,
+        speciesId,
+        colorId,
+        acquiredAt: new Date().toISOString(),
       });
       achievements = achResults.filter(a => a.unlocked);
       if (achievements.length > 0) {

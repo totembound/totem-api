@@ -99,7 +99,13 @@ async function evolve(user, totemId) {
   // 6. Trigger evolution achievement
   let achievements = [];
   try {
-    const achResults = await onTotemEvolved(userId, { newStage, totemId });
+    const achResults = await onTotemEvolved(userId, {
+      newStage,
+      totemId,
+      rarityId: totem.rarityId,
+      speciesId: totem.speciesId,
+      colorId: totem.colorId,
+    });
     achievements = (achResults || []).filter(a => a.unlocked).map(a => ({
       achievementId: a.achievementId,
       milestone: a.milestone,

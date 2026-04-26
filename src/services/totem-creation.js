@@ -337,6 +337,7 @@ function createStarterTotem(userId) {
     prestigeLevel: 0,
     stats,
     cooldowns: { feed: null, train: null, treat: null },
+    lastActionDates: {},
     createdAt: now,
     updatedAt: now,
   };

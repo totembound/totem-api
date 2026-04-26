@@ -18,6 +18,7 @@ const {
   getItem,
   putItem,
   updateItem,
+  rawUpdate,
   queryItems,
   getTotem,
   updateTotem,
@@ -25,6 +26,13 @@ const {
   logTransaction,
   TABLES,
 } = require('../common/db-client');
+const { getAffinity, getDomain } = require('./species-data');
+
+// Total counts for set-based one-time achievements.
+const TOTAL_AFFINITIES = 3;  // Strength, Agility, Wisdom
+const TOTAL_DOMAINS = 3;     // Earth, Water, Air
+const TOTAL_SPECIES = 12;    // species ids 0..11
+const TOTAL_COLORS = 28;     // colorIds 0..27 (see COLOR_NAMES in totem-app/utils/species.ts)
 
 // =============================================================================
 // ACHIEVEMENT IDS (must match schema)
@@ -56,6 +64,26 @@ const ACHIEVEMENT_IDS = {
   TENURE_MASTER: 'ach_tenure-master',
   COUNCIL_MISSIONS: 'ach_council-missions',
   FOUNDING_RITUAL: 'ach_founding-ritual',
+  // Batch 1
+  RARE_EVOLUTION: 'ach_rare-evolution',
+  EPIC_EVOLUTION: 'ach_epic-evolution',
+  LEGENDARY_EVOLUTION: 'ach_legendary-evolution',
+  BALANCED_CARE: 'ach_balanced-care',
+  ANTI_META_COLLECTOR: 'ach_anti-meta-collector',
+  MIXED_AFFINITY_EVOLUTION: 'ach_mixed-affinity-evolution',
+  // Batch 2 — TOTEM_ACQUIRED-driven affinity/domain/species achievements
+  AFFINITY_SPECIALIST: 'ach_affinity-specialist',
+  AFFINITY_DIVERSITY: 'ach_affinity-diversity',
+  DOMAIN_SPECIALIST: 'ach_domain-specialist',
+  DOMAIN_DIVERSITY: 'ach_domain-diversity',
+  SPECIES_MASTERY: 'ach_species-mastery',
+  // Batch 3 (selected) — Chromatic Mastery + Seasonal Spirit Keeper
+  COLOR_COLLECTOR_EVOLUTION: 'ach_color-collector-evolution',
+  SEASONAL_COLLECTOR: 'ach_seasonal-collector',
+  // Batch 3 — login + persistence (driven by daily-login event in auth handler)
+  PERSISTENCE_REWARD: 'ach_persistence-reward',
+  // Batch 3 — prestige (driven by XP threshold crossings via totem-xp chokepoint)
+  PRESTIGE_PROGRESSION: 'ach_prestige-progression',
 };
 
 // =============================================================================
@@ -69,12 +97,29 @@ const TRIGGER_TO_ACHIEVEMENTS = {
     ACHIEVEMENT_IDS.EPIC_COLLECTOR,
     ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR,
     ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION,
+    // Batch 2 — handled by post-loop atomic helpers (route through but value=0)
+    ACHIEVEMENT_IDS.AFFINITY_SPECIALIST,
+    ACHIEVEMENT_IDS.AFFINITY_DIVERSITY,
+    ACHIEVEMENT_IDS.DOMAIN_SPECIALIST,
+    ACHIEVEMENT_IDS.DOMAIN_DIVERSITY,
+    ACHIEVEMENT_IDS.SPECIES_MASTERY,
+    // Batch 3 (selected)
+    ACHIEVEMENT_IDS.SEASONAL_COLLECTOR,
   ],
-  TOTEM_EVOLVED: [ACHIEVEMENT_IDS.EVOLUTION_PROGRESSION],
+  TOTEM_EVOLVED: [
+    ACHIEVEMENT_IDS.EVOLUTION_PROGRESSION,
+    ACHIEVEMENT_IDS.RARE_EVOLUTION,
+    ACHIEVEMENT_IDS.EPIC_EVOLUTION,
+    ACHIEVEMENT_IDS.LEGENDARY_EVOLUTION,
+    ACHIEVEMENT_IDS.ANTI_META_COLLECTOR,
+    ACHIEVEMENT_IDS.MIXED_AFFINITY_EVOLUTION,
+    ACHIEVEMENT_IDS.COLOR_COLLECTOR_EVOLUTION,
+  ],
   ACTION_FEED: [ACHIEVEMENT_IDS.FEED_PROGRESSION],
   ACTION_TRAIN: [ACHIEVEMENT_IDS.TRAIN_PROGRESSION],
   ACTION_TREAT: [ACHIEVEMENT_IDS.TREAT_PROGRESSION],
   LOGIN_STREAK: [ACHIEVEMENT_IDS.LOGIN_PROGRESSION],
+  PERSISTENCE_CHECK: [ACHIEVEMENT_IDS.PERSISTENCE_REWARD],
   CHALLENGE_COMPLETED: [
     ACHIEVEMENT_IDS.CHALLENGE_INITIATE,
     ACHIEVEMENT_IDS.CHALLENGE_PROGRESSION,
@@ -98,6 +143,7 @@ const TRIGGER_TO_ACHIEVEMENTS = {
   ELDER_SEATED: [ACHIEVEMENT_IDS.FIRST_ELDER, ACHIEVEMENT_IDS.FULL_COUNCIL],
   SANCTUM_CLAIMED: [ACHIEVEMENT_IDS.SANCTUM_CLAIM],
   TENURE_CHECK: [ACHIEVEMENT_IDS.TENURE_MASTER],
+  TOTEM_PRESTIGED: [ACHIEVEMENT_IDS.PRESTIGE_PROGRESSION],
   MISSION_COMPLETED: [ACHIEVEMENT_IDS.COUNCIL_MISSIONS, ACHIEVEMENT_IDS.FOUNDING_RITUAL],
 };
 
@@ -121,6 +167,19 @@ const ACHIEVEMENT_MILESTONES = {
   [ACHIEVEMENT_IDS.SANCTUM_CLAIM]: [1, 10, 50, 100, 500],
   [ACHIEVEMENT_IDS.TENURE_MASTER]: [7, 14, 30],
   [ACHIEVEMENT_IDS.COUNCIL_MISSIONS]: [5, 25, 50, 100, 500],
+  // Batch 1 — must mirror totem-app/src/config/achievements.ts
+  [ACHIEVEMENT_IDS.BALANCED_CARE]: [10, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+  [ACHIEVEMENT_IDS.ANTI_META_COLLECTOR]: [3, 3, 3], // per-rarity counter, see checkAntiMetaProgress
+  [ACHIEVEMENT_IDS.MIXED_AFFINITY_EVOLUTION]: [2, 3],
+  // Batch 2 — collect-N-of-one-affinity / collect-N-of-one-domain
+  [ACHIEVEMENT_IDS.AFFINITY_SPECIALIST]: [6, 12, 24],
+  [ACHIEVEMENT_IDS.DOMAIN_SPECIALIST]: [6, 12, 24],
+  // Batch 3 (selected) — Seasonal Spirit Keeper (Limited rarity, unique months)
+  [ACHIEVEMENT_IDS.SEASONAL_COLLECTOR]: [1, 3, 6, 12],
+  // Batch 3 — persistence-reward: days since signup (lazy-evaluated on login)
+  [ACHIEVEMENT_IDS.PERSISTENCE_REWARD]: [30, 90, 365],
+  // Batch 3 — prestige-progression: total prestige levels across all totems
+  [ACHIEVEMENT_IDS.PRESTIGE_PROGRESSION]: [1, 3, 5, 10, 25, 50, 100],
 };
 
 const ONETIME_ACHIEVEMENTS = [
@@ -134,6 +193,16 @@ const ONETIME_ACHIEVEMENTS = [
   ACHIEVEMENT_IDS.LEGENDARY_FORGER,
   ACHIEVEMENT_IDS.FIRST_ELDER,
   ACHIEVEMENT_IDS.FOUNDING_RITUAL,
+  // Batch 1
+  ACHIEVEMENT_IDS.RARE_EVOLUTION,
+  ACHIEVEMENT_IDS.EPIC_EVOLUTION,
+  ACHIEVEMENT_IDS.LEGENDARY_EVOLUTION,
+  // Batch 2
+  ACHIEVEMENT_IDS.AFFINITY_DIVERSITY,
+  ACHIEVEMENT_IDS.DOMAIN_DIVERSITY,
+  ACHIEVEMENT_IDS.SPECIES_MASTERY,
+  // Batch 3 (selected) — Chromatic Mastery (one-time, all 28 colors)
+  ACHIEVEMENT_IDS.COLOR_COLLECTOR_EVOLUTION,
 ];
 
 // Rarity IDs (from totem data)
@@ -205,6 +274,44 @@ const ONE_TIME_REWARDS = {
     essence: 100,
     xp: 150,
     name: 'World Founder',
+  },
+  // Batch 1
+  [ACHIEVEMENT_IDS.RARE_EVOLUTION]: {
+    essence: 100,
+    xp: 75,
+    name: 'Rare Elder Evolution',
+  },
+  [ACHIEVEMENT_IDS.EPIC_EVOLUTION]: {
+    essence: 250,
+    xp: 100,
+    name: 'Epic Elder Evolution',
+  },
+  [ACHIEVEMENT_IDS.LEGENDARY_EVOLUTION]: {
+    essence: 500,
+    xp: 150,
+    name: 'Legendary Elder Evolution',
+  },
+  // Batch 2 — one-time diversity / mastery
+  [ACHIEVEMENT_IDS.AFFINITY_DIVERSITY]: {
+    essence: 300,
+    xp: 100,
+    name: 'Affinity Harmonizer',
+  },
+  [ACHIEVEMENT_IDS.DOMAIN_DIVERSITY]: {
+    essence: 300,
+    xp: 100,
+    name: 'Domain Wayfarer',
+  },
+  [ACHIEVEMENT_IDS.SPECIES_MASTERY]: {
+    essence: 1000,
+    xp: 250,
+    name: 'Totem Taxonomist',
+  },
+  // Batch 3 (selected) — long-term Chromatic Mastery (all 28 colors to Elder)
+  [ACHIEVEMENT_IDS.COLOR_COLLECTOR_EVOLUTION]: {
+    essence: 5000,
+    xp: 500,
+    name: 'Chromatic Mastery',
   },
 };
 
@@ -316,6 +423,64 @@ const MILESTONE_REWARDS = {
     { essence: 100, xp: 200, name: 'Elder Diplomat' },        // 50 missions
     { essence: 200, xp: 400, name: 'Grand Elder' },           // 100 missions
     { essence: 500, xp: 750, name: 'Eternal Elder' },         // 500 missions
+  ],
+  // Batch 1 — balanced-care (Daily Trifecta) 9 milestones
+  [ACHIEVEMENT_IDS.BALANCED_CARE]: [
+    { essence: 25, xp: 0, name: 'Mindful Keeper' },           // 10 trifectas
+    { essence: 75, xp: 25, name: 'Harmony Initiator' },       // 50
+    { essence: 150, xp: 50, name: 'Attentive Guardian' },     // 100
+    { essence: 250, xp: 75, name: 'Spirit Harmonizer' },      // 250
+    { essence: 400, xp: 100, name: 'Balanced Nurturer' },     // 500
+    { essence: 600, xp: 150, name: 'Devoted Custodian' },     // 1000
+    { essence: 1000, xp: 200, name: 'Enlightened Caregiver' },// 2500
+    { essence: 1500, xp: 250, name: 'Mystic Cultivator' },    // 5000
+    { essence: 2500, xp: 400, name: 'Legendary Steward' },    // 10000
+  ],
+  // Batch 1 — anti-meta-collector: per-rarity (common/uncommon/rare) milestone
+  [ACHIEVEMENT_IDS.ANTI_META_COLLECTOR]: [
+    { essence: 200, xp: 75, name: 'Humble Ascendant' },        // 3 commons to stage 4
+    { essence: 300, xp: 100, name: 'Uncommon Champion' },      // 3 uncommons to stage 4
+    { essence: 500, xp: 150, name: 'Rare Virtuoso' },          // 3 rares to stage 4
+  ],
+  // Batch 1 — mixed-affinity-evolution: 2 milestones
+  [ACHIEVEMENT_IDS.MIXED_AFFINITY_EVOLUTION]: [
+    { essence: 150, xp: 75, name: 'Dual Affinity Harmony' },   // 2 affinities
+    { essence: 300, xp: 150, name: 'Triforce of Spirits' },    // 3 affinities
+  ],
+  // Batch 2 — affinity-specialist: 3 milestones at 6/12/24
+  [ACHIEVEMENT_IDS.AFFINITY_SPECIALIST]: [
+    { essence: 100, xp: 50, name: 'Affinity Student' },        // 6
+    { essence: 250, xp: 100, name: 'Affinity Scholar' },       // 12
+    { essence: 500, xp: 200, name: 'Affinity Master' },        // 24
+  ],
+  // Batch 2 — domain-specialist: 3 milestones at 6/12/24
+  [ACHIEVEMENT_IDS.DOMAIN_SPECIALIST]: [
+    { essence: 100, xp: 50, name: 'Domain Adept' },            // 6
+    { essence: 250, xp: 100, name: 'Domain Expert' },          // 12
+    { essence: 500, xp: 200, name: 'Domain Sovereign' },       // 24
+  ],
+  // Batch 3 (selected) — Seasonal Spirit Keeper: 4 milestones, one Limited per month
+  [ACHIEVEMENT_IDS.SEASONAL_COLLECTOR]: [
+    { essence: 100, xp: 50, name: 'Seasonal Debut' },          // 1 month
+    { essence: 250, xp: 100, name: 'Seasonal Curator' },       // 3 months
+    { essence: 500, xp: 200, name: 'Seasonal Archiver' },      // 6 months
+    { essence: 1500, xp: 400, name: 'Eternal Timekeeper' },    // 12 months
+  ],
+  // Batch 3 — persistence-reward: 3 milestones (days since account creation)
+  [ACHIEVEMENT_IDS.PERSISTENCE_REWARD]: [
+    { essence: 200, xp: 50, name: 'First Moon' },              // 30 days
+    { essence: 500, xp: 100, name: 'Cycle Master' },           // 90 days
+    { essence: 2000, xp: 500, name: 'Eternal Spirit' },        // 365 days
+  ],
+  // Batch 3 — prestige-progression: 7 milestones (total prestige across totems)
+  [ACHIEVEMENT_IDS.PRESTIGE_PROGRESSION]: [
+    { essence: 200, xp: 50, name: 'Emerging Collective' },     // 1
+    { essence: 400, xp: 100, name: 'Collective Wisdom' },      // 3
+    { essence: 750, xp: 150, name: 'Legendary Guardians' },    // 5
+    { essence: 1500, xp: 200, name: 'Ethereal Convergence' },  // 10
+    { essence: 3000, xp: 300, name: 'Cosmic Resonance' },      // 25
+    { essence: 6000, xp: 400, name: 'Realm Shapers' },         // 50
+    { essence: 12000, xp: 500, name: 'Infinite Pantheon' },    // 100
   ],
 };
 
@@ -697,10 +862,34 @@ async function checkAchievement(userId, trigger, data = {}) {
           else if (achievementId === ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION) {
             value = data.totemCount || 1;
           }
+          else {
+            // Batch 2 affinity/domain/species achievements use atomic helpers
+            // run AFTER the standard loop (see post-loop block below).
+            value = 0;
+          }
           break;
 
         case 'TOTEM_EVOLVED':
-          value = data.newStage || data.evolutionCount || 0;
+          if (achievementId === ACHIEVEMENT_IDS.EVOLUTION_PROGRESSION) {
+            value = data.newStage || data.evolutionCount || 0;
+          }
+          // "Elder" = data stage 4 (UI display "5/5"). The achievement names
+          // (Rare/Epic/Legendary "Elder Evolution") and the maximum-potential
+          // intent require reaching the Wise Elder stage, not Adult (stage 3).
+          else if (achievementId === ACHIEVEMENT_IDS.RARE_EVOLUTION) {
+            value = (data.newStage === 4 && data.rarityId === RARITY.RARE) ? 1 : 0;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.EPIC_EVOLUTION) {
+            value = (data.newStage === 4 && data.rarityId === RARITY.EPIC) ? 1 : 0;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.LEGENDARY_EVOLUTION) {
+            value = (data.newStage === 4 && data.rarityId === RARITY.LEGENDARY) ? 1 : 0;
+          }
+          else {
+            // ANTI_META_COLLECTOR, MIXED_AFFINITY_EVOLUTION, COLOR_COLLECTOR_EVOLUTION
+            // are handled by dedicated atomic helpers after the standard loop.
+            value = 0;
+          }
           break;
 
         case 'ACTION_FEED':
@@ -717,6 +906,10 @@ async function checkAchievement(userId, trigger, data = {}) {
 
         case 'LOGIN_STREAK':
           value = data.streak || 0;
+          break;
+
+        case 'PERSISTENCE_CHECK':
+          value = data.daysSinceCreated || 0;
           break;
 
         case 'CHALLENGE_COMPLETED':
@@ -817,7 +1010,505 @@ async function checkAchievement(userId, trigger, data = {}) {
     }
   }
 
+  // Post-loop custom helpers — atomic / non-sequential achievements that don't
+  // fit the standard "currentValue >= threshold" model.
+  if (trigger === 'TOTEM_EVOLVED') {
+    try {
+      const antiMeta = await checkAntiMetaProgress(userId, data, totemId);
+      if (antiMeta) results.push(antiMeta);
+    }
+    catch (err) {
+      console.error(`[Achievement] anti-meta error for ${userId}:`, err.message);
+    }
+    try {
+      const mixedAff = await checkMixedAffinityProgress(userId, data, totemId);
+      if (mixedAff) results.push(mixedAff);
+    }
+    catch (err) {
+      console.error(`[Achievement] mixed-affinity error for ${userId}:`, err.message);
+    }
+    try {
+      const chromatic = await checkColorCollectorEvolution(userId, data, totemId);
+      if (chromatic) results.push(chromatic);
+    }
+    catch (err) {
+      console.error(`[Achievement] color-collector error for ${userId}:`, err.message);
+    }
+  }
+
+  if (trigger === 'TOTEM_ACQUIRED' && data.speciesId !== null && data.speciesId !== undefined) {
+    const checks = [
+      ['affinity-specialist', () => checkAffinitySpecialist(userId, data, totemId)],
+      ['domain-specialist', () => checkDomainSpecialist(userId, data, totemId)],
+      ['species-mastery', () => checkSpeciesMastery(userId, data, totemId)],
+      ['affinity-diversity', () => checkAffinityDiversity(userId, data, totemId)],
+      ['domain-diversity', () => checkDomainDiversity(userId, data, totemId)],
+      ['seasonal-collector', () => checkSeasonalCollector(userId, data, totemId)],
+    ];
+    for (const [name, fn] of checks) {
+      try {
+        const r = await fn();
+        if (r) results.push(r);
+      }
+      catch (err) {
+        console.error(`[Achievement] ${name} error for ${userId}:`, err.message);
+      }
+    }
+  }
+
   return results;
+}
+
+// =============================================================================
+// BATCH 1 — Atomic helpers for non-sequential / set-based achievements
+// =============================================================================
+
+/**
+ * Ensure the achievement progress record exists. Returns the existing or
+ * newly-created record. Initializes Batch 1 fields (perRarityCount, etc.)
+ * when first creating, so subsequent atomic updates don't fail on missing
+ * parent maps.
+ */
+async function ensureAchievementRecord(userId, achievementId) {
+  let progress = await getAchievementProgress(userId, achievementId);
+  if (progress) return progress;
+
+  const now = new Date().toISOString();
+  progress = {
+    pk: achievementPK(userId),
+    sk: achievementSK(achievementId),
+    odUserId: userId,
+    achievementId,
+    currentValue: 0,
+    milestoneIndex: -1,
+    isComplete: false,
+    milestones: [],
+    lastUpdatedAt: now,
+  };
+  if (achievementId === ACHIEVEMENT_IDS.BALANCED_CARE) {
+    progress.trifectaLog = {};
+  }
+  if (achievementId === ACHIEVEMENT_IDS.ANTI_META_COLLECTOR) {
+    progress.perRarityCount = {};
+  }
+  if (achievementId === ACHIEVEMENT_IDS.AFFINITY_SPECIALIST) {
+    progress.affinityCounts = {};
+  }
+  if (achievementId === ACHIEVEMENT_IDS.DOMAIN_SPECIALIST) {
+    progress.domainCounts = {};
+  }
+  if (achievementId === ACHIEVEMENT_IDS.PRESTIGE_PROGRESSION) {
+    progress.prestigeByTotem = {};
+  }
+  await putItem(TABLES.ACHIEVEMENT_PROGRESS, progress);
+  return progress;
+}
+
+/**
+ * Atomically award a milestone if not already in the unlocked set.
+ * Used by anti-meta-collector (non-sequential milestones).
+ */
+async function awardSingleMilestone(userId, achievementId, milestoneIndex, totemId) {
+  const progress = await getAchievementProgress(userId, achievementId);
+  const existing = progress?.milestones || [];
+  if (existing.some(m => m.index === milestoneIndex)) {
+    return null; // already unlocked, idempotent
+  }
+  const now = new Date().toISOString();
+  const newMilestones = [...existing, { index: milestoneIndex, unlockedAt: now }];
+  const newMilestoneIndex = Math.max(...newMilestones.map(m => m.index));
+
+  await updateItem(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId),
+    sk: achievementSK(achievementId),
+  }, {
+    milestones: newMilestones,
+    milestoneIndex: newMilestoneIndex,
+    unlockedAt: progress?.unlockedAt || now,
+    lastUpdatedAt: now,
+  });
+
+  const rewardConfig = getRewardConfig(achievementId, milestoneIndex);
+  let rewards = { essence: 0, xp: 0 };
+  if (rewardConfig) {
+    rewards = await distributeAchievementReward(
+      userId, achievementId, rewardConfig.name, rewardConfig.essence, rewardConfig.xp,
+      totemId, milestoneIndex
+    );
+  }
+  return {
+    unlocked: true,
+    achievementId,
+    milestone: milestoneIndex,
+    newMilestones: [milestoneIndex],
+    rewards,
+  };
+}
+
+/**
+ * Anti-meta collector: per-rarity counter. Atomic ADD on perRarityCount.{r}.
+ * Milestone i unlocks when perRarityCount[i] >= 3 (i ∈ {0,1,2} = common/uncommon/rare).
+ */
+async function checkAntiMetaProgress(userId, data, totemId) {
+  const { newStage, rarityId } = data;
+  if (newStage !== 4) return null;
+  if (rarityId !== RARITY.COMMON && rarityId !== RARITY.UNCOMMON && rarityId !== RARITY.RARE) {
+    return null;
+  }
+
+  const id = ACHIEVEMENT_IDS.ANTI_META_COLLECTOR;
+  await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId),
+    sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD perRarityCount.#r :one SET lastUpdatedAt = :now',
+    ExpressionAttributeNames: { '#r': String(rarityId) },
+    ExpressionAttributeValues: {
+      ':one': 1,
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  });
+
+  const newCount = result?.Attributes?.perRarityCount?.[rarityId] || 0;
+  if (newCount >= ACHIEVEMENT_MILESTONES[id][rarityId]) {
+    return await awardSingleMilestone(userId, id, rarityId, totemId);
+  }
+  return null;
+}
+
+/**
+ * Mixed-affinity-evolution: string-set ADD. Milestone unlocks when set size
+ * crosses the threshold (2 → milestone 0, 3 → milestone 1).
+ */
+async function checkMixedAffinityProgress(userId, data, totemId) {
+  const { newStage, speciesId } = data;
+  // Mirror the Elder semantics: "evolve to maximum potential" = stage 4.
+  if (newStage !== 4) return null;
+  const affinity = getAffinity(speciesId);
+  if (!affinity) return null;
+
+  const id = ACHIEVEMENT_IDS.MIXED_AFFINITY_EVOLUTION;
+  await ensureAchievementRecord(userId, id);
+
+  // DynamoDB SS type — use a Set instance so the SDK serializes it correctly.
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId),
+    sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD seenAffinities :a SET lastUpdatedAt = :now',
+    ExpressionAttributeValues: {
+      ':a': new Set([affinity]),
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  });
+
+  const seen = result?.Attributes?.seenAffinities;
+  const size = seen instanceof Set ? seen.size : (seen?.values?.length ?? (Array.isArray(seen) ? seen.length : 0));
+  if (!size) return null;
+
+  // Mirror checkAndUnlockMilestone: also update currentValue so frontend
+  // progress display reflects "X of Y affinities".
+  await updateItem(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId),
+    sk: achievementSK(id),
+  }, { currentValue: size });
+
+  // Walk milestones; for the new ones, dispatch via checkAndUnlockMilestone with
+  // the size as currentValue. Use the standard sequential progression flow.
+  return await checkAndUnlockMilestone(userId, id, size, totemId);
+}
+
+// =============================================================================
+// BATCH 2 — TOTEM_ACQUIRED-driven affinity/domain/species helpers
+// =============================================================================
+
+/**
+ * Affinity-specialist: collect N totems of the same affinity. Storage:
+ *   affinityCounts: { Strength: N, Agility: N, Wisdom: N }
+ * Milestones [6, 12, 24] unlock when MAX(counts) crosses each threshold.
+ * Sets currentValue = max so the UI's progress bar tracks the leading affinity.
+ */
+async function checkAffinitySpecialist(userId, data, totemId) {
+  const affinity = getAffinity(data.speciesId);
+  if (!affinity) return null;
+
+  const id = ACHIEVEMENT_IDS.AFFINITY_SPECIALIST;
+  await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId), sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD affinityCounts.#a :one SET lastUpdatedAt = :now',
+    ExpressionAttributeNames: { '#a': affinity },
+    ExpressionAttributeValues: { ':one': 1, ':now': new Date().toISOString() },
+    ReturnValues: 'ALL_NEW',
+  });
+  const counts = result?.Attributes?.affinityCounts || {};
+  const max = Math.max(0, ...Object.values(counts));
+  if (max === 0) return null;
+
+  return await checkAndUnlockMilestone(userId, id, max, totemId);
+}
+
+/**
+ * Domain-specialist: same pattern as affinity-specialist but keyed on domain.
+ */
+async function checkDomainSpecialist(userId, data, totemId) {
+  const domain = getDomain(data.speciesId);
+  if (!domain) return null;
+
+  const id = ACHIEVEMENT_IDS.DOMAIN_SPECIALIST;
+  await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId), sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD domainCounts.#d :one SET lastUpdatedAt = :now',
+    ExpressionAttributeNames: { '#d': domain },
+    ExpressionAttributeValues: { ':one': 1, ':now': new Date().toISOString() },
+    ReturnValues: 'ALL_NEW',
+  });
+  const counts = result?.Attributes?.domainCounts || {};
+  const max = Math.max(0, ...Object.values(counts));
+  if (max === 0) return null;
+
+  return await checkAndUnlockMilestone(userId, id, max, totemId);
+}
+
+/**
+ * Species-mastery: collect at least one of each species (12 total). Atomic
+ * string-set ADD on seenSpecies. Unlocks once size === TOTAL_SPECIES.
+ */
+async function checkSpeciesMastery(userId, data, totemId) {
+  if (data.speciesId === null || data.speciesId === undefined) return null;
+
+  const id = ACHIEVEMENT_IDS.SPECIES_MASTERY;
+  // Optimization: once a one-time achievement is unlocked, skip the rawUpdate
+  // entirely on subsequent calls. Saves a DB write per acquired totem.
+  const existing = await getAchievementProgress(userId, id);
+  if (existing?.isComplete) return null;
+  if (!existing) await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId), sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD seenSpecies :s SET lastUpdatedAt = :now',
+    ExpressionAttributeValues: {
+      ':s': new Set([String(data.speciesId)]),
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  });
+  const seen = result?.Attributes?.seenSpecies;
+  const size = seen instanceof Set ? seen.size : 0;
+  if (size < TOTAL_SPECIES) {
+    await updateItem(TABLES.ACHIEVEMENT_PROGRESS, {
+      pk: achievementPK(userId), sk: achievementSK(id),
+    }, { currentValue: size });
+    return null;
+  }
+  return await checkAndUnlockMilestone(userId, id, 1, totemId);
+}
+
+/**
+ * Affinity-diversity: collect a Rare+ totem from each of the 3 affinities.
+ * Atomic string-set ADD on seenAffinitiesRare. Skipped for non-Rare+ totems.
+ */
+async function checkAffinityDiversity(userId, data, totemId) {
+  if (data.rarityId < RARITY.RARE) return null;
+  const affinity = getAffinity(data.speciesId);
+  if (!affinity) return null;
+
+  const id = ACHIEVEMENT_IDS.AFFINITY_DIVERSITY;
+  const existing = await getAchievementProgress(userId, id);
+  if (existing?.isComplete) return null;
+  if (!existing) await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId), sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD seenAffinitiesRare :a SET lastUpdatedAt = :now',
+    ExpressionAttributeValues: {
+      ':a': new Set([affinity]),
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  });
+  const seen = result?.Attributes?.seenAffinitiesRare;
+  const size = seen instanceof Set ? seen.size : 0;
+  if (size < TOTAL_AFFINITIES) {
+    await updateItem(TABLES.ACHIEVEMENT_PROGRESS, {
+      pk: achievementPK(userId), sk: achievementSK(id),
+    }, { currentValue: size });
+    return null;
+  }
+  return await checkAndUnlockMilestone(userId, id, 1, totemId);
+}
+
+/**
+ * Chromatic Mastery: evolve every color variant to Elder (stage 4).
+ * Atomic string-set ADD on seenColors. Unlocks once size === TOTAL_COLORS.
+ *
+ * Long-term achievement — most players will never complete it.
+ */
+async function checkColorCollectorEvolution(userId, data, totemId) {
+  if (data.newStage !== 4) return null;
+  if (data.colorId === null || data.colorId === undefined) return null;
+
+  const id = ACHIEVEMENT_IDS.COLOR_COLLECTOR_EVOLUTION;
+  const existing = await getAchievementProgress(userId, id);
+  if (existing?.isComplete) return null;
+  if (!existing) await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId), sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD seenColors :c SET lastUpdatedAt = :now',
+    ExpressionAttributeValues: {
+      ':c': new Set([String(data.colorId)]),
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  });
+  const seen = result?.Attributes?.seenColors;
+  const size = seen instanceof Set ? seen.size : 0;
+  if (size < TOTAL_COLORS) {
+    await updateItem(TABLES.ACHIEVEMENT_PROGRESS, {
+      pk: achievementPK(userId), sk: achievementSK(id),
+    }, { currentValue: size });
+    return null;
+  }
+  return await checkAndUnlockMilestone(userId, id, 1, totemId);
+}
+
+/**
+ * Seasonal Spirit Keeper: collect Limited-rarity totems, deduped by
+ * the totem's colorId. Each monthly Limited release has its own unique
+ * color (16=frostbite Jan, 17=rosy Feb, 18=verdant Mar, ... 27=starlit Dec),
+ * so colorId is the canonical identity of a seasonal release.
+ *
+ * Two duplicate January totems (same colorId) collapse into 1.
+ * Four totems from four different months (four distinct colorIds) count as 4.
+ *
+ * Storage: seenSeasonalColors — StringSet of colorId entries.
+ * Milestones [1, 3, 6, 12] unlock as the set size grows.
+ */
+async function checkSeasonalCollector(userId, data, totemId) {
+  if (data.rarityId !== RARITY.LIMITED) return null;
+  if (data.colorId === null || data.colorId === undefined) return null;
+
+  const id = ACHIEVEMENT_IDS.SEASONAL_COLLECTOR;
+  await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId), sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD seenSeasonalColors :c SET lastUpdatedAt = :now',
+    ExpressionAttributeValues: {
+      ':c': new Set([String(data.colorId)]),
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  });
+  const seen = result?.Attributes?.seenSeasonalColors;
+  const size = seen instanceof Set ? seen.size : 0;
+  if (size === 0) return null;
+
+  return await checkAndUnlockMilestone(userId, id, size, totemId);
+}
+
+/**
+ * Domain-diversity: same as affinity-diversity but keyed on domain.
+ */
+async function checkDomainDiversity(userId, data, totemId) {
+  if (data.rarityId < RARITY.RARE) return null;
+  const domain = getDomain(data.speciesId);
+  if (!domain) return null;
+
+  const id = ACHIEVEMENT_IDS.DOMAIN_DIVERSITY;
+  const existing = await getAchievementProgress(userId, id);
+  if (existing?.isComplete) return null;
+  if (!existing) await ensureAchievementRecord(userId, id);
+
+  const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+    pk: achievementPK(userId), sk: achievementSK(id),
+  }, {
+    UpdateExpression: 'ADD seenDomainsRare :d SET lastUpdatedAt = :now',
+    ExpressionAttributeValues: {
+      ':d': new Set([domain]),
+      ':now': new Date().toISOString(),
+    },
+    ReturnValues: 'ALL_NEW',
+  });
+  const seen = result?.Attributes?.seenDomainsRare;
+  const size = seen instanceof Set ? seen.size : 0;
+  if (size < TOTAL_DOMAINS) {
+    await updateItem(TABLES.ACHIEVEMENT_PROGRESS, {
+      pk: achievementPK(userId), sk: achievementSK(id),
+    }, { currentValue: size });
+    return null;
+  }
+  return await checkAndUnlockMilestone(userId, id, 1, totemId);
+}
+
+/**
+ * Balanced-care (Daily Trifecta). Called from feed/train/treat handlers
+ * with the merged-in-memory totem after the action's totem update.
+ *
+ * Atomic conditional update on trifectaLog[totemId]:
+ *   - succeeds (and increments currentValue) only if the entry is not today.
+ *   - throws ConditionalCheckFailedException if already counted today (idempotent no-op).
+ *
+ * @param {string} userId
+ * @param {object} totem - merged totem record including lastActionDates
+ * @returns {Array} - array of unlocked achievement results (possibly empty)
+ */
+async function checkBalancedCare(userId, totem) {
+  const today = new Date().toISOString().slice(0, 10);
+  const dates = totem.lastActionDates || {};
+  if (dates.feed !== today || dates.train !== today || dates.treat !== today) {
+    return [];
+  }
+
+  const id = ACHIEVEMENT_IDS.BALANCED_CARE;
+  const totemId = totem.id;
+  await ensureAchievementRecord(userId, id);
+
+  let attributes;
+  try {
+    const result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+      pk: achievementPK(userId),
+      sk: achievementSK(id),
+    }, {
+      UpdateExpression: 'SET trifectaLog.#tid = :today, currentValue = if_not_exists(currentValue, :zero) + :one, lastUpdatedAt = :now',
+      ConditionExpression: 'attribute_not_exists(trifectaLog.#tid) OR trifectaLog.#tid <> :today',
+      ExpressionAttributeNames: { '#tid': totemId },
+      ExpressionAttributeValues: {
+        ':today': today,
+        ':one': 1,
+        ':zero': 0,
+        ':now': new Date().toISOString(),
+      },
+      ReturnValues: 'ALL_NEW',
+    });
+    attributes = result?.Attributes || {};
+  }
+  catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      // Already counted today for this totem — idempotent no-op.
+      return [];
+    }
+    throw err;
+  }
+
+  // Run standard milestone unlock against the new currentValue.
+  const newValue = attributes.currentValue || 0;
+  const milestoneResult = await checkAndUnlockMilestone(userId, id, newValue, totemId);
+  return milestoneResult.unlocked ? [milestoneResult] : [];
 }
 
 // =============================================================================
@@ -841,11 +1532,14 @@ async function onUserSignup(userId, totemId = null) {
  * @param {number} options.totalTotemCount - Total totems owned by user
  * @param {string} [options.totemId] - The new totem's ID for XP rewards
  */
-async function onTotemAcquired(userId, { rarityId, totalTotemCount, totemId = null }) {
+async function onTotemAcquired(userId, { rarityId, totalTotemCount, totemId = null, speciesId = null, colorId = null, acquiredAt = null }) {
   return checkAchievement(userId, 'TOTEM_ACQUIRED', {
     rarityId,
     totemCount: totalTotemCount,
     totemId,
+    speciesId,
+    colorId,
+    acquiredAt,
   });
 }
 
@@ -855,9 +1549,11 @@ async function onTotemAcquired(userId, { rarityId, totalTotemCount, totemId = nu
  * @param {object} options - Options object
  * @param {number} options.newStage - The new evolution stage (1-4)
  * @param {string} [options.totemId] - Totem ID for XP rewards
+ * @param {number} [options.rarityId] - Rarity (0-5) — drives rare/epic/legendary-evolution + anti-meta
+ * @param {number} [options.speciesId] - Species (0-11) — drives mixed-affinity-evolution via static lookup
  */
-async function onTotemEvolved(userId, { newStage, totemId = null }) {
-  return checkAchievement(userId, 'TOTEM_EVOLVED', { newStage, totemId });
+async function onTotemEvolved(userId, { newStage, totemId = null, rarityId = null, speciesId = null, colorId = null }) {
+  return checkAchievement(userId, 'TOTEM_EVOLVED', { newStage, totemId, rarityId, speciesId, colorId });
 }
 
 /**
@@ -888,6 +1584,103 @@ async function onGameAction(userId, actionType, totalCount, totemId = null) {
  */
 async function onLoginStreak(userId, streak, totemId = null) {
   return checkAchievement(userId, 'LOGIN_STREAK', { streak, totemId });
+}
+
+/**
+ * Call on sanctum claim with the seats array. Computes max-tenure across all
+ * seated elders (in days) and fires TENURE_CHECK so milestones at 7/14/30
+ * days unlock. Lazy evaluation — runs on each claim instead of via cron.
+ *
+ * @param {string} userId
+ * @param {Array<{seatedAt: string}>} seats - Currently-occupied sanctum seats
+ * @returns {Array} unlocked achievement results
+ */
+async function onTenureCheck(userId, seats) {
+  if (!Array.isArray(seats) || seats.length === 0) return [];
+  const now = Date.now();
+  let maxTenureDays = 0;
+  for (const seat of seats) {
+    if (!seat?.seatedAt) continue;
+    const days = Math.floor((now - new Date(seat.seatedAt).getTime()) / (24 * 60 * 60 * 1000));
+    if (days > maxTenureDays) maxTenureDays = days;
+  }
+  if (maxTenureDays <= 0) return [];
+  return checkAchievement(userId, 'TENURE_CHECK', { tenureDays: maxTenureDays });
+}
+
+/**
+ * Call on each daily login (or app mount) with the user's account-creation
+ * timestamp. Computes days-since-signup and fires the PERSISTENCE_CHECK
+ * trigger so milestones at 30/90/365 days unlock.
+ *
+ * @param {string} userId
+ * @param {string} createdAt - User account ISO timestamp
+ * @param {string} [totemId] - For XP rewards (optional)
+ */
+async function onPersistenceCheck(userId, createdAt, totemId = null) {
+  if (!createdAt) return [];
+  const created = new Date(createdAt);
+  if (isNaN(created.getTime())) return [];
+  const ms = Date.now() - created.getTime();
+  const daysSinceCreated = Math.floor(ms / (24 * 60 * 60 * 1000));
+  if (daysSinceCreated <= 0) return [];
+  return checkAchievement(userId, 'PERSISTENCE_CHECK', { daysSinceCreated, totemId });
+}
+
+/**
+ * Prestige Collective: total prestige levels across all of the user's totems.
+ *
+ * Called from totem-xp.addTotemXp whenever a totem's XP crosses a prestige
+ * threshold (XP > BASE_ELDER_XP, every PRESTIGE_XP_REQUIREMENT). Storage
+ * uses a `prestigeByTotem` map on the achievement record so each totem's
+ * contribution is tracked individually and the total is the sum of values.
+ *
+ * Idempotency: a conditional update only writes when the new prestige
+ * exceeds the stored max for that totem. Replaying the same crossing or a
+ * lower value is a no-op (ConditionalCheckFailed → return []).
+ *
+ * Atomicity: the SET of `prestigeByTotem.<tid>` and ADD on `currentValue`
+ * happen in one DDB call so the running total never drifts from the map.
+ */
+async function onTotemPrestiged(userId, { totemId, oldPrestige, newPrestige }) {
+  if (!totemId) return [];
+  const newP = Number(newPrestige) || 0;
+  const oldP = Number(oldPrestige) || 0;
+  if (newP <= oldP) return [];
+
+  const id = ACHIEVEMENT_IDS.PRESTIGE_PROGRESSION;
+  await ensureAchievementRecord(userId, id);
+
+  const delta = newP - oldP;
+  const now = new Date().toISOString();
+
+  let result;
+  try {
+    result = await rawUpdate(TABLES.ACHIEVEMENT_PROGRESS, {
+      pk: achievementPK(userId), sk: achievementSK(id),
+    }, {
+      UpdateExpression:
+        'SET prestigeByTotem.#tid = :newP, lastUpdatedAt = :now ADD currentValue :delta',
+      ConditionExpression:
+        'attribute_not_exists(prestigeByTotem.#tid) OR prestigeByTotem.#tid < :newP',
+      ExpressionAttributeNames: { '#tid': totemId },
+      ExpressionAttributeValues: {
+        ':newP': newP,
+        ':delta': delta,
+        ':now': now,
+      },
+      ReturnValues: 'ALL_NEW',
+    });
+  }
+  catch (err) {
+    if (err && err.name === 'ConditionalCheckFailedException') return [];
+    throw err;
+  }
+
+  const newTotal = result?.Attributes?.currentValue ?? 0;
+  if (newTotal <= 0) return [];
+  const r = await checkAndUnlockMilestone(userId, id, newTotal, totemId);
+  return r ? [r] : [];
 }
 
 /**
@@ -998,10 +1791,29 @@ module.exports = {
   onTotemEvolved,
   onGameAction,
   onLoginStreak,
+  onPersistenceCheck,
+  onTotemPrestiged,
+  onTenureCheck,
   onChallengeCompleted,
   onExpeditionCompleted,
   onTotemFused,
   onElderSeated,
   onSanctumClaimed,
   onMissionCompleted,
+
+  // Batch 1 helpers
+  checkBalancedCare,
+  checkAntiMetaProgress,
+  checkMixedAffinityProgress,
+
+  // Batch 2 helpers
+  checkAffinitySpecialist,
+  checkDomainSpecialist,
+  checkSpeciesMastery,
+  checkAffinityDiversity,
+  checkDomainDiversity,
+
+  // Batch 3 (selected) helpers
+  checkColorCollectorEvolution,
+  checkSeasonalCollector,
 };

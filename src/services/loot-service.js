@@ -262,6 +262,9 @@ async function claimTotemBox(userId, boxDef, options) {
       rarityId: totem.rarityId,
       totalTotemCount,
       totemId: totem.id,
+      speciesId: totem.speciesId,
+      colorId: totem.colorId,
+      acquiredAt: totem.createdAt,
     });
     achievements = (achResults || []).filter(a => a.unlocked).map(a => ({
       achievementId: a.achievementId,

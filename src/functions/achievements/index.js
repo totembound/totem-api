@@ -19,6 +19,7 @@
 const {
   getAllAchievementProgress,
   ACHIEVEMENT_MILESTONES,
+  ACHIEVEMENT_IDS,
   ONETIME_ACHIEVEMENTS,
 } = require('../../services/achievements-service');
 
@@ -47,12 +48,21 @@ async function getAchievements(user) {
       const currentValue = progress?.currentValue || 0;
       const unlockedMilestones = progress?.milestones || [];
 
-      // Build milestones array
+      // Anti-meta has independent per-rarity counters: each milestone shows its
+      // own count (commons / uncommons / rares), not a shared currentValue.
+      const isAntiMeta = achId === ACHIEVEMENT_IDS.ANTI_META_COLLECTOR;
+      const perRarityCount = progress?.perRarityCount || {};
+
       achievements[achId] = milestoneThresholds.map((threshold, index) => {
         const isUnlocked = unlockedMilestones.some(m => m.index === index);
+        let milestoneProgress = currentValue;
+        if (isAntiMeta) {
+          // DDB returns map keys as strings.
+          milestoneProgress = perRarityCount[index] ?? perRarityCount[String(index)] ?? 0;
+        }
         return {
           unlocked: isUnlocked,
-          progress: currentValue,
+          progress: milestoneProgress,
         };
       });
     }

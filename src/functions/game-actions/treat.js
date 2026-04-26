@@ -12,7 +12,7 @@
  * - Experience Gain: 0 (no XP from treating)
  */
 
-const { getTotem, updateTotem, deductEssence, getUser, updateUser } = require('../../common/db-client');
+const { getTotem, deductEssence, getUser, updateUser } = require('../../common/db-client');
 const {
   ACTION_CONFIGS,
   checkCooldown,
@@ -21,7 +21,8 @@ const {
   calculateStatChanges,
   buildActionResult,
 } = require('./helpers');
-const { onGameAction } = require('../../services/achievements-service');
+const { onGameAction, checkBalancedCare } = require('../../services/achievements-service');
+const { addTotemXp } = require('../../services/totem-xp');
 
 /**
  * Give a totem a treat
@@ -96,35 +97,53 @@ async function treat(user, totemId) {
   // 5. Calculate stat changes - FIXED happiness change from contract (+10)
   const statChanges = calculateStatChanges(actionType, totem);
 
-  // 6. Update totem in database
+  // 6. Update totem in database (chokepoint applies XP + prestige check atomically)
   const now = new Date().toISOString();
-  const newExperience = (totem.experience || 0) + xpGained;
-
-  const updates = {
-    experience: newExperience,
-    'stats.happiness': statChanges.happiness,
-    'cooldowns.treat': now,
-    // Note: updatedAt is automatically added by db-client
-  };
-
-  await updateTotem(userId, totemId, updates);
+  const todayUTC = now.slice(0, 10);
+  const newLastActionDates = { ...(totem.lastActionDates || {}), treat: todayUTC };
+  const xpResult = await addTotemXp(userId, totem, xpGained, {
+    extraUpdates: {
+      'stats.happiness': statChanges.happiness,
+      'cooldowns.treat': now,
+      lastActionDates: newLastActionDates,
+    },
+  });
 
   // 8. Update user's total treat count and trigger achievement check
   let totalTreatCount;
-  let achievements = [];
+  // Prestige unlocks (if any) come from the XP chokepoint.
+  let achievements = [...(xpResult.achievements || [])];
   try {
     const userRecord = await getUser(userId);
     totalTreatCount = (userRecord?.stats?.totalTreatCount || 0) + 1;
     await updateUser(userId, { 'stats.totalTreatCount': totalTreatCount });
     const achResults = await onGameAction(userId, 'treat', totalTreatCount, totemId);
-    achievements = (achResults || []).filter(a => a.unlocked).map(a => ({
-      achievementId: a.achievementId,
-      milestone: a.milestone,
-      rewards: a.rewards,
-    }));
+    for (const a of (achResults || [])) {
+      if (a.unlocked) {
+        achievements.push({
+          achievementId: a.achievementId,
+          milestone: a.milestone,
+          rewards: a.rewards,
+        });
+      }
+    }
   }
   catch (achievementErr) {
     console.error('Failed to process treat achievement:', achievementErr);
+  }
+
+  // Balanced-care (Daily Trifecta).
+  try {
+    const mergedTotem = { ...totem, lastActionDates: newLastActionDates };
+    const trifectaResults = await checkBalancedCare(userId, mergedTotem);
+    for (const a of (trifectaResults || [])) {
+      if (a.unlocked) {
+        achievements.push({ achievementId: a.achievementId, milestone: a.milestone, rewards: a.rewards });
+      }
+    }
+  }
+  catch (achievementErr) {
+    console.error('Failed to process balanced-care:', achievementErr);
   }
 
   // 9. Build response

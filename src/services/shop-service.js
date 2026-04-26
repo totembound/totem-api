@@ -385,6 +385,9 @@ async function purchaseUnboundTotem(buyerId, totemId) {
         rarityId: listing.totemData.rarityId,
         totalTotemCount,
         totemId,
+        speciesId: listing.totemData.speciesId,
+        colorId: listing.totemData.colorId,
+        acquiredAt: new Date().toISOString(),
       });
       achievements = (achResults || []).filter(a => a.unlocked).map(a => ({
         achievementId: a.achievementId,

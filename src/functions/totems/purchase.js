@@ -152,6 +152,9 @@ async function purchaseTotem(user, body = {}) {
       rarityId: totemData.rarityId,
       totalTotemCount,
       totemId: totemData.id,
+      speciesId: totemData.speciesId,
+      colorId: totemData.colorId,
+      acquiredAt: totemData.createdAt,
     });
     achievements = achResults.filter(a => a.unlocked);
   }
