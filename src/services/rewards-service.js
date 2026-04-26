@@ -250,45 +250,55 @@ function canClaimReward(lastClaimTimestamp, type) {
 }
 
 /**
- * Check if streak should be reset based on grace period
+ * Decide whether a streak resets, and whether a protection charge should be
+ * consumed to save it.
  *
- * Daily rewards: Streak resets if you miss a full UTC day (didn't claim yesterday)
- * Weekly rewards: 14 days grace period
+ * Returns: { reset: boolean, consumeCharge: boolean }
  *
- * Protection: If protectionExpiry is provided and still active, streak is preserved
- * (migrated from TotemRewards.sol _shouldMaintainStreak)
+ * Daily: streak resets if last claim was before yesterday's UTC midnight.
+ * Weekly: streak resets after the configured grace period.
+ *
+ * If `protectionCharges > 0` (or a legacy active `protectionExpiry`) when the
+ * streak would reset, we keep the streak and signal that a charge must be
+ * decremented (legacy expiry-based protection counts as a single save during
+ * migration).
  */
-function shouldResetStreak(lastClaimTimestamp, type, protectionExpiry = null) {
+function shouldResetStreak(lastClaimTimestamp, type, streakState = null) {
   if (!lastClaimTimestamp) {
-    return true; // No previous claim, start fresh
+    return { reset: true, consumeCharge: false };
   }
 
-  // Check if protection is active — if so, never reset streak
-  if (protectionExpiry) {
-    const expiryTime = new Date(protectionExpiry).getTime();
-    if (expiryTime > Date.now()) {
-      return false; // Protection active, maintain streak
-    }
-  }
-
+  let wouldReset;
   if (type === 'daily') {
-    // For daily rewards, check if last claim was yesterday or today (UTC)
-    // If it was 2+ days ago, reset the streak
     const lastClaim = new Date(lastClaimTimestamp);
     const todayMidnight = getTodayUTCMidnight();
     const yesterdayMidnight = new Date(todayMidnight.getTime() - 24 * 60 * 60 * 1000);
-
-    // If last claim was before yesterday's midnight, streak resets
-    return lastClaim.getTime() < yesterdayMidnight.getTime();
+    wouldReset = lastClaim.getTime() < yesterdayMidnight.getTime();
+  }
+  else {
+    const config = REWARD_CONFIG[type];
+    const lastClaim = new Date(lastClaimTimestamp);
+    wouldReset = (Date.now() - lastClaim.getTime()) > config.gracePeriodMs;
   }
 
-  // Weekly rewards use rolling grace period
-  const config = REWARD_CONFIG[type];
-  const lastClaim = new Date(lastClaimTimestamp);
-  const now = new Date();
-  const timeSinceLastClaim = now.getTime() - lastClaim.getTime();
+  if (!wouldReset) {
+    return { reset: false, consumeCharge: false };
+  }
 
-  return timeSinceLastClaim > config.gracePeriodMs;
+  const charges = streakState?.protectionCharges || 0;
+  if (charges > 0) {
+    return { reset: false, consumeCharge: true };
+  }
+
+  // Legacy time-window protection: treat as a one-shot save during migration.
+  if (streakState?.protectionExpiry) {
+    const expiryTime = new Date(streakState.protectionExpiry).getTime();
+    if (expiryTime > Date.now()) {
+      return { reset: false, consumeCharge: true };
+    }
+  }
+
+  return { reset: true, consumeCharge: false };
 }
 
 // =============================================================================
@@ -328,9 +338,12 @@ async function getStreakState(userId, type) {
 }
 
 /**
- * Update streak state after a claim
+ * Update streak state after a claim.
+ *
+ * If `consumeProtectionCharge` is true, decrements `protectionCharges` by 1
+ * and clears any legacy `protectionExpiry` (one-shot save during migration).
  */
-async function updateStreakState(userId, type, newStreak, totalAmount) {
+async function updateStreakState(userId, type, newStreak, totalAmount, { consumeProtectionCharge = false } = {}) {
   const now = new Date();
   const key = {
     pk: rewardUserPK(userId),
@@ -340,7 +353,6 @@ async function updateStreakState(userId, type, newStreak, totalAmount) {
   const existing = await getItem(REWARDS_CLAIMS_TABLE, key);
 
   if (!existing) {
-    // Create new streak state
     const newState = {
       pk: key.pk,
       sk: key.sk,
@@ -359,7 +371,6 @@ async function updateStreakState(userId, type, newStreak, totalAmount) {
     return newState;
   }
 
-  // Update existing
   const newLongestStreak = Math.max(existing.longestStreak || 0, newStreak);
   const updates = {
     currentStreak: newStreak,
@@ -369,6 +380,13 @@ async function updateStreakState(userId, type, newStreak, totalAmount) {
     totalClaims: (existing.totalClaims || 0) + 1,
     totalEssenceEarned: (existing.totalEssenceEarned || 0) + totalAmount,
   };
+
+  if (consumeProtectionCharge) {
+    const currentCharges = existing.protectionCharges || 0;
+    updates.protectionCharges = Math.max(0, currentCharges - 1);
+    // Legacy expiry-based protection counts as a one-shot save during migration.
+    updates.protectionExpiry = null;
+  }
 
   return updateItem(REWARDS_CLAIMS_TABLE, key, updates);
 }
@@ -444,14 +462,10 @@ async function claimDailyReward(userId) {
       };
     }
 
-    // Determine new streak (reset if outside grace period, respecting protection)
-    let newStreak;
-    if (shouldResetStreak(streakState.lastClaimTimestamp, 'daily', streakState.protectionExpiry)) {
-      newStreak = 1; // Start fresh
-    }
-    else {
-      newStreak = (streakState.currentStreak || 0) + 1;
-    }
+    // Determine new streak (reset if outside grace period, consuming a
+    // protection charge instead of resetting when one is available).
+    const { reset, consumeCharge } = shouldResetStreak(streakState.lastClaimTimestamp, 'daily', streakState);
+    const newStreak = reset ? 1 : (streakState.currentStreak || 0) + 1;
 
     // Calculate reward amount
     // Bonus is based on the NEW streak (after this claim)
@@ -476,8 +490,8 @@ async function claimDailyReward(userId) {
       totalAmount,
     });
 
-    // Update streak state
-    await updateStreakState(userId, 'daily', newStreak, totalAmount);
+    // Update streak state (decrements protection charge if one was consumed)
+    await updateStreakState(userId, 'daily', newStreak, totalAmount, { consumeProtectionCharge: consumeCharge });
 
     // Log transaction for audit
     await logTransaction(userId, {
@@ -524,6 +538,7 @@ async function claimDailyReward(userId) {
       newStreak,
       newBalance: balanceResult.newBalance,
       nextClaimTime: nextClaim,
+      streakSaved: consumeCharge,
       achievements,
     };
   }
@@ -561,14 +576,10 @@ async function claimWeeklyReward(userId) {
       };
     }
 
-    // Determine new streak (reset if outside grace period, respecting protection)
-    let newStreak;
-    if (shouldResetStreak(streakState.lastClaimTimestamp, 'weekly', streakState.protectionExpiry)) {
-      newStreak = 1; // Start fresh
-    }
-    else {
-      newStreak = (streakState.currentStreak || 0) + 1;
-    }
+    // Determine new streak (consume a protection charge instead of resetting
+    // when one is available).
+    const { reset, consumeCharge } = shouldResetStreak(streakState.lastClaimTimestamp, 'weekly', streakState);
+    const newStreak = reset ? 1 : (streakState.currentStreak || 0) + 1;
 
     // Calculate reward amount
     // Bonus is based on the NEW streak (after this claim)
@@ -593,8 +604,8 @@ async function claimWeeklyReward(userId) {
       totalAmount,
     });
 
-    // Update streak state
-    await updateStreakState(userId, 'weekly', newStreak, totalAmount);
+    // Update streak state (decrements protection charge if one was consumed)
+    await updateStreakState(userId, 'weekly', newStreak, totalAmount, { consumeProtectionCharge: consumeCharge });
 
     // Log transaction for audit
     await logTransaction(userId, {
@@ -626,6 +637,7 @@ async function claimWeeklyReward(userId) {
       newStreak,
       newBalance: balanceResult.newBalance,
       nextClaimTime: nextClaim,
+      streakSaved: consumeCharge,
     };
   }
   catch (error) {
@@ -662,16 +674,20 @@ async function getRewardStatus(userId) {
       getStreakState(userId, 'weekly'),
     ]);
 
-    // Calculate daily status (pass protectionExpiry to respect active protection)
+    // Calculate daily status. shouldResetStreak considers protection charges,
+    // so an at-risk streak is preserved (and a charge is held in reserve until
+    // the next claim actually consumes it).
     const dailyClaimCheck = canClaimReward(dailyState.lastClaimTimestamp, 'daily');
-    const dailyStreakWillReset = shouldResetStreak(dailyState.lastClaimTimestamp, 'daily', dailyState.protectionExpiry);
+    const dailyResetCheck = shouldResetStreak(dailyState.lastClaimTimestamp, 'daily', dailyState);
+    const dailyStreakWillReset = dailyResetCheck.reset;
     const dailyEffectiveStreak = dailyStreakWillReset ? 0 : dailyState.currentStreak;
     const dailyNextStreak = dailyEffectiveStreak + 1;
     const dailyPotentialReward = calculateRewardAmount('daily', dailyNextStreak);
 
-    // Calculate weekly status (pass protectionExpiry to respect active protection)
+    // Calculate weekly status
     const weeklyClaimCheck = canClaimReward(weeklyState.lastClaimTimestamp, 'weekly');
-    const weeklyStreakWillReset = shouldResetStreak(weeklyState.lastClaimTimestamp, 'weekly', weeklyState.protectionExpiry);
+    const weeklyResetCheck = shouldResetStreak(weeklyState.lastClaimTimestamp, 'weekly', weeklyState);
+    const weeklyStreakWillReset = weeklyResetCheck.reset;
     const weeklyEffectiveStreak = weeklyStreakWillReset ? 0 : weeklyState.currentStreak;
     const weeklyNextStreak = weeklyEffectiveStreak + 1;
     const weeklyPotentialReward = calculateRewardAmount('weekly', weeklyNextStreak);

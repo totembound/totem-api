@@ -363,15 +363,32 @@ describe('Reward Handlers', () => {
       expect(result.data.weekly.canClaim).toBe(false);
     });
 
-    it('should include protection status', async () => {
+    it('should include protection charge count when charges held', async () => {
       rewardsService.getRewardStatus.mockResolvedValue({
         success: true,
         daily: { canClaim: true, currentStreak: 10 },
         weekly: { canClaim: false },
       });
-      // Simulate active protection
+      dbClient.getItem.mockImplementation(async (table, key) => {
+        if (key.sk === 'STREAK#daily') return { protectionCharges: 3 };
+        return null;
+      });
+      achievementsService.getAchievementProgress.mockResolvedValue(null);
+
+      const result = await getStatus(testUser);
+      expect(result.data.daily.isProtected).toBe(true);
+      expect(result.data.daily.protectionCharges).toBe(3);
+    });
+
+    it('should treat legacy active protectionExpiry as 1 charge (migration)', async () => {
+      rewardsService.getRewardStatus.mockResolvedValue({
+        success: true,
+        daily: { canClaim: true, currentStreak: 10 },
+        weekly: { canClaim: false },
+      });
       dbClient.getItem.mockImplementation(async (table, key) => {
         if (key.sk === 'STREAK#daily') {
+          // Legacy record: no charges field, but has an active expiry.
           return { protectionExpiry: new Date(Date.now() + 86400000).toISOString() };
         }
         return null;
@@ -380,6 +397,29 @@ describe('Reward Handlers', () => {
 
       const result = await getStatus(testUser);
       expect(result.data.daily.isProtected).toBe(true);
+      expect(result.data.daily.protectionCharges).toBe(1);
+    });
+
+    it('should report no protection when neither charges nor active expiry exist', async () => {
+      rewardsService.getRewardStatus.mockResolvedValue({
+        success: true,
+        daily: { canClaim: true, currentStreak: 10 },
+        weekly: { canClaim: false },
+      });
+      dbClient.getItem.mockImplementation(async (table, key) => {
+        if (key.sk === 'STREAK#daily') {
+          return {
+            protectionCharges: 0,
+            protectionExpiry: new Date(Date.now() - 86400000).toISOString(), // expired
+          };
+        }
+        return null;
+      });
+      achievementsService.getAchievementProgress.mockResolvedValue(null);
+
+      const result = await getStatus(testUser);
+      expect(result.data.daily.isProtected).toBe(false);
+      expect(result.data.daily.protectionCharges).toBe(0);
     });
 
     it('should check weekly unlock via achievement milestoneIndex', async () => {
@@ -439,22 +479,17 @@ describe('Reward Handlers', () => {
   // PURCHASE PROTECTION TESTS
   // =============================================================================
 
-  describe('purchaseProtection', () => {
+  describe('purchaseProtection (charge model)', () => {
     describe('Configuration', () => {
-      it('should have daily protection tiers', () => {
+      it('should have daily protection tiers in charge form', () => {
         expect(PROTECTION_TIERS.daily).toHaveLength(2);
-        expect(PROTECTION_TIERS.daily[0].cost).toBe(50);
-        expect(PROTECTION_TIERS.daily[0].durationSeconds).toBe(86400);
-        expect(PROTECTION_TIERS.daily[0].requiredStreak).toBe(7);
-        expect(PROTECTION_TIERS.daily[1].cost).toBe(250);
-        expect(PROTECTION_TIERS.daily[1].requiredStreak).toBe(14);
+        expect(PROTECTION_TIERS.daily[0]).toMatchObject({ cost: 50, charges: 1, requiredStreak: 7 });
+        expect(PROTECTION_TIERS.daily[1]).toMatchObject({ cost: 250, charges: 7, requiredStreak: 14 });
       });
 
-      it('should have weekly protection tier', () => {
+      it('should have weekly protection tier in charge form', () => {
         expect(PROTECTION_TIERS.weekly).toHaveLength(1);
-        expect(PROTECTION_TIERS.weekly[0].cost).toBe(500);
-        expect(PROTECTION_TIERS.weekly[0].durationSeconds).toBe(1209600);
-        expect(PROTECTION_TIERS.weekly[0].requiredStreak).toBe(4);
+        expect(PROTECTION_TIERS.weekly[0]).toMatchObject({ cost: 500, charges: 2, requiredStreak: 4 });
       });
     });
 
@@ -467,13 +502,16 @@ describe('Reward Handlers', () => {
         });
       });
 
-      it('should purchase tier 0 daily protection', async () => {
+      it('should purchase tier 0 and grant 1 charge', async () => {
         const result = await purchaseProtection(testUser, { tier: 0 }, 'daily');
         expect(result.success).toBe(true);
-        expect(result.data.rewardType).toBe('daily');
-        expect(result.data.tier).toBe(0);
-        expect(result.data.cost).toBe(50);
-        expect(result.data.protectionExpiry).toBeDefined();
+        expect(result.data).toMatchObject({
+          rewardType: 'daily',
+          tier: 0,
+          cost: 50,
+          chargesAdded: 1,
+          protectionCharges: 1,
+        });
       });
 
       it('should deduct Essence for protection', async () => {
@@ -484,14 +522,15 @@ describe('Reward Handlers', () => {
         );
       });
 
-      it('should update streak state with protection expiry', async () => {
+      it('should persist charges and clear legacy expiry on the streak record', async () => {
         await purchaseProtection(testUser, { tier: 0 }, 'daily');
         expect(dbClient.updateItem).toHaveBeenCalledWith(
           'TotemBound-RewardsClaims',
           expect.objectContaining({ sk: 'STREAK#daily' }),
           expect.objectContaining({
-            protectionExpiry: expect.any(String),
+            protectionCharges: 1,
             protectionTier: 0,
+            protectionExpiry: null,
           })
         );
       });
@@ -499,6 +538,22 @@ describe('Reward Handlers', () => {
       it('should log transaction', async () => {
         await purchaseProtection(testUser, { tier: 0 }, 'daily');
         expect(dbClient.logTransaction).toHaveBeenCalled();
+      });
+
+      it('should stack charges across multiple purchases', async () => {
+        // User already has 1 charge banked
+        dbClient.getItem.mockResolvedValue({ currentStreak: 14, protectionCharges: 1 });
+        const result = await purchaseProtection(testUser, { tier: 0 }, 'daily');
+        expect(result.success).toBe(true);
+        expect(result.data.protectionCharges).toBe(2);
+      });
+
+      it('tier 1 grants 7 charges in one purchase', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 14 });
+        const result = await purchaseProtection(testUser, { tier: 1 }, 'daily');
+        expect(result.success).toBe(true);
+        expect(result.data.chargesAdded).toBe(7);
+        expect(result.data.protectionCharges).toBe(7);
       });
     });
 
@@ -535,23 +590,43 @@ describe('Reward Handlers', () => {
         expect(result.error.code).toBe('INSUFFICIENT_STREAK');
       });
 
-      it('should return ALREADY_PROTECTED when protection active', async () => {
+      it('should return CHARGES_FULL when buying would exceed cap', async () => {
+        // Daily cap is 7. Already has 7, attempt to add 1 more.
+        dbClient.getItem.mockResolvedValue({ currentStreak: 14, protectionCharges: 7 });
+        const result = await purchaseProtection(testUser, { tier: 0 }, 'daily');
+        expect(result.success).toBe(false);
+        expect(result.error.code).toBe('CHARGES_FULL');
+        expect(result.error.protectionCharges).toBe(7);
+      });
+
+      it('should return CHARGES_FULL when stacking tier 1 onto existing charges', async () => {
+        // 1 banked + 7 from tier 1 = 8, > 7 cap.
+        dbClient.getItem.mockResolvedValue({ currentStreak: 14, protectionCharges: 1 });
+        const result = await purchaseProtection(testUser, { tier: 1 }, 'daily');
+        expect(result.success).toBe(false);
+        expect(result.error.code).toBe('CHARGES_FULL');
+      });
+
+      it('should treat legacy active expiry as 1 charge for cap math', async () => {
+        // Legacy field present, no charges field. Counts as 1.
+        // Buying tier 0 (1 charge) → 2 total, well under 7-cap.
         dbClient.getItem.mockResolvedValue({
           currentStreak: 10,
           protectionExpiry: new Date(Date.now() + 86400000).toISOString(),
         });
         const result = await purchaseProtection(testUser, { tier: 0 }, 'daily');
-        expect(result.success).toBe(false);
-        expect(result.error.code).toBe('ALREADY_PROTECTED');
+        expect(result.success).toBe(true);
+        expect(result.data.protectionCharges).toBe(2);
       });
 
-      it('should allow purchase when protection expired', async () => {
+      it('should ignore expired legacy expiry (not counted toward cap)', async () => {
         dbClient.getItem.mockResolvedValue({
           currentStreak: 10,
-          protectionExpiry: new Date(Date.now() - 86400000).toISOString(), // expired
+          protectionExpiry: new Date(Date.now() - 86400000).toISOString(),
         });
         const result = await purchaseProtection(testUser, { tier: 0 }, 'daily');
         expect(result.success).toBe(true);
+        expect(result.data.protectionCharges).toBe(1);
       });
 
       it('should return INSUFFICIENT_ESSENCE when not enough balance', async () => {
@@ -570,76 +645,55 @@ describe('Reward Handlers', () => {
       });
     });
 
-    describe('Daily protection tier 1', () => {
-      it('should reject tier 1 when streak is between 7 and 13', async () => {
-        dbClient.getItem.mockResolvedValue({ currentStreak: 10 }); // need 14
+    describe('Daily tier 1', () => {
+      it('rejects tier 1 when streak is between 7 and 13', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 10 });
         const result = await purchaseProtection(testUser, { tier: 1 }, 'daily');
         expect(result.success).toBe(false);
         expect(result.error.code).toBe('INSUFFICIENT_STREAK');
         expect(result.error.message).toContain('14');
       });
-
-      it('should purchase tier 1 when streak is 14+', async () => {
-        dbClient.getItem.mockResolvedValue({ currentStreak: 14 });
-        const result = await purchaseProtection(testUser, { tier: 1 }, 'daily');
-        expect(result.success).toBe(true);
-        expect(result.data.tier).toBe(1);
-        expect(result.data.cost).toBe(250);
-        expect(result.data.durationSeconds).toBe(604800);
-      });
     });
 
     describe('Weekly protection', () => {
-      it('should purchase weekly protection at tier 0', async () => {
-        dbClient.getItem.mockResolvedValue({ currentStreak: 5 }); // need 4
+      it('purchases weekly tier 0 and grants 2 charges', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 5 });
         const result = await purchaseProtection(testUser, { tier: 0 }, 'weekly');
         expect(result.success).toBe(true);
-        expect(result.data.cost).toBe(500);
-        expect(result.data.durationSeconds).toBe(1209600);
+        expect(result.data).toMatchObject({ cost: 500, chargesAdded: 2, protectionCharges: 2, maxCharges: 2 });
       });
 
-      it('should reject tier 1 for weekly (only tier 0 exists)', async () => {
+      it('rejects tier 1 for weekly (only tier 0 exists)', async () => {
         const result = await purchaseProtection(testUser, { tier: 1 }, 'weekly');
         expect(result.success).toBe(false);
         expect(result.error.code).toBe('INVALID_TIER');
       });
 
-      it('should reject weekly protection when streak below 4 weeks', async () => {
-        dbClient.getItem.mockResolvedValue({ currentStreak: 3 }); // need 4
+      it('rejects weekly when streak below 4 weeks', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 3 });
         const result = await purchaseProtection(testUser, { tier: 0 }, 'weekly');
         expect(result.success).toBe(false);
         expect(result.error.code).toBe('INSUFFICIENT_STREAK');
-        expect(result.error.message).toContain('4');
         expect(result.error.message).toContain('week');
       });
 
-      it('should reject weekly protection when already protected', async () => {
-        dbClient.getItem.mockResolvedValue({
-          currentStreak: 5,
-          protectionExpiry: new Date(Date.now() + 86400000).toISOString(),
-        });
+      it('rejects when weekly cap (2) would be exceeded', async () => {
+        dbClient.getItem.mockResolvedValue({ currentStreak: 5, protectionCharges: 1 });
         const result = await purchaseProtection(testUser, { tier: 0 }, 'weekly');
         expect(result.success).toBe(false);
-        expect(result.error.code).toBe('ALREADY_PROTECTED');
+        expect(result.error.code).toBe('CHARGES_FULL');
       });
 
-      it('should reject weekly protection with insufficient Essence', async () => {
-        dbClient.getItem.mockResolvedValue({ currentStreak: 5 });
-        dbClient.deductEssence.mockResolvedValue({ success: false, currentBalance: 200 });
-        const result = await purchaseProtection(testUser, { tier: 0 }, 'weekly');
-        expect(result.success).toBe(false);
-        expect(result.error.code).toBe('INSUFFICIENT_ESSENCE');
-      });
-
-      it('should update STREAK#weekly (not daily) on purchase', async () => {
+      it('updates STREAK#weekly (not daily) on purchase', async () => {
         dbClient.getItem.mockResolvedValue({ currentStreak: 5 });
         await purchaseProtection(testUser, { tier: 0 }, 'weekly');
         expect(dbClient.updateItem).toHaveBeenCalledWith(
           'TotemBound-RewardsClaims',
           expect.objectContaining({ sk: 'STREAK#weekly' }),
           expect.objectContaining({
-            protectionExpiry: expect.any(String),
+            protectionCharges: 2,
             protectionTier: 0,
+            protectionExpiry: null,
           })
         );
       });

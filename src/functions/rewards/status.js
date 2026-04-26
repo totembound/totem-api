@@ -14,7 +14,8 @@ const { getItem, TABLES } = require('../../common/db-client');
 const REWARDS_CLAIMS_TABLE = TABLES.REWARDS_CLAIMS;
 
 /**
- * Check if a user has active protection for a reward type
+ * Check whether a user has any protection charges (or legacy time-window
+ * protection still active) for a reward type.
  */
 async function getProtectionStatus(userId, rewardType) {
   const streakKey = {
@@ -23,16 +24,22 @@ async function getProtectionStatus(userId, rewardType) {
   };
   const streakState = await getItem(REWARDS_CLAIMS_TABLE, streakKey);
 
-  if (!streakState || !streakState.protectionExpiry) {
-    return { isProtected: false, protectionExpiry: null };
+  if (!streakState) {
+    return { isProtected: false, protectionCharges: 0 };
   }
 
-  const expiryTime = new Date(streakState.protectionExpiry).getTime();
-  const isProtected = expiryTime > Date.now();
+  let charges = streakState.protectionCharges || 0;
+  // Migration: an active legacy expiry counts as one charge.
+  if (!charges && streakState.protectionExpiry) {
+    const expiryTime = new Date(streakState.protectionExpiry).getTime();
+    if (expiryTime > Date.now()) {
+      charges = 1;
+    }
+  }
 
   return {
-    isProtected,
-    protectionExpiry: isProtected ? streakState.protectionExpiry : null,
+    isProtected: charges > 0,
+    protectionCharges: charges,
   };
 }
 
@@ -99,7 +106,7 @@ async function getStatus(user) {
           bestStreak: status.daily?.longestStreak || 0,
           nextClaimTime: status.daily?.nextClaimTime || null,
           isProtected: dailyProtection.isProtected,
-          protectionExpiry: dailyProtection.protectionExpiry,
+          protectionCharges: dailyProtection.protectionCharges,
         },
         weekly: {
           canClaim: status.weekly?.canClaim || false,
@@ -107,7 +114,7 @@ async function getStatus(user) {
           bestStreak: status.weekly?.longestStreak || 0,
           nextClaimTime: status.weekly?.nextClaimTime || null,
           isProtected: weeklyProtection.isProtected,
-          protectionExpiry: weeklyProtection.protectionExpiry,
+          protectionCharges: weeklyProtection.protectionCharges,
           isUnlocked: weeklyUnlocked,
         },
       },

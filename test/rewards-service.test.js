@@ -218,30 +218,60 @@ describe('Rewards Service', () => {
   });
 
   describe('shouldResetStreak', () => {
-    it('should reset streak when no previous claim', () => {
-      expect(shouldResetStreak(null, 'daily')).toBe(true);
+    it('resets when no previous claim', () => {
+      expect(shouldResetStreak(null, 'daily')).toEqual({ reset: true, consumeCharge: false });
     });
 
-    it('should not reset daily streak if claimed yesterday', () => {
-      // Claimed yesterday afternoon — after yesterday's midnight
+    it('does not reset daily streak if claimed yesterday', () => {
       const claimedYesterday = utcTime(1, 14);
-      expect(shouldResetStreak(claimedYesterday, 'daily')).toBe(false);
+      expect(shouldResetStreak(claimedYesterday, 'daily')).toEqual({ reset: false, consumeCharge: false });
     });
 
-    it('should reset daily streak if last claim was 2+ days ago', () => {
-      // Claimed 3 days ago — before yesterday's midnight
+    it('resets daily streak if last claim was 2+ days ago and no charges held', () => {
       const claimed3DaysAgo = utcTime(3, 12);
-      expect(shouldResetStreak(claimed3DaysAgo, 'daily')).toBe(true);
+      expect(shouldResetStreak(claimed3DaysAgo, 'daily')).toEqual({ reset: true, consumeCharge: false });
     });
 
-    it('should not reset weekly streak within 14 days', () => {
-      const recentClaim = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(); // 10 days ago
-      expect(shouldResetStreak(recentClaim, 'weekly')).toBe(false);
+    it('does not reset weekly streak within 14 days', () => {
+      const recentClaim = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+      expect(shouldResetStreak(recentClaim, 'weekly')).toEqual({ reset: false, consumeCharge: false });
     });
 
-    it('should reset weekly streak after 14 days', () => {
-      const oldClaim = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(); // 15 days ago
-      expect(shouldResetStreak(oldClaim, 'weekly')).toBe(true);
+    it('resets weekly streak after 14 days when no charges held', () => {
+      const oldClaim = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+      expect(shouldResetStreak(oldClaim, 'weekly')).toEqual({ reset: true, consumeCharge: false });
+    });
+
+    it('consumes a charge instead of resetting daily streak', () => {
+      const claimed3DaysAgo = utcTime(3, 12);
+      expect(shouldResetStreak(claimed3DaysAgo, 'daily', { protectionCharges: 2 }))
+        .toEqual({ reset: false, consumeCharge: true });
+    });
+
+    it('consumes a charge instead of resetting weekly streak', () => {
+      const oldClaim = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
+      expect(shouldResetStreak(oldClaim, 'weekly', { protectionCharges: 1 }))
+        .toEqual({ reset: false, consumeCharge: true });
+    });
+
+    it('does not consume a charge when streak would not have reset', () => {
+      const claimedYesterday = utcTime(1, 14);
+      expect(shouldResetStreak(claimedYesterday, 'daily', { protectionCharges: 5 }))
+        .toEqual({ reset: false, consumeCharge: false });
+    });
+
+    it('treats legacy active expiry as a one-shot save (migration)', () => {
+      const claimed3DaysAgo = utcTime(3, 12);
+      const futureExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+      expect(shouldResetStreak(claimed3DaysAgo, 'daily', { protectionExpiry: futureExpiry }))
+        .toEqual({ reset: false, consumeCharge: true });
+    });
+
+    it('expired legacy expiry does not save streak', () => {
+      const claimed3DaysAgo = utcTime(3, 12);
+      const pastExpiry = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      expect(shouldResetStreak(claimed3DaysAgo, 'daily', { protectionExpiry: pastExpiry }))
+        .toEqual({ reset: true, consumeCharge: false });
     });
   });
 
@@ -306,6 +336,52 @@ describe('Rewards Service', () => {
 
       expect(result.success).toBe(true);
       expect(result.newStreak).toBe(1); // Reset to 1
+      expect(result.streakSaved).toBe(false);
+    });
+
+    it('consumes a protection charge to save a streak that would otherwise reset', async () => {
+      const oldClaim = utcTime(3, 12);
+      dbClient.getItem.mockResolvedValue({
+        currentStreak: 10,
+        longestStreak: 10,
+        lastClaimTimestamp: oldClaim,
+        totalClaims: 10,
+        totalEssenceEarned: 150,
+        protectionCharges: 2,
+      });
+
+      const result = await claimDailyReward('usr_test123');
+
+      expect(result.success).toBe(true);
+      expect(result.newStreak).toBe(11); // streak preserved
+      expect(result.streakSaved).toBe(true);
+      // The streak update should decrement charges from 2 to 1.
+      expect(dbClient.updateItem).toHaveBeenCalledWith(
+        'TotemBound-RewardsClaims',
+        expect.objectContaining({ sk: 'STREAK#daily' }),
+        expect.objectContaining({ protectionCharges: 1, protectionExpiry: null })
+      );
+    });
+
+    it('does not decrement charges on a normal consecutive claim', async () => {
+      const lastClaim = utcTime(1, 14);
+      dbClient.getItem.mockResolvedValue({
+        currentStreak: 5,
+        longestStreak: 5,
+        lastClaimTimestamp: lastClaim,
+        totalClaims: 5,
+        totalEssenceEarned: 50,
+        protectionCharges: 3,
+      });
+
+      const result = await claimDailyReward('usr_test123');
+
+      expect(result.success).toBe(true);
+      expect(result.newStreak).toBe(6);
+      expect(result.streakSaved).toBe(false);
+      // No protectionCharges write — caller should not touch them on normal claims.
+      const updateCall = dbClient.updateItem.mock.calls.find(c => c[1]?.sk === 'STREAK#daily');
+      expect(updateCall?.[2]).not.toHaveProperty('protectionCharges');
     });
 
     it('should fail if claim is within cooldown (already claimed today)', async () => {
@@ -669,33 +745,31 @@ describe('Rewards Service', () => {
   // shouldResetStreak - weekly grace period (coverage for lines 264-266)
   // =============================================================================
 
-  describe('shouldResetStreak - protection and weekly paths', () => {
-    it('should not reset streak when protection is active', () => {
-      // Last claim was 20 days ago (would normally reset), but protection is active
+  describe('shouldResetStreak - charges + legacy expiry', () => {
+    it('charges save daily streak that would otherwise reset', () => {
       const oldClaim = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
-      const futureProtection = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-      expect(shouldResetStreak(oldClaim, 'daily', futureProtection)).toBe(false);
-      expect(shouldResetStreak(oldClaim, 'weekly', futureProtection)).toBe(false);
+      expect(shouldResetStreak(oldClaim, 'daily', { protectionCharges: 1 }))
+        .toEqual({ reset: false, consumeCharge: true });
+      expect(shouldResetStreak(oldClaim, 'weekly', { protectionCharges: 1 }))
+        .toEqual({ reset: false, consumeCharge: true });
     });
 
-    it('should reset streak when protection has expired', () => {
-      // Last claim was 20 days ago and protection already expired
+    it('zero charges and no legacy expiry => streak resets', () => {
       const oldClaim = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
-      const expiredProtection = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
-
-      expect(shouldResetStreak(oldClaim, 'daily', expiredProtection)).toBe(true);
-      expect(shouldResetStreak(oldClaim, 'weekly', expiredProtection)).toBe(true);
+      expect(shouldResetStreak(oldClaim, 'daily', { protectionCharges: 0 }))
+        .toEqual({ reset: true, consumeCharge: false });
+      expect(shouldResetStreak(oldClaim, 'weekly', { protectionCharges: 0 }))
+        .toEqual({ reset: true, consumeCharge: false });
     });
 
-    it('should reset weekly streak when beyond 14 day grace period', () => {
+    it('weekly streak resets when beyond 14-day grace period', () => {
       const oldClaim = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
-      expect(shouldResetStreak(oldClaim, 'weekly')).toBe(true);
+      expect(shouldResetStreak(oldClaim, 'weekly')).toEqual({ reset: true, consumeCharge: false });
     });
 
-    it('should not reset weekly streak when within 14 day grace period', () => {
+    it('weekly streak survives within 14-day grace period', () => {
       const recentClaim = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString();
-      expect(shouldResetStreak(recentClaim, 'weekly')).toBe(false);
+      expect(shouldResetStreak(recentClaim, 'weekly')).toEqual({ reset: false, consumeCharge: false });
     });
   });
 
