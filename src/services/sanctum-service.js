@@ -901,7 +901,7 @@ async function claimCouncilMission(userId, totemId) {
 
   // 8. Check council mission achievements (non-blocking) — seed with any
   // prestige unlocks from the XP chokepoint above.
-  let achievements = [...prestigeAchievements];
+  const achievements = [...prestigeAchievements];
   try {
     const { getAchievementProgress } = require('./achievements-service');
     const missionProgress = await getAchievementProgress(userId, 'ach_council-missions');

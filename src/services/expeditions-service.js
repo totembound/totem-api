@@ -929,7 +929,7 @@ async function claimExpeditionReward(userId, totemId) {
   // Trigger achievement check (pass totemId for XP rewards)
   const totalExpeditions = await getExpeditionCount(userId);
   // Seed with any prestige unlocks from the XP chokepoint above.
-  let achievements = [...prestigeAchievements];
+  const achievements = [...prestigeAchievements];
   try {
     const achResults = await onExpeditionCompleted(userId, totalExpeditions, totemId);
     for (const a of (achResults || [])) {

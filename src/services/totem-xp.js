@@ -73,7 +73,8 @@ async function addTotemXp(userId, totem, xpDelta, opts = {}) {
           milestone: r.milestone,
           rewards: r.rewards,
         }));
-    } catch (err) {
+    }
+    catch (err) {
       console.error('[Prestige] Achievement check failed:', err?.message || err);
     }
   }

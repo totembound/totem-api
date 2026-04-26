@@ -1671,7 +1671,8 @@ async function onTotemPrestiged(userId, { totemId, oldPrestige, newPrestige }) {
       },
       ReturnValues: 'ALL_NEW',
     });
-  } catch (err) {
+  }
+  catch (err) {
     if (err && err.name === 'ConditionalCheckFailedException') return [];
     throw err;
   }

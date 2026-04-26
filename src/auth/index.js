@@ -26,9 +26,6 @@ const {
   getUser,
   getUserByEmail,
   updateUser,
-  rawUpdate,
-  TABLES,
-  userPK,
 } = require('../common/db-client');
 
 const { sendNewUserWelcomeEmail } = require('../common/email');
