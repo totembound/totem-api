@@ -443,6 +443,7 @@ async function handleGetMe(req, res) {
       });
     }
 
+    const { SKIP_COST: DISPLAY_NAME_SKIP_COST } = require('../functions/user/update-display-name');
     return res.status(200).json({
       success: true,
       user: {
@@ -454,6 +455,10 @@ async function handleGetMe(req, res) {
         currencies: user.currencies,
         stats: user.stats,
         settings: user.settings,
+        displayNameCooldown: {
+          readyAt: user.displayNameChangeReadyAt || null,
+          skipCost: DISPLAY_NAME_SKIP_COST,
+        },
         createdAt: user.createdAt,
       },
     });

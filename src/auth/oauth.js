@@ -122,10 +122,18 @@ async function handleOAuthCallback(req, res) {
         isNewUser = true;
         console.log(`[OAuth] Creating new user from ${provider}: ${profile.email}`);
 
+        // Coerce inherited name into our format so signup never fails on a
+        // malformed (long, accented, profane) external display name.
+        const { sanitizeInboundDisplayName } = require('../common/display-name');
+        const safeDisplayName = sanitizeInboundDisplayName(
+          profile.displayName,
+          profile.email ? profile.email.split('@')[0] : 'Player',
+        );
+
         // Create Cognito user (passwordless)
         const cognitoResult = await createOAuthUser({
           email: profile.email,
-          displayName: profile.displayName,
+          displayName: safeDisplayName,
           provider,
           providerId: profile.providerId,
         });
@@ -134,7 +142,7 @@ async function handleOAuthCallback(req, res) {
         const userData = {
           id: cognitoResult.userId,
           email: profile.email,
-          displayName: profile.displayName,
+          displayName: safeDisplayName,
           tier: 'free',
           currencies: { essence: 2000, gems: 0 },
           stats: {

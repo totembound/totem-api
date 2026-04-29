@@ -379,6 +379,12 @@
  *                       properties:
  *                         notifications: { type: boolean, example: true }
  *                         darkMode: { type: string, enum: [system, light, dark], example: system }
+ *                     displayNameCooldown:
+ *                       type: object
+ *                       description: Cooldown state for display-name changes. `readyAt` is null if no cooldown is active.
+ *                       properties:
+ *                         readyAt: { type: string, format: date-time, nullable: true, example: "2026-05-28T14:22:00Z" }
+ *                         skipCost: { type: number, example: 500 }
  *       401:
  *         description: Unauthorized
  */
@@ -412,6 +418,68 @@
  *         description: Profile updated
  *       400:
  *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /v1/user/displayName:
+ *   put:
+ *     tags: [User]
+ *     summary: Change display name
+ *     description: |
+ *       Change the authenticated user's display name. Validates length (3–20 chars),
+ *       charset (alphanumeric + spaces/hyphens/underscores, no leading/trailing/consecutive spaces),
+ *       and runs a profanity filter. The first change is free; subsequent changes are subject to a
+ *       30-day cooldown. The cooldown can be skipped by paying 500 Essence (`skipCooldown: true`).
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [displayName]
+ *             properties:
+ *               displayName:
+ *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 20
+ *                 example: TotemMaster
+ *               skipCooldown:
+ *                 type: boolean
+ *                 default: false
+ *                 description: If true and a cooldown is active, deduct 500 Essence and proceed.
+ *     responses:
+ *       200:
+ *         description: Display name changed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     displayName: { type: string, example: TotemMaster }
+ *                     displayNameCooldown:
+ *                       type: object
+ *                       properties:
+ *                         readyAt: { type: string, format: date-time }
+ *                         skipCost: { type: number, example: 500 }
+ *                     skippedCooldown: { type: boolean, example: false }
+ *                     newEssenceBalance:
+ *                       type: number
+ *                       description: Present only when `skippedCooldown` is true.
+ *       400:
+ *         description: Validation error (length, charset, profanity, or no change)
+ *       402:
+ *         description: Insufficient Essence to skip cooldown
+ *       409:
+ *         description: Cooldown active (response includes `readyAt`, `remainingMs`, and `skipCost`)
  *       401:
  *         description: Unauthorized
  */

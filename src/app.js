@@ -268,6 +268,34 @@ app.put('/v1/user/profile', authenticateJWT, async (req, res) => {
   }
 });
 
+app.put('/v1/user/displayName', authenticateJWT, async (req, res) => {
+  try {
+    if (!userRoutes?.updateDisplayName) {
+      return res.status(503).json({
+        success: false,
+        error: { code: 'NOT_IMPLEMENTED', message: 'Display name update not available' },
+      });
+    }
+    const result = await userRoutes.updateDisplayName(req.user, req.body);
+    if (result.success) {
+      return res.json(result);
+    }
+    const statusByCode = {
+      VALIDATION_ERROR: 400,
+      NO_CHANGES: 400,
+      PROFANITY: 400,
+      COOLDOWN_ACTIVE: 409,
+      INSUFFICIENT_BALANCE: 402,
+      NOT_FOUND: 404,
+    };
+    const statusCode = statusByCode[result.error?.code] || 400;
+    res.status(statusCode).json(result);
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 // Totem routes
 app.get('/v1/totems', authenticateJWT, async (req, res) => {
   try {
