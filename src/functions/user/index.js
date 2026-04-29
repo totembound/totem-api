@@ -8,8 +8,10 @@
 
 const { getProfile } = require('./get-profile');
 const { updateProfile } = require('./update-profile');
+const { updateDisplayName } = require('./update-display-name');
 
 module.exports = {
   getProfile,
   updateProfile,
+  updateDisplayName,
 };

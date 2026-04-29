@@ -12,6 +12,7 @@
  */
 
 const { getUser, getUserTotems } = require('../../common/db-client');
+const { SKIP_COST: DISPLAY_NAME_SKIP_COST } = require('./update-display-name');
 
 /**
  * Get user profile
@@ -73,6 +74,10 @@ async function getProfile(user) {
         darkMode: userRecord.settings?.darkMode || 'dark',
         soundEffects: userRecord.settings?.soundEffects !== false,
         language: userRecord.settings?.language || 'en',
+      },
+      displayNameCooldown: {
+        readyAt: userRecord.displayNameChangeReadyAt || null,
+        skipCost: DISPLAY_NAME_SKIP_COST,
       },
       createdAt: userRecord.createdAt,
     };

@@ -58,6 +58,7 @@
         "helmet": "^7.0.0",
         "jsonwebtoken": "^9.0.3",
         "nodemailer": "^8.0.0",
+        "obscenity": "^0.4.6",
         "serverless-http": "^3.2.0",
         "stripe": "^13.3.0",
         "ulid": "^3.0.2",
@@ -73,8 +74,6 @@
         "@typescript-eslint/parser": "^5.62.0",
         "aws4": "^1.13.2",
         "chalk": "^4.1.2",
-        "swagger-jsdoc": "^6.2.8",
-        "swagger-ui-express": "^5.0.1",
         "concurrently": "^8.2.1",
         "cross-env": "^7.0.3",
         "eslint": "^8.47.0",
@@ -93,7 +92,9 @@
         "prettier": "^3.5.3",
         "rimraf": "^5.0.1",
         "sinon": "^15.2.0",
-        "socket.io": "^4.8.3"
+        "socket.io": "^4.8.3",
+        "swagger-jsdoc": "^6.2.8",
+        "swagger-ui-express": "^5.0.1"
     },
     "jest": {
         "testEnvironment": "node",
