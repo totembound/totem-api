@@ -395,7 +395,10 @@
  *   put:
  *     tags: [User]
  *     summary: Update user profile
- *     description: Update display name and settings
+ *     description: |
+ *       Update display name, settings, and the public profile sub-object
+ *       (bio, avatar, banner). All fields are optional; supplied fields are
+ *       validated independently and applied atomically.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -413,6 +416,35 @@
  *                 properties:
  *                   notifications: { type: boolean }
  *                   darkMode: { type: string, enum: [system, light, dark] }
+ *               bio:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 240
+ *                 description: Plain text (no links, no HTML), multi-line, emoji allowed. Pass null to clear.
+ *               avatar:
+ *                 nullable: true
+ *                 description: Reference to a built-in image. Pass null to clear.
+ *                 oneOf:
+ *                   - type: object
+ *                     required: [kind, id]
+ *                     properties:
+ *                       kind: { type: string, enum: [domain] }
+ *                       id: { type: integer, minimum: 0, maximum: 5, description: "Domain enum (0=Air, 1=Earth, 2=Water, 3=Fire, 4=Spirit, 5=Shadow)" }
+ *                   - type: object
+ *                     required: [kind, speciesId, colorId, stage]
+ *                     properties:
+ *                       kind: { type: string, enum: [totem] }
+ *                       speciesId: { type: integer, minimum: 0 }
+ *                       colorId: { type: integer, minimum: 0 }
+ *                       stage: { type: integer, minimum: 0, maximum: 4, description: "Must be ≤ user's current stage for that totem" }
+ *               banner:
+ *                 nullable: true
+ *                 description: Domain-only banner reference. Pass null to clear.
+ *                 type: object
+ *                 required: [kind, id]
+ *                 properties:
+ *                   kind: { type: string, enum: [domain] }
+ *                   id: { type: integer, minimum: 0, maximum: 5 }
  *     responses:
  *       200:
  *         description: Profile updated
@@ -420,6 +452,56 @@
  *         description: Invalid input
  *       401:
  *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /v1/players/{userId}/public:
+ *   get:
+ *     tags: [User]
+ *     summary: Get a player's public profile
+ *     description: |
+ *       Returns the public-safe subset of another player's profile. Requires
+ *       authentication (defense-in-depth — marketplace is the only entry
+ *       point and is itself auth-only). Returns only whitelisted public
+ *       fields; never returns email, currencies, settings, role, tier, or
+ *       any other private field.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Player's user ID (e.g. usr_abc123)
+ *     responses:
+ *       200:
+ *         description: Public profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     displayName: { type: string }
+ *                     createdAt: { type: string, format: date-time }
+ *                     profile:
+ *                       type: object
+ *                       properties:
+ *                         bio: { type: string, nullable: true }
+ *                         avatar: { type: object, nullable: true }
+ *                         banner: { type: object, nullable: true }
+ *                     stats:
+ *                       type: object
+ *                       properties:
+ *                         totalTotems: { type: number }
+ *                         totalChallengesCompleted: { type: number }
+ *       404:
+ *         description: Player not found
  */
 
 /**

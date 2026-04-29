@@ -459,6 +459,11 @@ async function handleGetMe(req, res) {
           readyAt: user.displayNameChangeReadyAt || null,
           skipCost: DISPLAY_NAME_SKIP_COST,
         },
+        profile: {
+          bio: user.profile?.bio ?? null,
+          avatar: user.profile?.avatar ?? null,
+          banner: user.profile?.banner ?? null,
+        },
         createdAt: user.createdAt,
       },
     });

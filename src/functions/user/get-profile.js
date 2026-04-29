@@ -79,6 +79,11 @@ async function getProfile(user) {
         readyAt: userRecord.displayNameChangeReadyAt || null,
         skipCost: DISPLAY_NAME_SKIP_COST,
       },
+      profile: {
+        bio: userRecord.profile?.bio ?? null,
+        avatar: userRecord.profile?.avatar ?? null,
+        banner: userRecord.profile?.banner ?? null,
+      },
       createdAt: userRecord.createdAt,
     };
 

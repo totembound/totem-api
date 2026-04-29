@@ -6,6 +6,7 @@
  * Allows users to update their profile settings:
  * - displayName
  * - settings (notifications, darkMode, soundEffects, language)
+ * - profile.bio, profile.avatar, profile.banner
  *
  * Protected fields (cannot be updated via this endpoint):
  * - id, email (immutable)
@@ -14,7 +15,12 @@
  * - stats (managed by game system)
  */
 
-const { getUser, updateUser } = require('../../common/db-client');
+const { getUser, updateUser, getUserTotems } = require('../../common/db-client');
+const {
+  validateBio,
+  validateAvatar,
+  validateBanner,
+} = require('../../common/profile-validation');
 
 // Allowed fields for user self-service updates
 const ALLOWED_FIELDS = ['displayName'];
@@ -62,18 +68,30 @@ function validateField(field, value) {
 }
 
 /**
- * Update user profile
+ * Verify the user owns a totem matching speciesId+colorId and has reached the
+ * requested stage. Returns null if valid, or an error message string.
  *
- * @param {Object} user - Authenticated user from JWT middleware
- * @param {Object} body - Request body with fields to update
- * @returns {Object} Updated profile data with success flag
+ * Why this lives in the handler not the validator: it requires DB access. The
+ * pure validators in profile-validation.js stay synchronous and DB-free.
  */
+async function authorizeTotemAvatar(userId, avatar) {
+  if (!avatar || avatar.kind !== 'totem') return null;
+  const totems = await getUserTotems(userId);
+  const owned = totems.find(t =>
+    t.speciesId === avatar.speciesId && t.colorId === avatar.colorId,
+  );
+  if (!owned) return 'You do not own a totem matching that avatar';
+  if ((owned.stage ?? 0) < avatar.stage) {
+    return 'Selected stage exceeds your totem\'s current stage';
+  }
+  return null;
+}
+
 async function updateProfile(user, body) {
   try {
     const userId = user.userId;
     console.log('[updateProfile] userId:', userId, 'updates:', Object.keys(body));
 
-    // Get current user to verify existence
     const existingUser = await getUser(userId);
     if (!existingUser) {
       return {
@@ -82,11 +100,9 @@ async function updateProfile(user, body) {
       };
     }
 
-    // Build update object from allowed fields
     const updates = {};
     const errors = [];
 
-    // Process top-level allowed fields
     for (const field of ALLOWED_FIELDS) {
       if (body[field] !== undefined) {
         const validation = validateField(field, body[field]);
@@ -99,7 +115,6 @@ async function updateProfile(user, body) {
       }
     }
 
-    // Process settings updates
     if (body.settings && typeof body.settings === 'object') {
       for (const setting of ALLOWED_SETTINGS) {
         if (body.settings[setting] !== undefined) {
@@ -108,14 +123,54 @@ async function updateProfile(user, body) {
             errors.push(validation.error);
           }
           else {
-            // Use dot notation for nested updates
             updates[`settings.${setting}`] = body.settings[setting];
           }
         }
       }
     }
 
-    // Return validation errors if any
+    // Profile sub-object: bio, avatar, banner.
+    // Set the whole `profile` map at once (atomic, sidesteps "parent map missing"
+    // errors with nested SET on absent maps for users who pre-date this feature).
+    const wantsProfileUpdate = body.bio !== undefined
+      || body.avatar !== undefined
+      || body.banner !== undefined;
+
+    if (wantsProfileUpdate) {
+      const currentProfile = existingUser.profile || {};
+      const nextProfile = {
+        bio: currentProfile.bio ?? null,
+        avatar: currentProfile.avatar ?? null,
+        banner: currentProfile.banner ?? null,
+      };
+
+      if (body.bio !== undefined) {
+        const r = validateBio(body.bio);
+        if (!r.valid) errors.push(r.message);
+        else nextProfile.bio = r.value;
+      }
+      if (body.avatar !== undefined) {
+        const r = validateAvatar(body.avatar);
+        if (!r.valid) {
+          errors.push(r.message);
+        }
+        else {
+          const ownershipErr = await authorizeTotemAvatar(userId, r.value);
+          if (ownershipErr) errors.push(ownershipErr);
+          else nextProfile.avatar = r.value;
+        }
+      }
+      if (body.banner !== undefined) {
+        const r = validateBanner(body.banner);
+        if (!r.valid) errors.push(r.message);
+        else nextProfile.banner = r.value;
+      }
+
+      if (errors.length === 0) {
+        updates.profile = nextProfile;
+      }
+    }
+
     if (errors.length > 0) {
       return {
         success: false,
@@ -123,7 +178,6 @@ async function updateProfile(user, body) {
       };
     }
 
-    // Check if there's anything to update
     if (Object.keys(updates).length === 0) {
       return {
         success: false,
@@ -131,10 +185,8 @@ async function updateProfile(user, body) {
       };
     }
 
-    // Perform the update
     const updatedUser = await updateUser(userId, updates);
 
-    // Build response with updated values
     const response = {
       id: updatedUser.id,
       email: updatedUser.email,
@@ -155,6 +207,11 @@ async function updateProfile(user, body) {
         darkMode: updatedUser.settings?.darkMode || 'dark',
         soundEffects: updatedUser.settings?.soundEffects !== false,
         language: updatedUser.settings?.language || 'en',
+      },
+      profile: {
+        bio: updatedUser.profile?.bio ?? null,
+        avatar: updatedUser.profile?.avatar ?? null,
+        banner: updatedUser.profile?.banner ?? null,
       },
       updatedAt: updatedUser.updatedAt,
     };
