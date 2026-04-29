@@ -296,6 +296,32 @@ app.put('/v1/user/displayName', authenticateJWT, async (req, res) => {
   }
 });
 
+// Public profile route — viewable by any authenticated player. The handler
+// returns only whitelisted public-safe fields (no email/currencies/etc) so
+// the auth requirement is defense-in-depth, not a privacy boundary. We still
+// require auth because the only entry point (marketplace) is auth-only and
+// there's no benefit in exposing a scrapable endpoint to anonymous traffic.
+app.get('/v1/players/:userId/public', authenticateJWT, async (req, res) => {
+  try {
+    if (!userRoutes?.getPublicProfile) {
+      return res.status(503).json({
+        success: false,
+        error: { code: 'NOT_IMPLEMENTED', message: 'Public profile not available' },
+      });
+    }
+    const result = await userRoutes.getPublicProfile(req.params.userId);
+    if (!result.success) {
+      const status = result.error?.code === 'NOT_FOUND' ? 404 : 400;
+      return res.status(status).json(result);
+    }
+    return res.json(result);
+  }
+  catch (error) {
+    console.error('Error in getPublicProfile:', error);
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 // Totem routes
 app.get('/v1/totems', authenticateJWT, async (req, res) => {
   try {
