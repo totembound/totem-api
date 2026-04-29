@@ -719,7 +719,10 @@ describe('Sanctum Service', () => {
         sanctum: { seated: true, seatIndex: 0, onMission: true },
       });
       dbClient.updateTotem.mockResolvedValue({});
-      dbClient.addRunes.mockResolvedValue({ lesser: 1, greater: 0, ancient: 0 });
+      dbClient.addRunes.mockResolvedValue({
+        success: true,
+        newBalances: { lesser: 5, greater: 2, ancient: 0 },
+      });
       dbClient.deleteItem.mockResolvedValue({});
 
       const result = await sanctumService.claimCouncilMission(testUserId, testTotemId);
@@ -769,7 +772,10 @@ describe('Sanctum Service', () => {
         sanctum: { seated: true, seatIndex: 1, onMission: true, missionEndsAt: pastEndsAt },
       });
       dbClient.updateTotem.mockResolvedValue({});
-      dbClient.addRunes.mockResolvedValue({ lesser: 0, greater: 0, ancient: 0 });
+      dbClient.addRunes.mockResolvedValue({
+        success: true,
+        newBalances: { lesser: 0, greater: 0, ancient: 0 },
+      });
       dbClient.deleteItem.mockResolvedValue({});
 
       const result = await sanctumService.claimCouncilMission(testUserId, testTotemId);
@@ -786,6 +792,121 @@ describe('Sanctum Service', () => {
           }),
         },
       );
+    });
+  });
+
+  // ===========================================================================
+  // claimCouncilMission - rune balance shape (regression for fix/mission-runes #146)
+  //
+  // The frontend (GameContext.claimCouncilMission) reads
+  // response.data.newRuneBalances and feeds it directly into setRuneBalances.
+  // It MUST be either:
+  //   - the unwrapped balances object: { lesser, greater, ancient }
+  //   - null (when no runes dropped)
+  //
+  // Previously sanctum-service assigned the addRunes() wrapper
+  // ({ success, newBalances }) to newRuneBalances. The frontend then read
+  // .lesser/.greater/.ancient (undefined) and reset all rune balances to 0
+  // until reload. These tests lock in the correct shape.
+  // ===========================================================================
+
+  describe('claimCouncilMission - rune balance shape', () => {
+    const pastEndsAt = new Date(Date.now() - 1000).toISOString();
+
+    function mockReadyMission(missionType = 'cm_decree-of-wisdom') {
+      dbClient.getItem.mockResolvedValue({
+        pk: `SANCTUM#${testUserId}`,
+        sk: `MISSION#ACTIVE#${testTotemId}`,
+        totemId: testTotemId,
+        missionType,
+        endsAt: pastEndsAt,
+        status: 'in_progress',
+      });
+      dbClient.getTotem.mockResolvedValue({
+        id: testTotemId,
+        experience: 8000,
+        species: 'fox',
+        sanctum: { seated: true, seatIndex: 0, onMission: true },
+      });
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+    }
+
+    afterEach(() => {
+      if (Math.random.mockRestore) Math.random.mockRestore();
+    });
+
+    it('should return unwrapped { lesser, greater, ancient } when runes drop', async () => {
+      mockReadyMission('cm_founding-ritual'); // greater: 75, ancient: 20
+      jest.spyOn(Math, 'random').mockReturnValue(0.01); // force every drop
+      dbClient.addRunes.mockResolvedValue({
+        success: true,
+        newBalances: { lesser: 12, greater: 4, ancient: 1 },
+      });
+
+      const result = await sanctumService.claimCouncilMission(testUserId, testTotemId);
+
+      expect(result.success).toBe(true);
+      expect(result.data.newRuneBalances).toEqual({ lesser: 12, greater: 4, ancient: 1 });
+    });
+
+    it('should NOT leak the addRunes wrapper into newRuneBalances', async () => {
+      mockReadyMission('cm_decree-of-wisdom'); // lesser: 50
+      jest.spyOn(Math, 'random').mockReturnValue(0.01); // force drop
+      dbClient.addRunes.mockResolvedValue({
+        success: true,
+        newBalances: { lesser: 7, greater: 0, ancient: 0 },
+      });
+
+      const result = await sanctumService.claimCouncilMission(testUserId, testTotemId);
+
+      // Regression guard: response must be the unwrapped balances, never the
+      // { success, newBalances } envelope that addRunes returns internally.
+      expect(result.data.newRuneBalances).not.toHaveProperty('success');
+      expect(result.data.newRuneBalances).not.toHaveProperty('newBalances');
+      expect(result.data.newRuneBalances).toHaveProperty('lesser');
+      expect(result.data.newRuneBalances).toHaveProperty('greater');
+      expect(result.data.newRuneBalances).toHaveProperty('ancient');
+    });
+
+    it('should return null newRuneBalances when no runes drop', async () => {
+      mockReadyMission('cm_decree-of-wisdom'); // lesser: 50
+      jest.spyOn(Math, 'random').mockReturnValue(0.99); // force no drop
+
+      const result = await sanctumService.claimCouncilMission(testUserId, testTotemId);
+
+      expect(result.success).toBe(true);
+      expect(result.data.newRuneBalances).toBeNull();
+      expect(result.data.rewards.runesEarned).toEqual({ lesser: 0, greater: 0, ancient: 0 });
+      expect(dbClient.addRunes).not.toHaveBeenCalled();
+    });
+
+    it('should call addRunes with the rolled drop counts', async () => {
+      mockReadyMission('cm_peace-summit'); // greater: 50
+      jest.spyOn(Math, 'random').mockReturnValue(0.01); // force drop
+      dbClient.addRunes.mockResolvedValue({
+        success: true,
+        newBalances: { lesser: 0, greater: 1, ancient: 0 },
+      });
+
+      await sanctumService.claimCouncilMission(testUserId, testTotemId);
+
+      expect(dbClient.addRunes).toHaveBeenCalledWith(
+        testUserId,
+        { lesser: 0, greater: 1, ancient: 0 },
+        expect.objectContaining({ type: 'council_mission_claim' }),
+      );
+    });
+
+    it('should leave newRuneBalances null if addRunes fails', async () => {
+      mockReadyMission('cm_decree-of-wisdom');
+      jest.spyOn(Math, 'random').mockReturnValue(0.01); // force drop attempt
+      dbClient.addRunes.mockResolvedValue({ success: false, error: 'User not found' });
+
+      const result = await sanctumService.claimCouncilMission(testUserId, testTotemId);
+
+      expect(result.success).toBe(true);
+      expect(result.data.newRuneBalances).toBeNull();
     });
   });
 
