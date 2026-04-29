@@ -868,10 +868,13 @@ async function claimCouncilMission(userId, totemId) {
   // Award runes if any dropped
   let newRuneBalances = null;
   if (runesEarned.lesser || runesEarned.greater || runesEarned.ancient) {
-    newRuneBalances = await addRunes(userId, runesEarned, {
+    const runeResult = await addRunes(userId, runesEarned, {
       type: 'council_mission_claim',
       ref: mission.id,
     });
+    if (runeResult.success) {
+      newRuneBalances = runeResult.newBalances;
+    }
   }
 
   // 5. Log transaction for mission claim
