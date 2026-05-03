@@ -1,0 +1,20 @@
+{
+    "StripeSecretKeyParam": "/totembound/stripe/secret-key",
+    "StripeWebhookSecretParam": "/totembound/stripe/webhook-secret",
+    "FromEmail": "no-reply@totembound.com",
+    "StripePriceStarter": "TODO_PROD_STRIPE_PRICE_STARTER",
+    "StripePricePopular": "TODO_PROD_STRIPE_PRICE_POPULAR",
+    "StripePriceBestValue": "TODO_PROD_STRIPE_PRICE_BEST_VALUE",
+    "StripePriceUltimate": "TODO_PROD_STRIPE_PRICE_ULTIMATE",
+    "StripePricePremium": "TODO_PROD_STRIPE_PRICE_PREMIUM",
+    "StripePriceVip": "TODO_PROD_STRIPE_PRICE_VIP",
+    "IoTEndpoint": "TODO_PROD_IOT_ATS_ENDPOINT",
+    "IoTIdentityPoolId": "TODO_PROD_IOT_IDENTITY_POOL_ID",
+    "IoTBrowserPolicyName": "totembound-browser-iot-policy",
+    "GoogleClientIdParam": "/totembound/oauth/google/client-id",
+    "GoogleClientSecretParam": "/totembound/oauth/google/client-secret",
+    "TwitchClientIdParam": "/totembound/oauth/twitch/client-id",
+    "TwitchClientSecretParam": "/totembound/oauth/twitch/client-secret",
+    "DiscordClientIdParam": "/totembound/oauth/discord/client-id",
+    "DiscordClientSecretParam": "/totembound/oauth/discord/client-secret"
+}
