@@ -308,7 +308,7 @@ async function handleLogin(req, res) {
       user: {
         id: result.userId,
         email: result.email,
-        displayName: result.displayName,
+        displayName: userProfile?.displayName || result.displayName,
         tier: userProfile?.tier || 'free',
         role: userRole,
         currencies: userProfile?.currencies || { essence: 0, gems: 0 },
