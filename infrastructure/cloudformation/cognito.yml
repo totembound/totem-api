@@ -23,6 +23,8 @@ Resources:
   # Cognito User Pool
   UserPool:
     Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       UserPoolName: !Sub
         - "${Prefix}-user-pool"
