@@ -308,12 +308,17 @@ async function handleLogin(req, res) {
       user: {
         id: result.userId,
         email: result.email,
-        displayName: result.displayName,
+        displayName: userProfile?.displayName || result.displayName,
         tier: userProfile?.tier || 'free',
         role: userRole,
         currencies: userProfile?.currencies || { essence: 0, gems: 0 },
         stats: userProfile?.stats || { totalTotems: 0, totalChallengesCompleted: 0, loginStreak: 1 },
         settings: userProfile?.settings || { notifications: true, darkMode: 'dark' },
+        profile: {
+          bio: userProfile?.profile?.bio ?? null,
+          avatar: userProfile?.profile?.avatar ?? null,
+          banner: userProfile?.profile?.banner ?? null,
+        },
       },
       tokens,
     });
@@ -571,6 +576,11 @@ async function handleVerify(req, res) {
         currencies: user.currencies,
         stats: user.stats,
         settings: user.settings,
+        profile: {
+          bio: user.profile?.bio ?? null,
+          avatar: user.profile?.avatar ?? null,
+          banner: user.profile?.banner ?? null,
+        },
       } : {
         id: loginResult.userId,
         email: loginResult.email,
