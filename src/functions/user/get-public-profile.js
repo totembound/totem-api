@@ -26,7 +26,13 @@
 const { getUser, getUserTotems } = require('../../common/db-client');
 
 async function getPublicProfile(userId) {
-  if (typeof userId !== 'string' || !userId.startsWith('usr_')) {
+  // Accept both local-format ids (`usr_*`) and Cognito sub UUIDs. A raw UUID
+  // is what awsSignIn returns on staging/prod, so a strict `usr_` check would
+  // reject every legitimate Cognito-authed player. getUser() returns null for
+  // anything that doesn't exist, so this guard only needs to fend off obviously
+  // malformed strings.
+  const ID_PATTERN = /^(usr_[A-Za-z0-9_-]+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+  if (typeof userId !== 'string' || !ID_PATTERN.test(userId)) {
     return {
       success: false,
       error: { code: 'NOT_FOUND', message: 'Player not found' },
