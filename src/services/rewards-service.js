@@ -29,18 +29,18 @@ const REWARDS_CLAIMS_TABLE = TABLES.REWARDS_CLAIMS;
 
 const REWARD_CONFIG = {
   daily: {
-    baseAmount: 10,              // 10 Essence base
+    baseAmount: 30,              // 30 Essence base (bumped from 10 on 2026-05-16 to keep the daily login meaningful next to Daily Quests' 195E/day)
     streakBonusPercent: 5,       // 5% per day
-    maxStreakBonusPercent: 100,  // Max 100% bonus (caps at 20 days)
+    maxStreakBonusPercent: 100,  // Max 100% bonus at day 20+ → max 60E
     cooldownMs: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
     cooldownHours: 24,
     // Grace period: if more than 48 hours since last claim, streak resets
     gracePeriodMs: 48 * 60 * 60 * 1000,
   },
   weekly: {
-    baseAmount: 100,             // 100 Essence base
+    baseAmount: 200,             // 200 Essence base (bumped from 100 on 2026-05-16 to scale with daily bump)
     streakBonusPercent: 10,      // 10% per consecutive week
-    maxStreakBonusPercent: 100,  // Max 100% bonus (caps at 10 weeks)
+    maxStreakBonusPercent: 100,  // Max 100% bonus at week 10+ → max 400E
     cooldownMs: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     cooldownDays: 7,
     // Grace period: if more than 14 days since last claim, streak resets
