@@ -1410,6 +1410,145 @@
 
 /**
  * @swagger
+ * /v1/rewards/quests:
+ *   get:
+ *     tags: [Rewards]
+ *     summary: Get today's daily quest set
+ *     description: |
+ *       Returns the player's 5-quest set for the current UTC day. Quests are lazy-generated
+ *       on first call of the day — no scheduled job. Theme rotates deterministically through
+ *       9 affinity×domain×action combinations on a dayOfYear cycle.
+ *
+ *       **Scope (catalog v1.1.0):** totem actions (feed/train/treat), challenges, and expeditions.
+ *
+ *       **Slot pattern:**
+ *       - Slot 1: themed action (matches today's `theme.action`)
+ *       - Slot 2: free easy (any non-themed action/challenge/expedition)
+ *       - Slot 3: affinity challenge (matches today's `theme.affinity`)
+ *       - Slot 4: domain expedition (matches today's `theme.domain`)
+ *       - Slot 5: hard objective (24h expedition / 3 challenges / 2 claims)
+ *
+ *       **Bonus:** +75 Essence + 1 random rune (80% Lesser, 18% Greater, 2% Ancient) when all 5 are claimed.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Today's quest set
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     date: { type: string, description: "UTC date YYYY-MM-DD" }
+ *                     theme:
+ *                       type: object
+ *                       properties:
+ *                         affinity: { type: string, enum: [strength, agility, wisdom] }
+ *                         domain: { type: string, enum: [air, earth, water] }
+ *                         action: { type: string, enum: [feed, train, treat] }
+ *                     nextResetAt: { type: string, description: "ISO 8601 next UTC midnight" }
+ *                     quests:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           slot: { type: integer, minimum: 1, maximum: 5 }
+ *                           id: { type: string }
+ *                           name: { type: string }
+ *                           description: { type: string }
+ *                           tier: { type: string, enum: [easy, medium, hard] }
+ *                           goal: { type: integer }
+ *                           progress: { type: integer }
+ *                           claimed: { type: boolean }
+ *                           completed: { type: boolean }
+ *                           reward:
+ *                             type: object
+ *                             properties:
+ *                               essence: { type: integer }
+ *                     bonus:
+ *                       type: object
+ *                       properties:
+ *                         reward:
+ *                           type: object
+ *                           properties:
+ *                             essence: { type: integer, example: 75 }
+ *                         claimed: { type: boolean }
+ *                         unlocked: { type: boolean }
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/quests/claim:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Batch-claim all completable daily quests + bonus
+ *     description: |
+ *       Single batch claim — no body required. Server flips every completed-but-unclaimed quest's
+ *       `claimed` flag, credits the total Essence, and (if all 5 are now claimed) auto-claims the
+ *       bonus + drops a random rune.
+ *
+ *       **Idempotent:** subsequent calls with nothing claimable return `claimed: []`,
+ *       `totalEssenceAwarded: 0`. Safe to call from Claim All buttons in card/wizard.
+ *
+ *       **Rune drop (bonus only):** 80% Lesser, 18% Greater, 2% Ancient.
+ *
+ *       **Achievement triggers:** `ach_quest-set-master` (per bonus claim), `ach_theme-master`
+ *       (per slot 3 affinity or slot 4 domain claim). Unlocked milestones returned in
+ *       `data.achievements` for the existing notification pipeline.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Claim result (essence, runes, milestones)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     claimed:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           questId: { type: string }
+ *                           reward:
+ *                             type: object
+ *                             properties:
+ *                               essence: { type: integer }
+ *                     bonusClaimed: { type: boolean }
+ *                     totalEssenceAwarded: { type: integer }
+ *                     newEssenceBalance: { type: integer, nullable: true }
+ *                     nextResetAt: { type: string }
+ *                     runesAwarded:
+ *                       type: object
+ *                       nullable: true
+ *                       description: "Only present when bonus is claimed"
+ *                       properties:
+ *                         lesser: { type: integer }
+ *                         greater: { type: integer }
+ *                         ancient: { type: integer }
+ *                     achievements:
+ *                       type: array
+ *                       description: "Milestone unlocks fired by this claim"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           achievementId: { type: string }
+ *                           milestone: { type: integer }
+ *                           rewards:
+ *                             type: object
+ */
+
+/**
+ * @swagger
  * /v1/rewards/daily/protection:
  *   post:
  *     tags: [Rewards]

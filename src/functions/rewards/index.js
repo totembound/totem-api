@@ -15,6 +15,8 @@ const { claimWeekly } = require('./claim-weekly');
 const { getStatus } = require('./status');
 const { claimTutorial, getTutorialProgress } = require('./claim-tutorial');
 const { purchaseProtection } = require('./purchase-protection');
+const { getDailyQuests } = require('./get-quests');
+const { claimDailyQuests } = require('./claim-quests');
 
 module.exports = {
   claimDaily,
@@ -23,4 +25,6 @@ module.exports = {
   claimTutorial,
   getTutorialProgress,
   purchaseProtection,
+  getDailyQuests,
+  claimDailyQuests,
 };
