@@ -10,20 +10,22 @@
  * Whitelist (and ONLY this whitelist):
  * - id, displayName, createdAt, tier
  * - profile.bio, profile.avatar, profile.banner
- * - stats.totalTotems, stats.totalChallengesCompleted, stats.bestLoginStreak,
- *   stats.highestStageReached
+ * - stats.totalTotems, stats.totalChallengesCompleted, stats.bestDailyStreak,
+ *   stats.highestStageReached, stats.highestPrestigeReached
  *
  * Explicitly excluded: email, currencies, settings, OAuth fields,
  * lastLoginDate (privacy — would reveal when they were online), role, status.
  * Tier IS exposed because the frontend renders a Free/Premium/VIP badge on
  * the public profile (intended user-visible signal, not PII).
  *
- * Why bestLoginStreak is OK to expose: it's a milestone count, not a recent
- * timestamp — it doesn't reveal recent presence and matches engagement-stat
- * conventions on most game profiles.
+ * bestDailyStreak comes from the rewards-service streak record
+ * (RewardsClaims STREAK#daily.longestStreak), which already persists
+ * Math.max(prev, newStreak) on every claim. NOT from login activity.
  */
 
 const { getUser, getUserTotems } = require('../../common/db-client');
+const { getAllChallengeProgress } = require('../../services/challenges-service');
+const { getStreakState } = require('../../services/rewards-service');
 
 async function getPublicProfile(userId) {
   // Accept both local-format ids (`usr_*`) and Cognito sub UUIDs. A raw UUID
@@ -47,22 +49,62 @@ async function getPublicProfile(userId) {
     };
   }
 
-  // Live totem count + highest stage, mirroring get-profile.js. Falls back to
-  // stored count on error.
+  // Live totem count, highest stage, and highest prestige. Stage 4 (Ascended)
+  // totems can accumulate XP beyond 7500 — each PRESTIGE_XP_REQUIREMENT (2500)
+  // earns one prestige level. Matches TotemDetailView formula so the public
+  // tile shows the same "P{n}" as the totem detail HUD.
+  const PRESTIGE_XP_REQUIREMENT = 2500;
+  const BASE_ELDER_XP = 7500;
   let totemCount = user.stats?.totalTotems || 0;
   let highestStage = 0;
+  let highestPrestige = 0;
   try {
     const totems = await getUserTotems(userId);
     totemCount = totems.length;
-    highestStage = totems.reduce((max, t) => Math.max(max, t.stage ?? 0), 0);
+    for (const t of totems) {
+      const stage = t.stage ?? 0;
+      if (stage > highestStage) highestStage = stage;
+      if (stage >= 4) {
+        const xp = t.experience ?? 0;
+        const prestige = xp > BASE_ELDER_XP
+          ? Math.floor((xp - BASE_ELDER_XP) / PRESTIGE_XP_REQUIREMENT)
+          : 0;
+        if (prestige > highestPrestige) highestPrestige = prestige;
+      }
+    }
   }
   catch (err) {
     console.warn('[getPublicProfile] Failed to count totems:', err.message);
   }
 
-  const bestStreak = user.stats?.bestLoginStreak
-    ?? user.stats?.loginStreak
-    ?? 0;
+  // Live challenge completion total — sum completionCount across all
+  // CHALLENGE_PROGRESS records (≤10 per user, one per challenge id). Same
+  // source completeChallenge feeds to achievements, so it's the ground truth.
+  // Falls back to the (currently never-written) stat field if the query fails.
+  let totalChallengesCompleted = user.stats?.totalChallengesCompleted || 0;
+  try {
+    const progress = await getAllChallengeProgress(userId);
+    totalChallengesCompleted = progress.reduce(
+      (sum, p) => sum + (p.completionCount || 0),
+      0,
+    );
+  }
+  catch (err) {
+    console.warn('[getPublicProfile] Failed to sum challenge progress:', err.message);
+  }
+
+  // Best daily streak — RewardsClaims STREAK#daily.longestStreak is the
+  // ground truth (updateStreakState writes Math.max(prev, newStreak)).
+  // Defaults to 0 for users who've never claimed, so the tile always has
+  // a number to display (was rendering empty when undefined leaked through).
+  let bestDailyStreak = 0;
+  try {
+    const streak = await getStreakState(userId, 'daily');
+    bestDailyStreak = streak?.longestStreak || 0;
+  }
+  catch (err) {
+    console.warn('[getPublicProfile] Failed to read daily streak:', err.message);
+  }
 
   return {
     success: true,
@@ -78,9 +120,10 @@ async function getPublicProfile(userId) {
       },
       stats: {
         totalTotems: totemCount,
-        totalChallengesCompleted: user.stats?.totalChallengesCompleted || 0,
-        bestLoginStreak: bestStreak,
+        totalChallengesCompleted,
+        bestDailyStreak,
         highestStageReached: highestStage,
+        highestPrestigeReached: highestPrestige,
       },
     },
   };
