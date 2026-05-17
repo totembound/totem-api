@@ -100,6 +100,9 @@ async function getStatus(user) {
     return {
       success: true,
       data: {
+        tier: status.tier,
+        tierMultiplier: status.tierMultiplier,
+        tierBonusPercent: status.tierBonusPercent,
         daily: {
           canClaim: status.daily?.canClaim || false,
           streakDays: status.daily?.currentStreak || 0,
