@@ -57,18 +57,17 @@ async function claimDaily(user) {
       };
     }
 
-    // 4. Return success response (format expected by frontend)
+    // 4. Return success response — pass through the full reward object so the
+    // frontend can surface base/tier/streak breakdown (mirrors claim-weekly).
     return {
       success: true,
       data: {
-        reward: {
-          amount: result.reward.totalAmount || result.reward.essence || 0,
-          streakDays: result.newStreak,
-          streakBonus: result.reward.bonusAmount || 0,
-        },
+        reward: result.reward,
         newStreak: result.newStreak,
+        newBalance: result.newBalance,
+        nextClaimTime: result.nextClaimTime,
         nextClaimAt: result.nextClaimTime,
-        message: `Daily reward claimed! +${result.reward.totalAmount || result.reward.essence} Essence`,
+        message: `Daily reward claimed! +${result.reward.totalAmount} Essence`,
         achievements: result.achievements || [],
       },
     };

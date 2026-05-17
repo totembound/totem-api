@@ -1327,6 +1327,9 @@
  *                 data:
  *                   type: object
  *                   properties:
+ *                     tier: { type: string, enum: [free, premium, vip], description: "User subscription tier" }
+ *                     tierMultiplier: { type: number, description: "Reward base multiplier (free=1, premium=2, vip=3)" }
+ *                     tierBonusPercent: { type: number, description: "Tier bonus as percent over base (0 / 100 / 200)" }
  *                     daily:
  *                       type: object
  *                       properties:
@@ -1335,7 +1338,7 @@
  *                         bestStreak: { type: number }
  *                         nextClaimTime: { type: string, nullable: true }
  *                         isProtected: { type: boolean }
- *                         protectionExpiry: { type: string, nullable: true }
+ *                         protectionCharges: { type: number, description: "Banked streak-saver charges" }
  *                     weekly:
  *                       type: object
  *                       properties:
@@ -1345,6 +1348,7 @@
  *                         isUnlocked: { type: boolean }
  *                         nextClaimTime: { type: string, nullable: true }
  *                         isProtected: { type: boolean }
+ *                         protectionCharges: { type: number }
  */
 
 /**
@@ -1367,7 +1371,11 @@
  *   post:
  *     tags: [Rewards]
  *     summary: Claim daily reward
- *     description: Claim daily login reward. Base 10 Essence + streak bonus. Once per day.
+ *     description: |
+ *       Claim daily login reward. Once per day (resets at UTC midnight).
+ *       Total = baseAmount × tierMultiplier × (1 + bonusPercent/100).
+ *       Base is 30 Essence; tier multiplier is 1/2/3 for free/premium/vip;
+ *       streak bonus is 5% per consecutive day, capped at 100% (day 21+).
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1385,12 +1393,23 @@
  *                     reward:
  *                       type: object
  *                       properties:
+ *                         type: { type: string, example: daily }
  *                         baseAmount: { type: number }
- *                         streakBonus: { type: number }
- *                         totalAmount: { type: number }
+ *                         streakAtClaim: { type: number }
+ *                         bonusPercent: { type: number, description: "Streak bonus percent applied" }
+ *                         bonusAmount: { type: number }
+ *                         totalAmount: { type: number, description: "Final essence awarded" }
+ *                         tier: { type: string, enum: [free, premium, vip] }
+ *                         tierMultiplier: { type: number }
+ *                         tierBonusPercent: { type: number }
  *                     newStreak: { type: number }
  *                     newBalance: { type: number }
- *                     nextClaimTime: { type: string }
+ *                     nextClaimTime: { type: string, format: date-time }
+ *                     nextClaimAt: { type: string, format: date-time, description: "Alias for nextClaimTime" }
+ *                     message: { type: string }
+ *                     achievements:
+ *                       type: array
+ *                       items: { type: object }
  *       400:
  *         description: Already claimed today
  */
@@ -1417,7 +1436,12 @@
  *   post:
  *     tags: [Rewards]
  *     summary: Claim weekly reward
- *     description: Claim weekly bonus. Requires 7 consecutive daily claims to unlock. Resets weekly.
+ *     description: |
+ *       Claim weekly bonus. Requires the Week Warrior achievement (7-day daily login streak) to unlock.
+ *       7-day rolling cooldown.
+ *       Total = baseAmount × tierMultiplier × (1 + bonusPercent/100).
+ *       Base is 100 Essence; tier multiplier is 1/2/3 for free/premium/vip;
+ *       streak bonus is 10% per consecutive week, capped at 100% (week 11+).
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1435,10 +1459,19 @@
  *                     reward:
  *                       type: object
  *                       properties:
- *                         totalAmount: { type: number }
+ *                         type: { type: string, example: weekly }
+ *                         baseAmount: { type: number }
+ *                         streakAtClaim: { type: number }
+ *                         bonusPercent: { type: number, description: "Streak bonus percent applied" }
+ *                         bonusAmount: { type: number }
+ *                         totalAmount: { type: number, description: "Final essence awarded" }
+ *                         tier: { type: string, enum: [free, premium, vip] }
+ *                         tierMultiplier: { type: number }
+ *                         tierBonusPercent: { type: number }
  *                     newStreak: { type: number }
  *                     newBalance: { type: number }
- *                     nextClaimTime: { type: string }
+ *                     nextClaimTime: { type: string, format: date-time }
+ *                     message: { type: string }
  *       400:
  *         description: Not unlocked or already claimed this week
  */
