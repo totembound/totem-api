@@ -394,7 +394,7 @@ describe('Loot Service', () => {
         const finalizeCalls = dbClient.updateItem.mock.calls.filter(
           call => call[2]?.status === 'claimed'
         );
-        expect(finalizeCalls.length).toBe(1);
+        expect(finalizeCalls).toHaveLength(1);
       });
     });
   });

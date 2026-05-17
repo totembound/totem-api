@@ -101,7 +101,8 @@ async function uploadPackage() {
     await uploadToS3(zipFilePath, `totem-api/${FUNCTION_NAME}-latest.zip`);
 
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     console.error(chalk.red(`  ✗ Failed: ${error.message}`));
     return false;
   }
@@ -122,7 +123,8 @@ async function uploadTemplate() {
     await uploadToS3(CF_TEMPLATE_PATH, `totem-api/cloudformation/api-${VERSION}.yml`);
     await uploadToS3(CF_TEMPLATE_PATH, `totem-api/cloudformation/api-latest.yml`);
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     console.error(chalk.red(`  ✗ Failed: ${error.message}`));
     return false;
   }
@@ -135,7 +137,8 @@ async function stackExists(stackName) {
   try {
     await cfClient.send(new DescribeStacksCommand({ StackName: stackName }));
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     if (error.name === 'ValidationError' && error.message.includes('does not exist')) {
       return false;
     }
@@ -152,7 +155,7 @@ async function deployStack() {
   const templateUrl = `https://${config.s3Bucket}.s3.amazonaws.com/totem-api/cloudformation/api-${VERSION}.yml`;
 
   // Load environment parameters
-  let parameters = [
+  const parameters = [
     { ParameterKey: 'Environment', ParameterValue: environment },
     { ParameterKey: 'AppVersion', ParameterValue: VERSION },
   ];
@@ -174,22 +177,23 @@ async function deployStack() {
   try {
     const command = exists
       ? new UpdateStackCommand({
-          StackName: config.stackName,
-          TemplateURL: templateUrl,
-          Parameters: parameters,
-          Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
-        })
+        StackName: config.stackName,
+        TemplateURL: templateUrl,
+        Parameters: parameters,
+        Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
+      })
       : new CreateStackCommand({
-          StackName: config.stackName,
-          TemplateURL: templateUrl,
-          Parameters: parameters,
-          Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
-        });
+        StackName: config.stackName,
+        TemplateURL: templateUrl,
+        Parameters: parameters,
+        Capabilities: ['CAPABILITY_IAM', 'CAPABILITY_NAMED_IAM']
+      });
 
     await cfClient.send(command);
     console.log(chalk.green(`  ✓ Stack ${exists ? 'update' : 'creation'} initiated.`));
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     console.error(chalk.red(`  ✗ Failed: ${error.message}`));
     return false;
   }
@@ -212,7 +216,8 @@ async function updateLambdaCode() {
     }));
     console.log(chalk.green(`  ✓ Updated ${lambdaName}`));
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     console.error(chalk.red(`  ✗ Failed: ${error.message}`));
     return false;
   }
@@ -255,14 +260,16 @@ async function deploy() {
   // CloudFormation stack update
   if (await promptYesNo('Deploy/update CloudFormation stack?')) {
     await deployStack();
-  } else {
+  }
+  else {
     console.log(chalk.yellow('Skipping CloudFormation update.'));
   }
 
   // Direct Lambda code update
   if (await promptYesNo('Update Lambda function code directly?')) {
     await updateLambdaCode();
-  } else {
+  }
+  else {
     console.log(chalk.yellow('Skipping Lambda code update.'));
   }
 

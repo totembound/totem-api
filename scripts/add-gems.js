@@ -56,7 +56,8 @@ async function main() {
       }
       userId = user.id;
       console.log(`Found user: ${user.displayName || user.id}`);
-    } else {
+    }
+    else {
       // It's a userId
       user = await getUser(userId);
       if (!user) {
@@ -85,7 +86,8 @@ async function main() {
     console.log('');
     console.log('Success!');
     console.log('');
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Error:', error.message);
     process.exit(1);
   }

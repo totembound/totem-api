@@ -38,7 +38,8 @@ async function startCouncilMission(user, body) {
   try {
     const result = await sanctumService.startCouncilMission(user.userId, totemId, missionType);
     return result;
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to start council mission:', error);
     return {
       success: false,

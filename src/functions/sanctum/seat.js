@@ -54,7 +54,8 @@ async function seatTotem(user, body) {
       seatIndex !== undefined && seatIndex !== null ? Number(seatIndex) : undefined,
     );
     return result;
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to seat totem:', error);
     return {
       success: false,

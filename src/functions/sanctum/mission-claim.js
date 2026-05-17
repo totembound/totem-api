@@ -30,7 +30,8 @@ async function claimCouncilMission(user, body) {
   try {
     const result = await sanctumService.claimCouncilMission(user.userId, totemId);
     return result;
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to claim council mission:', error);
     return {
       success: false,

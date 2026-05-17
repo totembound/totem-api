@@ -39,7 +39,8 @@ async function unseatTotem(user, body) {
   try {
     const result = await sanctumService.unseatTotem(user.userId, totemId);
     return result;
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to unseat totem:', error);
     return {
       success: false,

@@ -19,7 +19,8 @@ async function claimSanctum(user) {
   try {
     const result = await sanctumService.claimSanctum(user.userId);
     return result;
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to claim sanctum earnings:', error);
     return {
       success: false,

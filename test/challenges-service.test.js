@@ -363,7 +363,7 @@ describe('getAvailableChallenges', () => {
     const available = getAvailableChallenges(totem);
 
     // Only Garden Pest Patrol (stage 1, all stats 1)
-    expect(available.length).toBe(1);
+    expect(available).toHaveLength(1);
     expect(available[0].id).toBe('chl_garden-pest-patrol');
   });
 

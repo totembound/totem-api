@@ -21,13 +21,13 @@ const isLocal = process.argv.includes('--local') || process.env.IS_LOCAL === 'tr
 
 const clientConfig = isLocal
   ? {
-      endpoint: process.env.DYNAMODB_ENDPOINT || 'http://localhost:8000',
-      region: 'us-east-1',
-      credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
-    }
+    endpoint: process.env.DYNAMODB_ENDPOINT || 'http://localhost:8000',
+    region: 'us-east-1',
+    credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
+  }
   : {
-      region: process.env.AWS_REGION || 'us-east-1',
-    };
+    region: process.env.AWS_REGION || 'us-east-1',
+  };
 
 const client = new DynamoDBClient(clientConfig);
 const TABLE_NAME = process.env.DYNAMODB_USERS_TABLE || 'TotemBound-Users';
@@ -87,10 +87,12 @@ async function addGSI() {
     console.log('\nThis GSI enables analytics queries:');
     console.log('  - getTransactionsByType("train", { startTime, endTime })');
     console.log('  - getTransactionAnalytics("feed", startTime, endTime)');
-  } catch (error) {
+  }
+  catch (error) {
     if (error.name === 'ValidationException' && error.message.includes('already exists')) {
       console.log(`GSI '${GSI_NAME}' already exists.`);
-    } else {
+    }
+    else {
       throw error;
     }
   }
