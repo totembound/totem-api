@@ -19,7 +19,8 @@ async function getSanctum(user) {
   try {
     const result = await sanctumService.getSanctum(user.userId);
     return { success: true, data: result };
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to get sanctum:', error);
     return {
       success: false,

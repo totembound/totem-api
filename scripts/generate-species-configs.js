@@ -130,7 +130,8 @@ function loadSpeciesMetadata() {
       metadataById[species.id] = species;
     }
     return metadataById;
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Failed to load species metadata:', err.message);
     return {};
   }
@@ -143,7 +144,8 @@ function loadSpeciesConfig(speciesName) {
   const configPath = path.join(TOTEMBOUND_DIR, speciesName, `${speciesName}-config.json`);
   try {
     return JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  } catch (err) {
+  }
+  catch (err) {
     console.warn(`No config found for ${speciesName}: ${err.message}`);
     return null;
   }
@@ -263,7 +265,8 @@ function main() {
       console.log(`✅ ${speciesName}: ${colorCount} colors, available: ${speciesConfig.available}`);
       results.success.push(speciesName);
 
-    } catch (err) {
+    }
+    catch (err) {
       console.error(`❌ ${speciesName}: ${err.message}`);
       results.errors.push({ species: speciesName, error: err.message });
     }

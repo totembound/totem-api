@@ -114,7 +114,8 @@ async function forgeTotem(user, body = {}) {
   let activeExpeditions;
   try {
     activeExpeditions = await getActiveExpeditions(userId);
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[forge] Expedition check failed — blocking forge for safety:', err.message);
     return {
       success: false,
@@ -170,7 +171,8 @@ async function forgeTotem(user, body = {}) {
   let speciesId;
   if (allSameSpecies) {
     speciesId = totems[0].speciesId;
-  } else {
+  }
+  else {
     const randomSpecies = selectRandomSpecies();
     speciesId = randomSpecies.speciesId;
   }
@@ -206,7 +208,8 @@ async function forgeTotem(user, body = {}) {
 
   try {
     await transactWrite(transactItems);
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[forge] Transaction failed:', err.message);
     if (err.name === 'TransactionCanceledException') {
       return {
@@ -243,7 +246,8 @@ async function forgeTotem(user, body = {}) {
       outputColorId: newTotemData.colorId,
       essenceValueBurned: totemIds.length * 500,
     });
-  } catch (err) {
+  }
+  catch (err) {
     console.warn('[forge] Failed to log transaction:', err.message);
   }
 
@@ -260,7 +264,8 @@ async function forgeTotem(user, body = {}) {
 
     // Update stats.totalTotems
     await updateUser(userId, { 'stats.totalTotems': totalTotemCount });
-  } catch (err) {
+  }
+  catch (err) {
     console.warn('[forge] Failed to update stats:', err.message);
   }
 
@@ -296,7 +301,8 @@ async function forgeTotem(user, body = {}) {
       totemId: newTotemData.id,
     });
     achievements = achResults.filter(a => a.unlocked);
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[forge] Failed to process achievements:', err.message);
   }
 

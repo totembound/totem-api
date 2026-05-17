@@ -59,7 +59,8 @@ function copyDir(src, dest) {
 
     if (entry.isDirectory()) {
       copyDir(srcPath, destPath);
-    } else {
+    }
+    else {
       fs.copyFileSync(srcPath, destPath);
     }
   }
@@ -81,7 +82,8 @@ function buildMonolith() {
     if (fs.existsSync(srcPath)) {
       fs.copyFileSync(srcPath, destPath);
       console.log(chalk.green(`  ✓ Copied ${file}`));
-    } else {
+    }
+    else {
       console.log(chalk.yellow(`  ⚠ Not found: ${file}`));
     }
   }
@@ -93,7 +95,8 @@ function buildMonolith() {
     if (fs.existsSync(srcPath)) {
       copyDir(srcPath, destPath);
       console.log(chalk.green(`  ✓ Copied ${dir}/`));
-    } else {
+    }
+    else {
       console.log(chalk.yellow(`  ⚠ Not found: ${dir}/`));
     }
   }
@@ -134,7 +137,8 @@ const success = buildMonolith();
 
 if (success) {
   console.log(chalk.bold.green('\n✅ Build complete!\n'));
-} else {
+}
+else {
   console.log(chalk.bold.red('\n❌ Build failed.\n'));
   process.exit(1);
 }

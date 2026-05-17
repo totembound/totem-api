@@ -114,7 +114,7 @@ async function treat(user, totemId) {
   let totalTreatCount;
   let userRecord;
   // Prestige unlocks (if any) come from the XP chokepoint.
-  let achievements = [...(xpResult.achievements || [])];
+  const achievements = [...(xpResult.achievements || [])];
   try {
     userRecord = await getUser(userId);
     totalTreatCount = (userRecord?.stats?.totalTreatCount || 0) + 1;

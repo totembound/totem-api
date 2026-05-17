@@ -57,10 +57,12 @@ for (let i = 0; i < args.length; i++) {
   if (args[i] === '--user' && args[i + 1]) {
     userType = args[i + 1];
     i++;
-  } else if (args[i] === '--email' && args[i + 1]) {
+  }
+  else if (args[i] === '--email' && args[i + 1]) {
     customEmail = args[i + 1];
     i++;
-  } else if (args[i] === '--help' || args[i] === '-h') {
+  }
+  else if (args[i] === '--help' || args[i] === '-h') {
     console.log(`
 Usage: node scripts/generate-test-token.js [options]
 
@@ -99,9 +101,11 @@ if (customEmail) {
     'custom:tier': 'free',
     email_verified: true,
   };
-} else if (TEST_USERS[userType]) {
+}
+else if (TEST_USERS[userType]) {
   payload = TEST_USERS[userType];
-} else {
+}
+else {
   console.error(`Unknown user type: ${userType}`);
   console.error('Available types: free, premium, vip');
   process.exit(1);

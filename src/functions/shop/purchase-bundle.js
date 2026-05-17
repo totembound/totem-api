@@ -51,6 +51,7 @@ const {
 const { onTotemAcquired } = require('../../services/achievements-service');
 
 const { getTotemImageUrl } = require('../../config/totem-config');
+const { buildInitialTraits } = require('../../config/traits');
 
 // Load special offer bundles from config
 const SPECIAL_OFFER_BUNDLES = shopConfig.specialOfferBundles || [];
@@ -289,6 +290,7 @@ async function purchaseBundle(user, body = {}) {
         train: null,
         treat: null,
       },
+      traits: buildInitialTraits(),
       source: 'bundle_purchase',
       bundleId: bundle.id,
       createdAt: now,

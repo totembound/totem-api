@@ -485,6 +485,30 @@ app.post('/v1/totems/:id/evolve', authenticateJWT, async (req, res) => {
   }
 });
 
+// Choose a trait for Learned or Awakened slot
+app.post('/v1/totems/:id/traits/choose', authenticateJWT, async (req, res) => {
+  try {
+    if (totemRoutes?.chooseTrait) {
+      const result = await totemRoutes.chooseTrait(req.user, req.params.id, req.body);
+      if (!result.success && result.error?.code) {
+        const status =
+          result.error.code === 'TOTEM_NOT_FOUND' ? 404 :
+            result.error.code === 'STAGE_LOCKED' ? 403 :
+              result.error.code === 'SLOT_TAKEN' ? 409 :
+                400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.status(503).json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'chooseTrait handler missing' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 // Set totem nickname
 app.post('/v1/totems/:id/nickname', authenticateJWT, async (req, res) => {
   try {

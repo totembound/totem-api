@@ -39,7 +39,8 @@ async function getDailyQuests(user) {
         },
       },
     };
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[getDailyQuests] Error:', err);
     return { success: false, error: { code: 'INTERNAL_ERROR', message: err.message } };
   }

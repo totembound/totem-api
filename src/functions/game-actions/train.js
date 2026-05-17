@@ -133,7 +133,7 @@ async function train(user, totemId) {
   let totalTrainCount;
   let userRecord;
   // Prestige unlocks (if any) come from the XP chokepoint.
-  let achievements = [...(xpResult.achievements || [])];
+  const achievements = [...(xpResult.achievements || [])];
   try {
     userRecord = await getUser(userId);
     totalTrainCount = (userRecord?.stats?.totalTrainCount || 0) + 1;

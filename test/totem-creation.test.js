@@ -403,6 +403,23 @@ describe('Totem Creation Service', () => {
       expect(totem.updatedAt).toBeDefined();
     });
 
+    it('should stamp an innate trait at creation, with learned/awakened null', () => {
+      const { INNATE_POOL } = require('../src/config/traits');
+      const totem = createTotem({ userId: 'usr_test123' });
+      expect(totem.traits).toBeDefined();
+      expect(INNATE_POOL).toContain(totem.traits.innate);
+      expect(totem.traits.learned).toBeNull();
+      expect(totem.traits.awakened).toBeNull();
+    });
+
+    it('starter totem also gets an innate trait', () => {
+      const { INNATE_POOL } = require('../src/config/traits');
+      const totem = createStarterTotem('usr_test123');
+      expect(INNATE_POOL).toContain(totem.traits.innate);
+      expect(totem.traits.learned).toBeNull();
+      expect(totem.traits.awakened).toBeNull();
+    });
+
     it('should select random species when not specified', () => {
       const totem = createTotem({ userId: 'usr_test123' });
       expect(AVAILABLE_SPECIES_IDS).toContain(totem.speciesId);

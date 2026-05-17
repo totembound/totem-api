@@ -21,7 +21,8 @@ async function claimDailyQuests(user) {
         achievements: result.achievements || [],
       },
     };
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[claimDailyQuests] Error:', err);
     return { success: false, error: { code: 'INTERNAL_ERROR', message: err.message } };
   }

@@ -129,7 +129,7 @@ async function feed(user, totemId) {
   let totalFeedCount;
   let userRecord;
   // Prestige unlocks (if any) come from the XP chokepoint.
-  let achievements = [...(xpResult.achievements || [])];
+  const achievements = [...(xpResult.achievements || [])];
   try {
     userRecord = await getUser(userId);
     totalFeedCount = (userRecord?.stats?.totalFeedCount || 0) + 1;

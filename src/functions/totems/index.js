@@ -98,6 +98,7 @@ function transformTotemForApi(totem) {
       color: totem.colorId,
       rarity: totem.rarityId,
       happiness: totem.stats?.happiness ?? 50,
+      hunger: totem.stats?.hunger ?? 100,
       experience: totem.experience || 0,
       stage: totem.stage || 0,
       strength: totem.stats?.strength || 5,
@@ -107,6 +108,9 @@ function transformTotemForApi(totem) {
       prestigeLevel: totem.prestigeLevel || 0,
       ...(totem.sanctum && { sanctum: totem.sanctum }),
     },
+
+    // Traits (innate at birth; learned/awakened chosen at stage gates)
+    traits: totem.traits || null,
 
     // Action tracking (used for cooldowns)
     trackings: {
@@ -213,6 +217,7 @@ async function getTotem(user, totemId) {
 
 const { purchaseTotem, getPurchaseInfo } = require('./purchase');
 const { forgeTotem } = require('./forge');
+const { chooseTrait } = require('./choose-trait');
 
 // ============================================
 // Exports
@@ -225,4 +230,5 @@ module.exports = {
   purchaseTotem,
   getPurchaseInfo,
   forgeTotem,
+  chooseTrait,
 };

@@ -244,7 +244,8 @@ async function dynamoRequest(target, body) {
     }
 
     return data;
-  } catch (error) {
+  }
+  catch (error) {
     clearTimeout(timeout);
     if (error.name === 'AbortError') {
       throw new Error('Request timeout');
@@ -264,7 +265,8 @@ async function waitForDynamo(maxAttempts = 30, delayMs = 1000) {
       await dynamoRequest('ListTables', {});
       if (attempt > 1) console.log(`✓ DynamoDB ready after ${attempt} attempts`);
       return;
-    } catch (error) {
+    }
+    catch (error) {
       if (attempt === maxAttempts) {
         throw new Error(`DynamoDB not reachable at ${ENDPOINT} after ${maxAttempts}s: ${error.message}`);
       }
@@ -295,7 +297,8 @@ async function main() {
   try {
     await waitForDynamo();
     if (process.stdout.write('')) console.log(''); // newline after dots if we printed any
-  } catch (error) {
+  }
+  catch (error) {
     console.error('');
     console.error(`❌ ${error.message}`);
     console.error('');
@@ -322,10 +325,12 @@ async function main() {
     try {
       await createTable(tableDefinition);
       console.log(`✓ ${tableName} (created)`);
-    } catch (error) {
+    }
+    catch (error) {
       if (error.code === 'ResourceInUseException') {
         console.log(`✓ ${tableName} (already exists)`);
-      } else {
+      }
+      else {
         console.error(`✗ ${tableName}: ${error.message}`);
       }
     }
@@ -349,11 +354,13 @@ async function main() {
       Key: { pk: { S: `USER#${TEST_USER_ID}` }, sk: { S: 'PROFILE' } },
     });
     userExists = !!result.Item;
-  } catch (e) { /* table may be empty */ }
+  }
+  catch (e) { /* table may be empty */ }
 
   if (userExists) {
     console.log(`✓ Dev test user already seeded (${TEST_USER_EMAIL})`);
-  } else {
+  }
+  else {
     console.log('');
     console.log('🌱 Seeding dev test user...');
 
@@ -451,11 +458,13 @@ async function main() {
       Key: { pk: { S: `USER#${ADMIN_USER_ID}` }, sk: { S: 'PROFILE' } },
     });
     adminExists = !!result.Item;
-  } catch (e) { /* table may be empty */ }
+  }
+  catch (e) { /* table may be empty */ }
 
   if (adminExists) {
     console.log(`✓ Admin test user already seeded (${ADMIN_USER_EMAIL})`);
-  } else {
+  }
+  else {
     console.log('');
     console.log('🌱 Seeding admin test user...');
 
