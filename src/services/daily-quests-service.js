@@ -351,7 +351,7 @@ async function batchClaim(userId, date, now = new Date()) {
   }
 
   const names = { '#quests': 'quests', '#claimed': 'claimed', '#claimedAt': 'claimedAt', '#date': 'date' };
-  const values = { ':true': true, ':now': now.toISOString(), ':today': date, ':false': false };
+  const values = { ':true': true, ':now': now.toISOString(), ':today': date };
   const sets = [];
   const conditions = ['#date = :today'];
 
@@ -366,6 +366,7 @@ async function batchClaim(userId, date, now = new Date()) {
   let bonusClaimed = false;
   if (bonusUnlockable) {
     names['#bonus'] = 'bonus';
+    values[':false'] = false;
     sets.push('#bonus.#claimed = :true');
     sets.push('#bonus.#claimedAt = :now');
     conditions.push('#bonus.#claimed = :false');

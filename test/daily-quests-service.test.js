@@ -312,6 +312,15 @@ describe('Daily Quests Service', () => {
       expect(r.bonusClaimed).toBe(false);
       expect(r.totalEssenceAwarded).toBe(15 + 15 + 25); // 55
       expect(db.addEssence).toHaveBeenCalledWith(USER_ID, 55, expect.objectContaining({ type: 'reward_quest' }));
+
+      // Regression: partial claim must not declare unused ExpressionAttributeValues —
+      // DynamoDB rejects the whole update with ValidationException otherwise.
+      const updateArgs = db.rawUpdate.mock.calls[0][2];
+      const valueKeys = Object.keys(updateArgs.ExpressionAttributeValues);
+      const expr = `${updateArgs.UpdateExpression} ${updateArgs.ConditionExpression}`;
+      for (const key of valueKeys) {
+        expect(expr).toContain(key);
+      }
     });
 
     it('auto-claims bonus when batch completes the full set + grants a rune', async () => {
