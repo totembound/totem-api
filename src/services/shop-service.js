@@ -28,6 +28,7 @@ const {
 } = require('../common/db-client');
 const { QueryCommand, ScanCommand } = require('@aws-sdk/lib-dynamodb');
 const { onTotemAcquired } = require('./achievements-service');
+const { buildInitialTraits } = require('../config/traits');
 
 // =============================================================================
 // CONSTANTS
@@ -156,6 +157,7 @@ async function listTotemForSale(userId, totemId, _askingPrice) {
         experience: totem.experience,
         prestigeLevel: totem.prestigeLevel,
         stats: { ...totem.stats },
+        traits: totem.traits ? { ...totem.traits } : null,
       },
       // GSI attributes
       speciesId: totem.speciesId,
@@ -297,6 +299,11 @@ async function purchaseUnboundTotem(buyerId, totemId) {
       prestigeLevel: listing.totemData.prestigeLevel,
       stats: { ...listing.totemData.stats },
       cooldowns: { feed: null, train: null, treat: null },
+      // Traits travel with the totem — they're identity, not seller-bound state.
+      // Fallback to a fresh innate roll if the snapshot is pre-traits (legacy listing).
+      traits: listing.totemData.traits
+        ? { ...listing.totemData.traits }
+        : buildInitialTraits(),
       createdAt: now,
       updatedAt: now,
     };
@@ -467,6 +474,10 @@ async function cancelListing(userId, totemId) {
       prestigeLevel: listing.totemData.prestigeLevel,
       stats: { ...listing.totemData.stats },
       cooldowns: { feed: null, train: null, treat: null },
+      // Preserve traits across unlist (or backfill if pre-traits listing).
+      traits: listing.totemData.traits
+        ? { ...listing.totemData.traits }
+        : buildInitialTraits(),
       createdAt: now,
       updatedAt: now,
     };

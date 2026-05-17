@@ -151,6 +151,7 @@ async function getListings(user, queryParams = {}) {
           stage: listing.totemData?.stage,
           experience: listing.totemData?.experience,
           stats: listing.totemData?.stats,
+          traits: listing.totemData?.traits || null,
         },
         askingPrice: currentPrice,
         sellPrice: currentPrice,
