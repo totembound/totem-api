@@ -1206,7 +1206,7 @@
  *   post:
  *     tags: [Expeditions]
  *     summary: Start an expedition
- *     description: Send a totem on an expedition. Totem becomes unavailable until expedition completes.
+ *     description: Send a team of 3 distinct totems on an expedition. All team totems become unavailable until expedition completes.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1221,14 +1221,19 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [totemId]
+ *             required: [totemIds]
  *             properties:
- *               totemId: { type: string }
+ *               totemIds:
+ *                 type: array
+ *                 minItems: 3
+ *                 maxItems: 3
+ *                 items: { type: string }
+ *                 description: Exactly 3 distinct totem IDs for the expedition team
  *     responses:
  *       200:
  *         description: Expedition started
  *       400:
- *         description: Totem unavailable or insufficient Essence
+ *         description: Invalid team, totems unavailable, or insufficient Essence
  */
 
 /**

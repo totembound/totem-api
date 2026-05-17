@@ -228,7 +228,8 @@ describe('Expeditions Service', () => {
       const result = await expeditionsService.startExpedition(
         testUserId,
         testTotemId,
-        'exp_lunch-delivery-mission'
+        'exp_lunch-delivery-mission',
+        [testTotemId, 'ttm_2', 'ttm_3']
       );
 
       expect(result.success).toBe(true);
@@ -433,12 +434,38 @@ describe('Expeditions Service', () => {
       const result = await expeditionsService.startExpedition(
         testUserId,
         testTotemId,
-        'exp_weed-pulling-quest'
+        'exp_weed-pulling-quest',
+        [testTotemId, 'ttm_2', 'ttm_3']
       );
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Totem is busy');
       expect(result.activeExpedition).toBeDefined();
+    });
+
+    it('should reject solo / partial team', async () => {
+      dbClient.getTotem.mockResolvedValue(mockTotem);
+      dbClient.getUserTotems.mockResolvedValue([{ id: 'ttm_1' }, { id: 'ttm_2' }, { id: 'ttm_3' }]);
+      const result = await expeditionsService.startExpedition(
+        testUserId,
+        testTotemId,
+        'exp_lunch-delivery-mission',
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid team size');
+    });
+
+    it('should reject team with duplicate totem IDs', async () => {
+      dbClient.getTotem.mockResolvedValue(mockTotem);
+      dbClient.getUserTotems.mockResolvedValue([{ id: 'ttm_1' }, { id: 'ttm_2' }, { id: 'ttm_3' }]);
+      const result = await expeditionsService.startExpedition(
+        testUserId,
+        testTotemId,
+        'exp_lunch-delivery-mission',
+        ['ttm_1', 'ttm_1', 'ttm_2'],
+      );
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Invalid team size');
     });
   });
 
