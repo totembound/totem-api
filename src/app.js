@@ -1030,6 +1030,37 @@ app.post('/v1/rewards/tutorial', authenticateJWT, async (req, res) => {
   }
 });
 
+// Daily Quests routes
+app.get('/v1/rewards/quests', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.getDailyQuests) {
+      const result = await rewardRoutes.getDailyQuests(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Daily quests not implemented' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/quests/claim', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.claimDailyQuests) {
+      const result = await rewardRoutes.claimDailyQuests(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Daily quests not implemented' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 // Achievement routes
 app.get('/v1/achievements', authenticateJWT, async (req, res) => {
   try {

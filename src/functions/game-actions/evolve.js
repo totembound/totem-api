@@ -18,6 +18,7 @@ const {
   MAX_STAGE,
 } = require('./helpers');
 const { onTotemEvolved } = require('../../services/achievements-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
 
 /**
  * Evolve a totem to the next stage
@@ -136,6 +137,7 @@ async function evolve(user, totemId) {
       },
       message: `Your totem evolved from ${oldStageName} to ${newStageName}!`,
       achievements,
+      quests: await emitQuestProgress(userId, 'ACTION_EVOLVE', { totemId, newStage }),
     },
   };
 }

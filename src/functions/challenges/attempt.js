@@ -9,7 +9,8 @@
  * awards XP to the totem AND Essence to the user, and triggers achievement hook.
  */
 
-const { completeChallenge } = require('../../services/challenges-service');
+const { completeChallenge, CHALLENGES_MAP } = require('../../services/challenges-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
 
 /**
  * Complete a challenge with a totem
@@ -69,11 +70,18 @@ async function attemptChallenge(user, body) {
     const { getTotem } = require('../../common/db-client');
     const totem = await getTotem(userId, totemId);
 
+    const challenge = CHALLENGES_MAP && CHALLENGES_MAP[challengeId];
+    const quests = await emitQuestProgress(userId, 'CHALLENGE_COMPLETED', {
+      challengeId,
+      affinity: challenge?.affinity || null,
+    });
+
     return {
       success: true,
       data: {
         ...result.data,
         totemStats: totem?.stats || {},
+        quests,
       },
     };
   }

@@ -117,6 +117,7 @@ async function handleSignup(req, res) {
       },
       settings: { notifications: true, darkMode: 'dark' },
       role: 'user',
+      lastQuestDate: null,
     };
 
     await createUser(userData);

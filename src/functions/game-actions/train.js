@@ -22,6 +22,7 @@ const {
   buildActionResult,
 } = require('./helpers');
 const { onGameAction, checkBalancedCare } = require('../../services/achievements-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
 const { addTotemXp } = require('../../services/totem-xp');
 
 /**
@@ -130,10 +131,11 @@ async function train(user, totemId) {
 
   // 9. Update user's total train count and trigger achievement check
   let totalTrainCount;
+  let userRecord;
   // Prestige unlocks (if any) come from the XP chokepoint.
   let achievements = [...(xpResult.achievements || [])];
   try {
-    const userRecord = await getUser(userId);
+    userRecord = await getUser(userId);
     totalTrainCount = (userRecord?.stats?.totalTrainCount || 0) + 1;
     await updateUser(userId, { 'stats.totalTrainCount': totalTrainCount });
     const achResults = await onGameAction(userId, 'train', totalTrainCount, totemId);
@@ -176,6 +178,7 @@ async function train(user, totemId) {
       essenceSpent: cost,
       newEssenceBalance: balanceResult.newBalance,
       achievements,
+      quests: await emitQuestProgress(userId, 'ACTION_TRAIN', { totemId }, { user: userRecord }),
     },
   };
 }

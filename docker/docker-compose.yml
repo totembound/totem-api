@@ -1,5 +1,3 @@
-version: '3.8'
-
 # TotemBound Local Development Environment
 # Run: docker-compose up -d
 # Stop: docker-compose down

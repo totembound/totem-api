@@ -48,6 +48,7 @@ const {
 
 const { getActiveExpeditions } = require('../../services/expeditions-service');
 const { onTotemFused } = require('../../services/achievements-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
 
 // Max forgeable rarity (Legendary = 4)
 const MAX_FORGE_RARITY = 3; // Epic is the highest input rarity (produces Legendary)
@@ -325,6 +326,7 @@ async function forgeTotem(user, body = {}) {
         milestone: a.milestone,
         rewards: a.rewards,
       })),
+      quests: await emitQuestProgress(userId, 'TOTEM_FORGED', { fusionType, newRarityId }),
     },
   };
 }

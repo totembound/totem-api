@@ -633,6 +633,18 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
   // Resolve all team totems
   const allTotemIds = Array.isArray(totemIds) && totemIds.length > 0 ? totemIds : [totemId];
 
+  // Expeditions require a full team of exactly 3 distinct totems
+  const uniqueTeam = Array.from(new Set(allTotemIds));
+  if (uniqueTeam.length !== 3) {
+    return {
+      success: false,
+      error: 'Invalid team size',
+      message: 'Expeditions require a team of 3 distinct totems',
+      required: 3,
+      provided: uniqueTeam.length,
+    };
+  }
+
   // Check if ANY team totem is already on an expedition (not just the lead)
   for (const tid of allTotemIds) {
     const existingExp = await getActiveExpedition(userId, tid);
