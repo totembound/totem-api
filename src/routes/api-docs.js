@@ -916,6 +916,50 @@
 
 /**
  * @swagger
+ * /v1/totems/{id}/traits/choose:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Choose a trait for a totem
+ *     description: |
+ *       Pick a trait for the Learned (Stage 2+) or Awakened (Stage 4+) slot.
+ *       Innate is set at birth and not selectable. Choices are permanent.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [slot, traitId]
+ *             properties:
+ *               slot:
+ *                 type: string
+ *                 enum: [learned, awakened]
+ *                 example: learned
+ *               traitId:
+ *                 type: string
+ *                 example: trt_quick_learner
+ *     responses:
+ *       200:
+ *         description: Trait chosen
+ *       400:
+ *         description: INVALID_SLOT or INVALID_TRAIT
+ *       403:
+ *         description: STAGE_LOCKED — totem not yet at the required stage
+ *       404:
+ *         description: TOTEM_NOT_FOUND
+ *       409:
+ *         description: SLOT_TAKEN — slot already filled
+ */
+
+/**
+ * @swagger
  * /v1/totems/{id}/nickname:
  *   post:
  *     tags: [Totems]
