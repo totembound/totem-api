@@ -19,7 +19,7 @@
  */
 
 const { getItem, updateItem, TABLES } = require('../../common/db-client');
-const { deductEssence, logTransaction } = require('../../common/db-client');
+const { deductEssence } = require('../../common/db-client');
 
 const REWARDS_CLAIMS_TABLE = TABLES.REWARDS_CLAIMS;
 
@@ -122,7 +122,9 @@ async function purchaseProtection(user, body, rewardType) {
 
     const deductResult = await deductEssence(userId, tierConfig.cost, {
       type: 'protection_purchase',
-      ref: `protection_${rewardType}_tier${tierIndex}`,
+      ref: `${rewardType}_tier${tierIndex}`,
+      refType: 'protection',
+      refName: `${rewardType === 'daily' ? 'Daily' : 'Weekly'} Protection (Tier ${tierIndex})`,
     });
 
     if (!deductResult.success) {
@@ -141,17 +143,6 @@ async function purchaseProtection(user, body, rewardType) {
       protectionPurchasedAt: new Date().toISOString(),
       // Clear any legacy expiry-based protection — charges replace it.
       protectionExpiry: null,
-    });
-
-    await logTransaction(userId, {
-      type: 'protection_purchase',
-      currency: 'essence',
-      amount: -tierConfig.cost,
-      balanceBefore: deductResult.newBalance + tierConfig.cost,
-      balanceAfter: deductResult.newBalance,
-      refType: 'protection',
-      ref: `${rewardType}_tier${tierIndex}`,
-      refName: `${rewardType === 'daily' ? 'Daily' : 'Weekly'} Protection (Tier ${tierIndex})`,
     });
 
     console.log(`[Protection] User ${userId} purchased ${rewardType} tier ${tierIndex}: +${tierConfig.charges} charges (now ${newCharges}/${maxCharges}) for ${tierConfig.cost} Essence.`);

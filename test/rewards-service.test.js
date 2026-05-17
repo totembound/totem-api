@@ -294,10 +294,13 @@ describe('Rewards Service', () => {
       expect(dbClient.addEssence).toHaveBeenCalledWith(
         'usr_test123',
         30, // base amount for streak 1
-        { type: 'reward_daily', ref: expect.stringMatching(/^daily_\d{4}-\d{2}-\d{2}$/) }
+        {
+          type: 'reward_daily',
+          ref: expect.stringMatching(/^daily_\d{4}-\d{2}-\d{2}$/),
+          refType: 'reward',
+          refName: 'Daily Reward (1 day streak)',
+        },
       );
-
-      expect(dbClient.logTransaction).toHaveBeenCalled();
     });
 
     it('should increment streak on consecutive daily claim', async () => {
@@ -448,7 +451,12 @@ describe('Rewards Service', () => {
       expect(dbClient.addEssence).toHaveBeenCalledWith(
         'usr_test123',
         200, // 200 base, no bonus on first claim
-        { type: 'reward_weekly', ref: expect.stringMatching(/^weekly_\d{4}-\d{2}-\d{2}$/) }
+        {
+          type: 'reward_weekly',
+          ref: expect.stringMatching(/^weekly_\d{4}-\d{2}-\d{2}$/),
+          refType: 'reward',
+          refName: 'Weekly Reward (1 week streak)',
+        },
       );
     });
 
@@ -967,10 +975,14 @@ describe('Rewards Service', () => {
       expect(dbClient.addEssence).toHaveBeenCalledWith(
         'usr_test123',
         50,
-        { type: 'reward_tutorial', ref: 'tutorial_step_1' }
+        {
+          type: 'reward_tutorial',
+          ref: 'tutorial_step_1',
+          refType: 'tutorial',
+          refName: 'Claim Your Spiritkeeper Reward',
+        },
       );
       expect(dbClient.putItem).toHaveBeenCalled();
-      expect(dbClient.logTransaction).toHaveBeenCalled();
       // No totem update for step 1 (experienceReward is 0)
       expect(dbClient.updateTotem).not.toHaveBeenCalled();
     });

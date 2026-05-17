@@ -14,7 +14,7 @@
  *   const status = await getRewardStatus(userId);
  */
 
-const { getItem, putItem, updateItem, queryItems, getUser, addEssence, logTransaction, getTotem, updateTotem, TABLES } = require('../common/db-client');
+const { getItem, putItem, updateItem, queryItems, getUser, addEssence, getTotem, updateTotem, TABLES } = require('../common/db-client');
 const { onLoginStreak } = require('./achievements-service');
 
 // =============================================================================
@@ -471,10 +471,12 @@ async function claimDailyReward(userId) {
     // Bonus is based on the NEW streak (after this claim)
     const { baseAmount, bonusPercent, bonusAmount, totalAmount } = calculateRewardAmount('daily', newStreak);
 
-    // Add Essence to user balance
+    // Add Essence (auto-logs to Transactions)
     const balanceResult = await addEssence(userId, totalAmount, {
       type: 'reward_daily',
       ref: `daily_${getDateString()}`,
+      refType: 'reward',
+      refName: `Daily Reward (${newStreak} day streak)`,
     });
 
     if (!balanceResult.success) {
@@ -492,18 +494,6 @@ async function claimDailyReward(userId) {
 
     // Update streak state (decrements protection charge if one was consumed)
     await updateStreakState(userId, 'daily', newStreak, totalAmount, { consumeProtectionCharge: consumeCharge });
-
-    // Log transaction for audit
-    await logTransaction(userId, {
-      type: 'reward_daily',
-      currency: 'essence',
-      amount: totalAmount,
-      balanceBefore: balanceResult.newBalance - totalAmount,
-      balanceAfter: balanceResult.newBalance,
-      refType: 'reward',
-      ref: `daily_streak_${newStreak}`,
-      refName: `Daily Reward (${newStreak} day streak)`,
-    });
 
     // Update login streak achievement progress
     let achievements = [];
@@ -585,10 +575,12 @@ async function claimWeeklyReward(userId) {
     // Bonus is based on the NEW streak (after this claim)
     const { baseAmount, bonusPercent, bonusAmount, totalAmount } = calculateRewardAmount('weekly', newStreak);
 
-    // Add Essence to user balance
+    // Add Essence (auto-logs to Transactions)
     const balanceResult = await addEssence(userId, totalAmount, {
       type: 'reward_weekly',
       ref: `weekly_${getDateString()}`,
+      refType: 'reward',
+      refName: `Weekly Reward (${newStreak} week streak)`,
     });
 
     if (!balanceResult.success) {
@@ -606,18 +598,6 @@ async function claimWeeklyReward(userId) {
 
     // Update streak state (decrements protection charge if one was consumed)
     await updateStreakState(userId, 'weekly', newStreak, totalAmount, { consumeProtectionCharge: consumeCharge });
-
-    // Log transaction for audit
-    await logTransaction(userId, {
-      type: 'reward_weekly',
-      currency: 'essence',
-      amount: totalAmount,
-      balanceBefore: balanceResult.newBalance - totalAmount,
-      balanceAfter: balanceResult.newBalance,
-      refType: 'reward',
-      ref: `weekly_streak_${newStreak}`,
-      refName: `Weekly Reward (${newStreak} week streak)`,
-    });
 
     // Calculate next claim time
     const nextClaim = new Date(Date.now() + REWARD_CONFIG.weekly.cooldownMs).toISOString();
@@ -873,12 +853,14 @@ async function claimTutorialReward(userId, step, totemId = null) {
       }
     }
 
-    // 5. Award Essence
+    // 5. Award Essence (auto-logs to Transactions)
     let newBalance = null;
     if (reward.essenceReward > 0) {
       const balanceResult = await addEssence(userId, reward.essenceReward, {
         type: 'reward_tutorial',
         ref: `tutorial_step_${step}`,
+        refType: 'tutorial',
+        refName: reward.name,
       });
 
       if (!balanceResult.success) {
@@ -917,20 +899,6 @@ async function claimTutorialReward(userId, step, totemId = null) {
     };
 
     await putItem(REWARDS_CLAIMS_TABLE, claimRecord);
-
-    // 8. Log transaction for audit (if essence was awarded)
-    if (reward.essenceReward > 0) {
-      await logTransaction(userId, {
-        type: 'reward_tutorial',
-        currency: 'essence',
-        amount: reward.essenceReward,
-        balanceBefore: newBalance - reward.essenceReward,
-        balanceAfter: newBalance,
-        refType: 'tutorial',
-        ref: `tutorial_step_${step}`,
-        refName: reward.name,
-      });
-    }
 
     console.log(`[Rewards] User ${userId} claimed tutorial step ${step}: ${reward.essenceReward} Essence, ${reward.experienceReward} XP`);
 

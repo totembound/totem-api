@@ -535,9 +535,16 @@ describe('Reward Handlers', () => {
         );
       });
 
-      it('should log transaction', async () => {
+      it('should pass audit metadata to deductEssence (logs via auto-log path)', async () => {
         await purchaseProtection(testUser, { tier: 0 }, 'daily');
-        expect(dbClient.logTransaction).toHaveBeenCalled();
+        expect(dbClient.deductEssence).toHaveBeenCalledWith(
+          testUser.userId, 50,
+          expect.objectContaining({
+            type: 'protection_purchase',
+            refType: 'protection',
+            refName: expect.stringContaining('Daily Protection'),
+          }),
+        );
       });
 
       it('should stack charges across multiple purchases', async () => {
