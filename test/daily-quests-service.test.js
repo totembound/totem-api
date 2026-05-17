@@ -144,7 +144,7 @@ describe('Daily Quests Service', () => {
 
   describe('questMatches', () => {
     it('matches trigger + empty filters', () => {
-      const q = { id: 'dq_feed_3' };
+      const q = { id: 'dq_feed_2' };
       expect(svc.questMatches(q, 'ACTION_FEED', { totemId: 'ttm_x' })).toBe(true);
     });
 
@@ -159,7 +159,7 @@ describe('Daily Quests Service', () => {
     });
 
     it('returns false when trigger mismatches', () => {
-      const q = { id: 'dq_feed_3' };
+      const q = { id: 'dq_feed_2' };
       expect(svc.questMatches(q, 'ACTION_TRAIN', {})).toBe(false);
     });
   });
@@ -236,12 +236,12 @@ describe('Daily Quests Service', () => {
       db.getItem.mockResolvedValue({
         date: TODAY,
         quests: [
-          { slot: 1, id: 'dq_feed_3', progress: 2, goal: 3, claimed: false },
+          { slot: 1, id: 'dq_feed_2', progress: 1, goal: 2, claimed: false },
           { slot: 2, id: 'dq_train_diff_2', progress: 0, goal: 2, claimed: false },
         ],
       });
       const updates = await svc.onQuestProgress(USER_ID, user, 'ACTION_FEED', {}, NOW);
-      expect(updates).toEqual([{ slot: 1, newProgress: 3 }]);
+      expect(updates).toEqual([{ slot: 1, newProgress: 2 }]);
       expect(db.rawUpdate).toHaveBeenCalledTimes(1);
     });
 
@@ -249,7 +249,7 @@ describe('Daily Quests Service', () => {
       const user = { lastQuestDate: TODAY };
       db.getItem.mockResolvedValue({
         date: TODAY,
-        quests: [{ slot: 1, id: 'dq_feed_3', progress: 0, goal: 3, claimed: false }],
+        quests: [{ slot: 1, id: 'dq_feed_2', progress: 0, goal: 2, claimed: false }],
       });
       const updates = await svc.onQuestProgress(USER_ID, user, 'EXPEDITION_STARTED', { domain: 'water' }, NOW);
       expect(updates).toEqual([]);
@@ -277,7 +277,7 @@ describe('Daily Quests Service', () => {
       db.getItem.mockResolvedValue({
         date: TODAY,
         quests: [
-          { slot: 1, id: 'dq_feed_3',  progress: 1, goal: 3, claimed: false, reward: { essence: 15 } },
+          { slot: 1, id: 'dq_feed_2',  progress: 1, goal: 2, claimed: false, reward: { essence: 15 } },
           { slot: 2, id: 'dq_expedition_claim_1',   progress: 1, goal: 1, claimed: true,  reward: { essence: 15 } },
         ],
         bonus: { reward: { essence: 75 }, claimed: false },
@@ -292,7 +292,7 @@ describe('Daily Quests Service', () => {
       db.getItem.mockResolvedValue({
         date: TODAY,
         quests: [
-          { slot: 1, id: 'dq_feed_3',         progress: 3, goal: 3, claimed: false, reward: { essence: 15 } },
+          { slot: 1, id: 'dq_feed_2',         progress: 3, goal: 2, claimed: false, reward: { essence: 15 } },
           { slot: 2, id: 'dq_train_diff_2',   progress: 2, goal: 2, claimed: false, reward: { essence: 15 } },
           { slot: 3, id: 'dq_challenge_wisdom', progress: 0, goal: 1, claimed: false, reward: { essence: 25 } },
           { slot: 4, id: 'dq_expedition_start_water', progress: 1, goal: 1, claimed: false, reward: { essence: 25 } },
@@ -307,7 +307,7 @@ describe('Daily Quests Service', () => {
 
       const r = await svc.batchClaim(USER_ID, TODAY, NOW);
       expect(r.claimed.map(c => c.questId).sort()).toEqual([
-        'dq_expedition_start_water', 'dq_feed_3', 'dq_train_diff_2',
+        'dq_expedition_start_water', 'dq_feed_2', 'dq_train_diff_2',
       ]);
       expect(r.bonusClaimed).toBe(false);
       expect(r.totalEssenceAwarded).toBe(15 + 15 + 25); // 55
@@ -318,7 +318,7 @@ describe('Daily Quests Service', () => {
       db.getItem.mockResolvedValue({
         date: TODAY,
         quests: [
-          { slot: 1, id: 'dq_feed_3',         progress: 3, goal: 3, claimed: true,  reward: { essence: 15 } },
+          { slot: 1, id: 'dq_feed_2',         progress: 3, goal: 2, claimed: true,  reward: { essence: 15 } },
           { slot: 2, id: 'dq_expedition_claim_1',          progress: 1, goal: 1, claimed: true,  reward: { essence: 15 } },
           { slot: 3, id: 'dq_challenge_wisdom', progress: 1, goal: 1, claimed: true,  reward: { essence: 25 } },
           { slot: 4, id: 'dq_expedition_start_water', progress: 1, goal: 1, claimed: true,  reward: { essence: 25 } },
@@ -347,7 +347,7 @@ describe('Daily Quests Service', () => {
       db.getItem.mockResolvedValue({
         date: TODAY,
         quests: [
-          { slot: 1, id: 'dq_feed_3', progress: 3, goal: 3, claimed: false, reward: { essence: 15 } },
+          { slot: 1, id: 'dq_feed_2', progress: 3, goal: 2, claimed: false, reward: { essence: 15 } },
           { slot: 2, id: 'dq_expedition_claim_1', progress: 0, goal: 1, claimed: false, reward: { essence: 15 } },
         ],
         bonus: { reward: { essence: 75 }, claimed: false },
@@ -366,7 +366,7 @@ describe('Daily Quests Service', () => {
     it('handles ConditionalCheckFailedException gracefully (race)', async () => {
       db.getItem.mockResolvedValue({
         date: TODAY,
-        quests: [{ slot: 1, id: 'dq_feed_3', progress: 3, goal: 3, claimed: false, reward: { essence: 15 } }],
+        quests: [{ slot: 1, id: 'dq_feed_2', progress: 3, goal: 2, claimed: false, reward: { essence: 15 } }],
         bonus: { reward: { essence: 75 }, claimed: false },
       });
       const err = new Error('check failed');

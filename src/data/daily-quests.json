@@ -2,12 +2,12 @@
   "version": "1.1.0",
   "quests": [
     {
-      "id": "dq_feed_3",
+      "id": "dq_feed_2",
       "name": "Feeding Hand",
-      "description": "Feed any totem 3 times",
+      "description": "Feed any 2 totems",
       "trigger": "ACTION_FEED",
       "filters": {},
-      "goal": 3,
+      "goal": 2,
       "slotEligibility": ["themed_action"],
       "tier": "easy",
       "themeTags": { "action": "feed" },
@@ -16,7 +16,7 @@
     {
       "id": "dq_train_2",
       "name": "Steady Drills",
-      "description": "Train any totem 2 times",
+      "description": "Train any 2 totems",
       "trigger": "ACTION_TRAIN",
       "filters": {},
       "goal": 2,
@@ -28,7 +28,7 @@
     {
       "id": "dq_treat_2",
       "name": "Small Comforts",
-      "description": "Treat any totem 2 times",
+      "description": "Treat any 2 totems",
       "trigger": "ACTION_TREAT",
       "filters": {},
       "goal": 2,

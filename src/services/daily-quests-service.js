@@ -84,7 +84,7 @@ function pickOne(candidates, rng) {
 }
 
 function toRuntimeQuest(slot, def) {
-  return {
+  const quest = {
     slot,
     id: def.id,
     name: def.name,
@@ -96,6 +96,10 @@ function toRuntimeQuest(slot, def) {
     reward: def.reward,
     completed: false,
   };
+  if (def.filters && def.filters.uniqueTotems) {
+    quest.seenTotems = [];
+  }
+  return quest;
 }
 
 function generateDailyQuestSet({ theme, playerCaps, yesterdayIds = [], rng = Math.random } = {}) {
@@ -160,6 +164,13 @@ function questMatches(quest, trigger, data) {
   if (!def || def.trigger !== trigger) return false;
   const filters = def.filters || {};
   for (const key of Object.keys(filters)) {
+    if (key === 'uniqueTotems') {
+      const totemId = (data || {}).totemId;
+      if (!totemId) return false;
+      const seen = quest.seenTotems || [];
+      if (seen.includes(totemId)) return false;
+      continue;
+    }
     if ((data || {})[key] !== filters[key]) return false;
   }
   return true;
@@ -264,6 +275,12 @@ async function applyProgressUpdate(userId, date, updates) {
     const v = `:p${i}`;
     values[v] = u.newProgress;
     sets.push(`#quests[${u.slot - 1}].#progress = ${v}`);
+    if (u.newSeenTotems) {
+      names['#seenTotems'] = 'seenTotems';
+      const s = `:s${i}`;
+      values[s] = u.newSeenTotems;
+      sets.push(`#quests[${u.slot - 1}].#seenTotems = ${s}`);
+    }
   });
   try {
     await rawUpdate(TABLES.REWARD_STATE, { pk: userPK(userId), sk: questSK(date) }, {
@@ -285,12 +302,18 @@ async function onQuestProgress(userId, user, trigger, data, now = new Date()) {
   const record = await getQuestRecord(userId, today);
   if (!record || !Array.isArray(record.quests)) return [];
 
+  const { quests: catalog } = loadCatalog();
   const updates = [];
   for (const quest of record.quests) {
     if (quest.claimed) continue;
     if (quest.progress >= quest.goal) continue;
     if (!questMatches(quest, trigger, data)) continue;
-    updates.push({ slot: quest.slot, newProgress: Math.min(quest.progress + 1, quest.goal) });
+    const update = { slot: quest.slot, newProgress: Math.min(quest.progress + 1, quest.goal) };
+    const def = catalog.find(q => q.id === quest.id);
+    if (def && def.filters && def.filters.uniqueTotems && data && data.totemId) {
+      update.newSeenTotems = [...(quest.seenTotems || []), data.totemId];
+    }
+    updates.push(update);
   }
   if (!updates.length) return [];
 
