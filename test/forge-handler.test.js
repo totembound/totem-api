@@ -39,6 +39,7 @@ jest.mock('../src/services/totem-creation', () => {
       nickname: null,
       stats: { strength: 10, agility: 8, wisdom: 12, happiness: 50, hunger: 100 },
       cooldowns: { feed: null, train: null, treat: null },
+      traits: { innate: 'trt_brave', learned: null, awakened: null },
       createdAt: '2024-01-01T00:00:00.000Z',
     })),
     selectRandomSpecies: jest.fn(() => ({
@@ -274,6 +275,9 @@ describe('forgeTotem - successful fusion', () => {
     expect(result.data.fusionType).toBe('pure');
     expect(result.data.consumedTotemIds).toEqual(['ttm_a', 'ttm_b', 'ttm_c']);
     expect(result.data.newTotem.id).toBe('ttm_forged');
+    // Response surfaces the forged totem's traits (innate auto-assigned by createTotem)
+    // so the client can show the born-trait badge without an extra fetch.
+    expect(result.data.newTotem.traits).toEqual({ innate: 'trt_brave', learned: null, awakened: null });
 
     // createTotem called with forced rarity = 1 (Uncommon) and speciesId = 2
     expect(totemCreation.createTotem).toHaveBeenCalledWith({

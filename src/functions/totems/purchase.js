@@ -176,6 +176,7 @@ async function purchaseTotem(user, body = {}) {
         stage: totemData.stage,
         experience: totemData.experience,
         stats: totemData.stats,
+        traits: totemData.traits,
         image: getTotemImageUrl(totemData.speciesId, totemData.colorId, 0),
         createdAt: totemData.createdAt,
       },

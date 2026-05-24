@@ -323,6 +323,7 @@ async function forgeTotem(user, body = {}) {
         stage: newTotemData.stage,
         experience: newTotemData.experience,
         stats: newTotemData.stats,
+        traits: newTotemData.traits,
         image: getTotemImageUrl(newTotemData.speciesId, newTotemData.colorId, 0),
         createdAt: newTotemData.createdAt,
       },
