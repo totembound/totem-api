@@ -36,6 +36,7 @@ jest.mock('../src/services/totem-creation', () => {
       nickname: opts.name || null,
       stats: { strength: 9, agility: 7, wisdom: 11, happiness: 50, hunger: 100 },
       cooldowns: { feed: null, train: null, treat: null },
+      traits: { innate: 'trt_brave', learned: null, awakened: null },
       createdAt: '2024-01-01T00:00:00.000Z',
     })),
   };
@@ -98,6 +99,8 @@ describe('Totem Handlers', () => {
       const result = await purchaseTotem(testUser, {});
       expect(result.success).toBe(true);
       expect(result.data.totem.id).toBe('ttm_newtotem');
+      // Innate trait is surfaced so the purchase celebration can show the born-trait badge.
+      expect(result.data.totem.traits).toEqual({ innate: 'trt_brave', learned: null, awakened: null });
       expect(result.data.cost).toBe(500);
       expect(result.data.newBalance).toBe(1500);
     });

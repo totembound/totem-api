@@ -717,6 +717,22 @@
  *                         stage:
  *                           type: integer
  *                           example: 0
+ *                         stats:
+ *                           type: object
+ *                         traits:
+ *                           type: object
+ *                           description: Trait slots; innate is auto-assigned at forge, learned/awakened are chosen later.
+ *                           properties:
+ *                             innate:
+ *                               type: string
+ *                               nullable: true
+ *                               example: trt_brave
+ *                             learned:
+ *                               type: string
+ *                               nullable: true
+ *                             awakened:
+ *                               type: string
+ *                               nullable: true
  *                         image:
  *                           type: string
  *                     newEssenceBalance:
@@ -757,6 +773,38 @@
  *     responses:
  *       201:
  *         description: Totem purchased
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totem:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         speciesId: { type: integer }
+ *                         speciesName: { type: string }
+ *                         colorId: { type: integer }
+ *                         rarityId: { type: integer }
+ *                         nickname: { type: string, nullable: true }
+ *                         stage: { type: integer }
+ *                         experience: { type: integer }
+ *                         stats: { type: object }
+ *                         traits:
+ *                           type: object
+ *                           description: Trait slots; innate is auto-assigned at purchase, learned/awakened are chosen later.
+ *                           properties:
+ *                             innate: { type: string, nullable: true, example: trt_curious }
+ *                             learned: { type: string, nullable: true }
+ *                             awakened: { type: string, nullable: true }
+ *                         image: { type: string }
+ *                     newBalance: { type: integer }
+ *                     cost: { type: integer }
+ *                     achievements: { type: array, items: { type: object } }
  *       402:
  *         description: Insufficient Essence
  *       400:
@@ -2057,6 +2105,43 @@
  *     responses:
  *       201:
  *         description: Bundle purchased
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     bundle:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         name: { type: string }
+ *                     totem:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         speciesId: { type: integer }
+ *                         speciesName: { type: string }
+ *                         colorId: { type: integer }
+ *                         rarityId: { type: integer }
+ *                         rarityName: { type: string }
+ *                         stage: { type: integer }
+ *                         stats: { type: object }
+ *                         traits:
+ *                           type: object
+ *                           description: Trait slots; innate is auto-assigned at purchase, learned/awakened are chosen later.
+ *                           properties:
+ *                             innate: { type: string, nullable: true, example: trt_dreamer }
+ *                             learned: { type: string, nullable: true }
+ *                             awakened: { type: string, nullable: true }
+ *                         image: { type: string }
+ *                     gemsSpent: { type: integer }
+ *                     essenceReceived: { type: integer }
+ *                     newGemsBalance: { type: integer }
+ *                     newEssenceBalance: { type: integer }
  *       402:
  *         description: Insufficient Gems
  *       409:
@@ -2576,11 +2661,39 @@
  *                 data:
  *                   type: object
  *                   properties:
- *                     totemId: { type: string }
- *                     speciesId: { type: number }
- *                     colorId: { type: number }
- *                     rarity: { type: string }
- *                     rarityId: { type: number }
+ *                     lootItemId: { type: string }
+ *                     boxName: { type: string }
+ *                     type: { type: string }
+ *                     result:
+ *                       type: object
+ *                       properties:
+ *                         type:
+ *                           type: string
+ *                           description: "'totem' or 'essence'"
+ *                         totem:
+ *                           type: object
+ *                           description: Present when the box yields a totem
+ *                           properties:
+ *                             id: { type: string }
+ *                             speciesId: { type: integer }
+ *                             speciesName: { type: string }
+ *                             colorId: { type: integer }
+ *                             colorName: { type: string }
+ *                             rarityId: { type: integer }
+ *                             rarityName: { type: string }
+ *                             stage: { type: integer }
+ *                             stats: { type: object }
+ *                             traits:
+ *                               type: object
+ *                               description: Trait slots; innate is auto-assigned on claim, learned/awakened are chosen later.
+ *                               properties:
+ *                                 innate: { type: string, nullable: true, example: trt_lucky }
+ *                                 learned: { type: string, nullable: true }
+ *                                 awakened: { type: string, nullable: true }
+ *                         amount:
+ *                           type: integer
+ *                           description: Essence amount when the box yields essence
+ *                         newBalance: { type: integer }
  *       400:
  *         description: Missing lootItemId
  *       422:

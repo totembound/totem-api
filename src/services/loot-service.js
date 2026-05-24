@@ -290,6 +290,7 @@ async function claimTotemBox(userId, boxDef, options) {
       stageName: getStageNameForSpecies(speciesId, 0),
       experience: 0,
       stats: totem.stats,
+      traits: totem.traits,
     },
     achievements,
   };

@@ -279,6 +279,11 @@ describe('Purchase Bundle', () => {
         expect(result.data.totem.colorId).toBe(18);   // Verdant
         expect(result.data.totem.rarityId).toBe(5);   // Limited
         expect(result.data.totem.rarityName).toBe('Limited');
+        // Innate trait is surfaced so the bundle celebration can show the born-trait badge.
+        expect(result.data.totem.traits).toBeDefined();
+        expect(result.data.totem.traits.innate).toMatch(/^trt_/);
+        expect(result.data.totem.traits.learned).toBeNull();
+        expect(result.data.totem.traits.awakened).toBeNull();
 
         // Verify totem was created with correct data
         const transactItems = dbClient.transactWrite.mock.calls[0][0];

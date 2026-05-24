@@ -57,6 +57,7 @@ jest.mock('../src/services/totem-creation', () => {
       experience: 0,
       stats: { strength: 9, agility: 7, wisdom: 11, happiness: 50, hunger: 100 },
       cooldowns: { feed: null, train: null, treat: null },
+      traits: { innate: 'trt_brave', learned: null, awakened: null },
     })),
   };
 });
@@ -253,6 +254,8 @@ describe('Loot Service', () => {
         expect(result.type).toBe('totem_box');
         expect(result.result.type).toBe('totem');
         expect(result.result.totem).toBeDefined();
+        // Innate trait is surfaced so the claim celebration can show the born-trait badge.
+        expect(result.result.totem.traits).toEqual({ innate: 'trt_brave', learned: null, awakened: null });
       });
 
       it('should throw when species not selected for totem box', async () => {
