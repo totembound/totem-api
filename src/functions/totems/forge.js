@@ -48,6 +48,7 @@ const {
 
 const { getActiveExpeditions } = require('../../services/expeditions-service');
 const { onTotemFused } = require('../../services/achievements-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
 
 // Max forgeable rarity (Legendary = 4)
 const MAX_FORGE_RARITY = 3; // Epic is the highest input rarity (produces Legendary)
@@ -113,7 +114,8 @@ async function forgeTotem(user, body = {}) {
   let activeExpeditions;
   try {
     activeExpeditions = await getActiveExpeditions(userId);
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[forge] Expedition check failed — blocking forge for safety:', err.message);
     return {
       success: false,
@@ -169,7 +171,8 @@ async function forgeTotem(user, body = {}) {
   let speciesId;
   if (allSameSpecies) {
     speciesId = totems[0].speciesId;
-  } else {
+  }
+  else {
     const randomSpecies = selectRandomSpecies();
     speciesId = randomSpecies.speciesId;
   }
@@ -205,7 +208,8 @@ async function forgeTotem(user, body = {}) {
 
   try {
     await transactWrite(transactItems);
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[forge] Transaction failed:', err.message);
     if (err.name === 'TransactionCanceledException') {
       return {
@@ -242,7 +246,8 @@ async function forgeTotem(user, body = {}) {
       outputColorId: newTotemData.colorId,
       essenceValueBurned: totemIds.length * 500,
     });
-  } catch (err) {
+  }
+  catch (err) {
     console.warn('[forge] Failed to log transaction:', err.message);
   }
 
@@ -259,7 +264,8 @@ async function forgeTotem(user, body = {}) {
 
     // Update stats.totalTotems
     await updateUser(userId, { 'stats.totalTotems': totalTotemCount });
-  } catch (err) {
+  }
+  catch (err) {
     console.warn('[forge] Failed to update stats:', err.message);
   }
 
@@ -295,7 +301,8 @@ async function forgeTotem(user, body = {}) {
       totemId: newTotemData.id,
     });
     achievements = achResults.filter(a => a.unlocked);
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[forge] Failed to process achievements:', err.message);
   }
 
@@ -325,6 +332,7 @@ async function forgeTotem(user, body = {}) {
         milestone: a.milestone,
         rewards: a.rewards,
       })),
+      quests: await emitQuestProgress(userId, 'TOTEM_FORGED', { fusionType, newRarityId }),
     },
   };
 }

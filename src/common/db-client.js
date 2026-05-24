@@ -421,7 +421,7 @@ async function getTransactionAnalytics(type, startTime, endTime) {
  * Uses DynamoDB conditional update to prevent race conditions
  * Returns { success, newBalance, error }
  */
-async function deductEssence(userId, amount, { type = 'action', ref = null } = {}) {
+async function deductEssence(userId, amount, { type = 'action', ref = null, refType = null, refName = null } = {}) {
   try {
     const command = new UpdateCommand({
       TableName: TABLES.USERS,
@@ -447,6 +447,8 @@ async function deductEssence(userId, amount, { type = 'action', ref = null } = {
       balanceBefore,
       balanceAfter: newBalance,
       ref,
+      refType,
+      refName,
     });
 
     return { success: true, newBalance, deducted: amount };
@@ -474,7 +476,7 @@ async function deductEssence(userId, amount, { type = 'action', ref = null } = {
  * Add Essence to user balance (ATOMIC)
  * Uses DynamoDB atomic increment to prevent race conditions
  */
-async function addEssence(userId, amount, { type = 'reward', ref = null } = {}) {
+async function addEssence(userId, amount, { type = 'reward', ref = null, refType = null, refName = null } = {}) {
   try {
     const command = new UpdateCommand({
       TableName: TABLES.USERS,
@@ -501,6 +503,8 @@ async function addEssence(userId, amount, { type = 'reward', ref = null } = {}) 
       balanceBefore,
       balanceAfter: newBalance,
       ref,
+      refType,
+      refName,
     });
 
     return { success: true, newBalance, added: amount };
@@ -621,7 +625,7 @@ async function getEssenceBalance(userId) {
  * Add Gems to user balance (ATOMIC)
  * Uses DynamoDB atomic increment to prevent race conditions
  */
-async function addGems(userId, amount, { type = 'purchase', ref = null } = {}) {
+async function addGems(userId, amount, { type = 'purchase', ref = null, refType = null, refName = null } = {}) {
   try {
     const command = new UpdateCommand({
       TableName: TABLES.USERS,
@@ -648,6 +652,8 @@ async function addGems(userId, amount, { type = 'purchase', ref = null } = {}) {
       balanceBefore,
       balanceAfter: newBalance,
       ref,
+      refType,
+      refName,
     });
 
     return { success: true, newBalance, added: amount };
@@ -664,7 +670,7 @@ async function addGems(userId, amount, { type = 'purchase', ref = null } = {}) {
  * Deduct Gems from user balance (ATOMIC)
  * Uses DynamoDB conditional update to prevent race conditions and double-spend
  */
-async function deductGems(userId, amount, { type = 'purchase', ref = null } = {}) {
+async function deductGems(userId, amount, { type = 'purchase', ref = null, refType = null, refName = null } = {}) {
   try {
     const command = new UpdateCommand({
       TableName: TABLES.USERS,
@@ -690,6 +696,8 @@ async function deductGems(userId, amount, { type = 'purchase', ref = null } = {}
       balanceBefore,
       balanceAfter: newBalance,
       ref,
+      refType,
+      refName,
     });
 
     return { success: true, newBalance, deducted: amount };

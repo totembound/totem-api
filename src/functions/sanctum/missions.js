@@ -18,7 +18,8 @@ async function getCouncilMissions(user) {
   try {
     const missions = sanctumService.getCouncilMissions();
     return { success: true, data: missions };
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to get council missions:', error);
     return {
       success: false,

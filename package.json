@@ -1,6 +1,6 @@
 {
     "name": "totem-api",
-    "version": "0.8.0",
+    "version": "0.10.0",
     "description": "TotemBound REST API - serverless backend for game actions and user management",
     "main": "index.js",
     "scripts": {

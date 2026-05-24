@@ -9,7 +9,10 @@
  * and checks if totem is already on an expedition.
  */
 
-const { startExpedition } = require('../../services/expeditions-service');
+const { startExpedition, getExpeditionDefinition } = require('../../services/expeditions-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
+
+const DOMAIN_NAMES = ['air', 'earth', 'water'];
 
 /**
  * Start a new expedition for a totem
@@ -89,11 +92,16 @@ async function startExpeditionHandler(user, body) {
       };
     }
 
+    const def = getExpeditionDefinition(expeditionId);
+    const domain = def ? DOMAIN_NAMES[def.domain] : null;
+    const duration = def ? def.durationMinutes * 60 : null;
+
     return {
       success: true,
       data: {
         expedition: result.expedition,
         message: `Expedition "${result.expedition.name}" started! Returns in ${result.expedition.durationMinutes} minutes.`,
+        quests: await emitQuestProgress(userId, 'EXPEDITION_STARTED', { expeditionId, domain, duration }),
       },
     };
   }

@@ -24,6 +24,8 @@ const {
   getStageNameForSpecies,
 } = require('../config/totem-config');
 
+const { buildInitialTraits } = require('../config/traits');
+
 // ============================================
 // Rarity Determination
 // ============================================
@@ -301,6 +303,9 @@ function createTotem({
       treat: null,
     },
 
+    // Traits (innate set at birth; learned/awakened chosen later at stage gates)
+    traits: buildInitialTraits(),
+
     // Metadata
     createdAt: now,
     updatedAt: now,
@@ -337,6 +342,7 @@ function createStarterTotem(userId) {
     prestigeLevel: 0,
     stats,
     cooldowns: { feed: null, train: null, treat: null },
+    traits: buildInitialTraits(),
     lastActionDates: {},
     createdAt: now,
     updatedAt: now,

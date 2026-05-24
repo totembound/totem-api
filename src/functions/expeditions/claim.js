@@ -9,7 +9,10 @@
  * its expedition (time elapsed) and not already claimed the reward.
  */
 
-const { claimExpeditionReward } = require('../../services/expeditions-service');
+const { claimExpeditionReward, getExpeditionDefinition } = require('../../services/expeditions-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
+
+const DOMAIN_NAMES = ['air', 'earth', 'water'];
 
 /**
  * Claim reward for a completed expedition
@@ -72,6 +75,9 @@ async function claimExpeditionHandler(user, body) {
       };
     }
 
+    const def = getExpeditionDefinition(result.expedition.expeditionId);
+    const domain = def ? DOMAIN_NAMES[def.domain] : null;
+
     return {
       success: true,
       data: {
@@ -81,6 +87,7 @@ async function claimExpeditionHandler(user, body) {
         totalExpeditions: result.totalExpeditions,
         achievements: result.achievements,
         message: `Expedition "${result.expedition.name}" complete! +${result.rewards.essence} Essence`,
+        quests: await emitQuestProgress(userId, 'EXPEDITION_CLAIMED', { expeditionId: result.expedition.expeditionId, domain }),
       },
     };
   }

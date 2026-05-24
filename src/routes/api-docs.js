@@ -916,6 +916,50 @@
 
 /**
  * @swagger
+ * /v1/totems/{id}/traits/choose:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Choose a trait for a totem
+ *     description: |
+ *       Pick a trait for the Learned (Stage 2+) or Awakened (Stage 4+) slot.
+ *       Innate is set at birth and not selectable. Choices are permanent.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [slot, traitId]
+ *             properties:
+ *               slot:
+ *                 type: string
+ *                 enum: [learned, awakened]
+ *                 example: learned
+ *               traitId:
+ *                 type: string
+ *                 example: trt_quick_learner
+ *     responses:
+ *       200:
+ *         description: Trait chosen
+ *       400:
+ *         description: INVALID_SLOT or INVALID_TRAIT
+ *       403:
+ *         description: STAGE_LOCKED — totem not yet at the required stage
+ *       404:
+ *         description: TOTEM_NOT_FOUND
+ *       409:
+ *         description: SLOT_TAKEN — slot already filled
+ */
+
+/**
+ * @swagger
  * /v1/totems/{id}/nickname:
  *   post:
  *     tags: [Totems]
@@ -1206,7 +1250,7 @@
  *   post:
  *     tags: [Expeditions]
  *     summary: Start an expedition
- *     description: Send a totem on an expedition. Totem becomes unavailable until expedition completes.
+ *     description: Send a team of 3 distinct totems on an expedition. All team totems become unavailable until expedition completes.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -1221,14 +1265,19 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [totemId]
+ *             required: [totemIds]
  *             properties:
- *               totemId: { type: string }
+ *               totemIds:
+ *                 type: array
+ *                 minItems: 3
+ *                 maxItems: 3
+ *                 items: { type: string }
+ *                 description: Exactly 3 distinct totem IDs for the expedition team
  *     responses:
  *       200:
  *         description: Expedition started
  *       400:
- *         description: Totem unavailable or insufficient Essence
+ *         description: Invalid team, totems unavailable, or insufficient Essence
  */
 
 /**
@@ -1278,6 +1327,9 @@
  *                 data:
  *                   type: object
  *                   properties:
+ *                     tier: { type: string, enum: [free, premium, vip], description: "User subscription tier" }
+ *                     tierMultiplier: { type: number, description: "Reward base multiplier (free=1, premium=2, vip=3)" }
+ *                     tierBonusPercent: { type: number, description: "Tier bonus as percent over base (0 / 100 / 200)" }
  *                     daily:
  *                       type: object
  *                       properties:
@@ -1286,7 +1338,7 @@
  *                         bestStreak: { type: number }
  *                         nextClaimTime: { type: string, nullable: true }
  *                         isProtected: { type: boolean }
- *                         protectionExpiry: { type: string, nullable: true }
+ *                         protectionCharges: { type: number, description: "Banked streak-saver charges" }
  *                     weekly:
  *                       type: object
  *                       properties:
@@ -1296,6 +1348,7 @@
  *                         isUnlocked: { type: boolean }
  *                         nextClaimTime: { type: string, nullable: true }
  *                         isProtected: { type: boolean }
+ *                         protectionCharges: { type: number }
  */
 
 /**
@@ -1318,7 +1371,11 @@
  *   post:
  *     tags: [Rewards]
  *     summary: Claim daily reward
- *     description: Claim daily login reward. Base 10 Essence + streak bonus. Once per day.
+ *     description: |
+ *       Claim daily login reward. Once per day (resets at UTC midnight).
+ *       Total = baseAmount × tierMultiplier × (1 + bonusPercent/100).
+ *       Base is 30 Essence; tier multiplier is 1/2/3 for free/premium/vip;
+ *       streak bonus is 5% per consecutive day, capped at 100% (day 21+).
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1336,12 +1393,23 @@
  *                     reward:
  *                       type: object
  *                       properties:
+ *                         type: { type: string, example: daily }
  *                         baseAmount: { type: number }
- *                         streakBonus: { type: number }
- *                         totalAmount: { type: number }
+ *                         streakAtClaim: { type: number }
+ *                         bonusPercent: { type: number, description: "Streak bonus percent applied" }
+ *                         bonusAmount: { type: number }
+ *                         totalAmount: { type: number, description: "Final essence awarded" }
+ *                         tier: { type: string, enum: [free, premium, vip] }
+ *                         tierMultiplier: { type: number }
+ *                         tierBonusPercent: { type: number }
  *                     newStreak: { type: number }
  *                     newBalance: { type: number }
- *                     nextClaimTime: { type: string }
+ *                     nextClaimTime: { type: string, format: date-time }
+ *                     nextClaimAt: { type: string, format: date-time, description: "Alias for nextClaimTime" }
+ *                     message: { type: string }
+ *                     achievements:
+ *                       type: array
+ *                       items: { type: object }
  *       400:
  *         description: Already claimed today
  */
@@ -1368,7 +1436,12 @@
  *   post:
  *     tags: [Rewards]
  *     summary: Claim weekly reward
- *     description: Claim weekly bonus. Requires 7 consecutive daily claims to unlock. Resets weekly.
+ *     description: |
+ *       Claim weekly bonus. Requires the Week Warrior achievement (7-day daily login streak) to unlock.
+ *       7-day rolling cooldown.
+ *       Total = baseAmount × tierMultiplier × (1 + bonusPercent/100).
+ *       Base is 100 Essence; tier multiplier is 1/2/3 for free/premium/vip;
+ *       streak bonus is 10% per consecutive week, capped at 100% (week 11+).
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1386,10 +1459,19 @@
  *                     reward:
  *                       type: object
  *                       properties:
- *                         totalAmount: { type: number }
+ *                         type: { type: string, example: weekly }
+ *                         baseAmount: { type: number }
+ *                         streakAtClaim: { type: number }
+ *                         bonusPercent: { type: number, description: "Streak bonus percent applied" }
+ *                         bonusAmount: { type: number }
+ *                         totalAmount: { type: number, description: "Final essence awarded" }
+ *                         tier: { type: string, enum: [free, premium, vip] }
+ *                         tierMultiplier: { type: number }
+ *                         tierBonusPercent: { type: number }
  *                     newStreak: { type: number }
  *                     newBalance: { type: number }
- *                     nextClaimTime: { type: string }
+ *                     nextClaimTime: { type: string, format: date-time }
+ *                     message: { type: string }
  *       400:
  *         description: Not unlocked or already claimed this week
  */
@@ -1406,6 +1488,145 @@
  *     responses:
  *       200:
  *         description: Weekly reward claimed
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/quests:
+ *   get:
+ *     tags: [Rewards]
+ *     summary: Get today's daily quest set
+ *     description: |
+ *       Returns the player's 5-quest set for the current UTC day. Quests are lazy-generated
+ *       on first call of the day — no scheduled job. Theme rotates deterministically through
+ *       9 affinity×domain×action combinations on a dayOfYear cycle.
+ *
+ *       **Scope (catalog v1.1.0):** totem actions (feed/train/treat), challenges, and expeditions.
+ *
+ *       **Slot pattern:**
+ *       - Slot 1: themed action (matches today's `theme.action`)
+ *       - Slot 2: free easy (any non-themed action/challenge/expedition)
+ *       - Slot 3: affinity challenge (matches today's `theme.affinity`)
+ *       - Slot 4: domain expedition (matches today's `theme.domain`)
+ *       - Slot 5: hard objective (24h expedition / 3 challenges / 2 claims)
+ *
+ *       **Bonus:** +75 Essence + 1 random rune (80% Lesser, 18% Greater, 2% Ancient) when all 5 are claimed.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Today's quest set
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     date: { type: string, description: "UTC date YYYY-MM-DD" }
+ *                     theme:
+ *                       type: object
+ *                       properties:
+ *                         affinity: { type: string, enum: [strength, agility, wisdom] }
+ *                         domain: { type: string, enum: [air, earth, water] }
+ *                         action: { type: string, enum: [feed, train, treat] }
+ *                     nextResetAt: { type: string, description: "ISO 8601 next UTC midnight" }
+ *                     quests:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           slot: { type: integer, minimum: 1, maximum: 5 }
+ *                           id: { type: string }
+ *                           name: { type: string }
+ *                           description: { type: string }
+ *                           tier: { type: string, enum: [easy, medium, hard] }
+ *                           goal: { type: integer }
+ *                           progress: { type: integer }
+ *                           claimed: { type: boolean }
+ *                           completed: { type: boolean }
+ *                           reward:
+ *                             type: object
+ *                             properties:
+ *                               essence: { type: integer }
+ *                     bonus:
+ *                       type: object
+ *                       properties:
+ *                         reward:
+ *                           type: object
+ *                           properties:
+ *                             essence: { type: integer, example: 75 }
+ *                         claimed: { type: boolean }
+ *                         unlocked: { type: boolean }
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/quests/claim:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Batch-claim all completable daily quests + bonus
+ *     description: |
+ *       Single batch claim — no body required. Server flips every completed-but-unclaimed quest's
+ *       `claimed` flag, credits the total Essence, and (if all 5 are now claimed) auto-claims the
+ *       bonus + drops a random rune.
+ *
+ *       **Idempotent:** subsequent calls with nothing claimable return `claimed: []`,
+ *       `totalEssenceAwarded: 0`. Safe to call from Claim All buttons in card/wizard.
+ *
+ *       **Rune drop (bonus only):** 80% Lesser, 18% Greater, 2% Ancient.
+ *
+ *       **Achievement triggers:** `ach_quest-set-master` (per bonus claim), `ach_theme-master`
+ *       (per slot 3 affinity or slot 4 domain claim). Unlocked milestones returned in
+ *       `data.achievements` for the existing notification pipeline.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Claim result (essence, runes, milestones)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     claimed:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           questId: { type: string }
+ *                           reward:
+ *                             type: object
+ *                             properties:
+ *                               essence: { type: integer }
+ *                     bonusClaimed: { type: boolean }
+ *                     totalEssenceAwarded: { type: integer }
+ *                     newEssenceBalance: { type: integer, nullable: true }
+ *                     nextResetAt: { type: string }
+ *                     runesAwarded:
+ *                       type: object
+ *                       nullable: true
+ *                       description: "Only present when bonus is claimed"
+ *                       properties:
+ *                         lesser: { type: integer }
+ *                         greater: { type: integer }
+ *                         ancient: { type: integer }
+ *                     achievements:
+ *                       type: array
+ *                       description: "Milestone unlocks fired by this claim"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           achievementId: { type: string }
+ *                           milestone: { type: integer }
+ *                           rewards:
+ *                             type: object
  */
 
 /**

@@ -14,8 +14,9 @@
  *   const status = await getRewardStatus(userId);
  */
 
-const { getItem, putItem, updateItem, queryItems, getUser, addEssence, logTransaction, getTotem, updateTotem, TABLES } = require('../common/db-client');
+const { getItem, putItem, updateItem, queryItems, getUser, addEssence, getTotem, updateTotem, TABLES } = require('../common/db-client');
 const { onLoginStreak } = require('./achievements-service');
+const { getTierMultiplier, getTierBonusPercent } = require('./tier-bonuses');
 
 // =============================================================================
 // TABLE NAME
@@ -29,18 +30,18 @@ const REWARDS_CLAIMS_TABLE = TABLES.REWARDS_CLAIMS;
 
 const REWARD_CONFIG = {
   daily: {
-    baseAmount: 10,              // 10 Essence base
+    baseAmount: 30,              // 30 Essence base (bumped from 10 on 2026-05-16 to keep the daily login meaningful next to Daily Quests' 195E/day)
     streakBonusPercent: 5,       // 5% per day
-    maxStreakBonusPercent: 100,  // Max 100% bonus (caps at 20 days)
+    maxStreakBonusPercent: 100,  // Max 100% bonus at day 20+ → max 60E
     cooldownMs: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
     cooldownHours: 24,
     // Grace period: if more than 48 hours since last claim, streak resets
     gracePeriodMs: 48 * 60 * 60 * 1000,
   },
   weekly: {
-    baseAmount: 100,             // 100 Essence base
+    baseAmount: 100,             // 100 Essence base (lowered from 200 on 2026-05-16 once tier multipliers landed — vip max-streak weekly would otherwise reach 1200E)
     streakBonusPercent: 10,      // 10% per consecutive week
-    maxStreakBonusPercent: 100,  // Max 100% bonus (caps at 10 weeks)
+    maxStreakBonusPercent: 100,  // Max 100% bonus at week 10+ → max 200E (free)
     cooldownMs: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
     cooldownDays: 7,
     // Grace period: if more than 14 days since last claim, streak resets
@@ -197,9 +198,16 @@ function calculateWeeklyBonus(weekStreak) {
 }
 
 /**
- * Calculate total reward amount for a given type and streak
+ * Calculate total reward amount for a given type, streak, and subscription tier.
+ *
+ * Tier multiplier scales the base reward BEFORE the streak bonus is applied:
+ *   total = floor(baseAmount × tierMultiplier × (1 + streakBonus/100))
+ *
+ * @param {'daily'|'weekly'} type
+ * @param {number} streak
+ * @param {string} [tier='free'] - 'free' | 'premium' | 'vip'
  */
-function calculateRewardAmount(type, streak) {
+function calculateRewardAmount(type, streak, tier = 'free') {
   const config = REWARD_CONFIG[type];
   const baseAmount = config.baseAmount;
 
@@ -207,10 +215,22 @@ function calculateRewardAmount(type, streak) {
     ? calculateDailyBonus(streak)
     : calculateWeeklyBonus(streak);
 
-  const bonusAmount = Math.floor(baseAmount * (bonusPercent / 100));
-  const totalAmount = baseAmount + bonusAmount;
+  const tierMultiplier = getTierMultiplier(tier);
+  const tierBonusPercent = getTierBonusPercent(tier);
+  const boostedBase = baseAmount * tierMultiplier;
 
-  return { baseAmount, bonusPercent, bonusAmount, totalAmount };
+  const bonusAmount = Math.floor(boostedBase * (bonusPercent / 100));
+  const totalAmount = boostedBase + bonusAmount;
+
+  return {
+    baseAmount,
+    tierMultiplier,
+    tierBonusPercent,
+    boostedBase,
+    bonusPercent,
+    bonusAmount,
+    totalAmount,
+  };
 }
 
 /**
@@ -413,6 +433,8 @@ async function recordClaim(userId, type, claimData) {
     bonusPercent: claimData.bonusPercent,
     bonusAmount: claimData.bonusAmount,
     totalAmount: claimData.totalAmount,
+    tier: claimData.tier || 'free',
+    tierMultiplier: claimData.tierMultiplier || 1,
     claimedAt: now.toISOString(),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
@@ -467,14 +489,18 @@ async function claimDailyReward(userId) {
     const { reset, consumeCharge } = shouldResetStreak(streakState.lastClaimTimestamp, 'daily', streakState);
     const newStreak = reset ? 1 : (streakState.currentStreak || 0) + 1;
 
-    // Calculate reward amount
+    // Calculate reward amount (tier multiplier × base, then streak bonus)
     // Bonus is based on the NEW streak (after this claim)
-    const { baseAmount, bonusPercent, bonusAmount, totalAmount } = calculateRewardAmount('daily', newStreak);
+    const tier = user.tier || 'free';
+    const { baseAmount, tierMultiplier, tierBonusPercent, bonusPercent, bonusAmount, totalAmount } =
+      calculateRewardAmount('daily', newStreak, tier);
 
-    // Add Essence to user balance
+    // Add Essence (auto-logs to Transactions)
     const balanceResult = await addEssence(userId, totalAmount, {
       type: 'reward_daily',
       ref: `daily_${getDateString()}`,
+      refType: 'reward',
+      refName: `Daily Reward (${newStreak} day streak)`,
     });
 
     if (!balanceResult.success) {
@@ -488,22 +514,12 @@ async function claimDailyReward(userId) {
       bonusPercent,
       bonusAmount,
       totalAmount,
+      tier,
+      tierMultiplier,
     });
 
     // Update streak state (decrements protection charge if one was consumed)
     await updateStreakState(userId, 'daily', newStreak, totalAmount, { consumeProtectionCharge: consumeCharge });
-
-    // Log transaction for audit
-    await logTransaction(userId, {
-      type: 'reward_daily',
-      currency: 'essence',
-      amount: totalAmount,
-      balanceBefore: balanceResult.newBalance - totalAmount,
-      balanceAfter: balanceResult.newBalance,
-      refType: 'reward',
-      ref: `daily_streak_${newStreak}`,
-      refName: `Daily Reward (${newStreak} day streak)`,
-    });
 
     // Update login streak achievement progress
     let achievements = [];
@@ -534,6 +550,9 @@ async function claimDailyReward(userId) {
         bonusPercent,
         bonusAmount,
         totalAmount,
+        tier,
+        tierMultiplier,
+        tierBonusPercent,
       },
       newStreak,
       newBalance: balanceResult.newBalance,
@@ -581,14 +600,18 @@ async function claimWeeklyReward(userId) {
     const { reset, consumeCharge } = shouldResetStreak(streakState.lastClaimTimestamp, 'weekly', streakState);
     const newStreak = reset ? 1 : (streakState.currentStreak || 0) + 1;
 
-    // Calculate reward amount
+    // Calculate reward amount (tier multiplier × base, then streak bonus)
     // Bonus is based on the NEW streak (after this claim)
-    const { baseAmount, bonusPercent, bonusAmount, totalAmount } = calculateRewardAmount('weekly', newStreak);
+    const tier = user.tier || 'free';
+    const { baseAmount, tierMultiplier, tierBonusPercent, bonusPercent, bonusAmount, totalAmount } =
+      calculateRewardAmount('weekly', newStreak, tier);
 
-    // Add Essence to user balance
+    // Add Essence (auto-logs to Transactions)
     const balanceResult = await addEssence(userId, totalAmount, {
       type: 'reward_weekly',
       ref: `weekly_${getDateString()}`,
+      refType: 'reward',
+      refName: `Weekly Reward (${newStreak} week streak)`,
     });
 
     if (!balanceResult.success) {
@@ -602,22 +625,12 @@ async function claimWeeklyReward(userId) {
       bonusPercent,
       bonusAmount,
       totalAmount,
+      tier,
+      tierMultiplier,
     });
 
     // Update streak state (decrements protection charge if one was consumed)
     await updateStreakState(userId, 'weekly', newStreak, totalAmount, { consumeProtectionCharge: consumeCharge });
-
-    // Log transaction for audit
-    await logTransaction(userId, {
-      type: 'reward_weekly',
-      currency: 'essence',
-      amount: totalAmount,
-      balanceBefore: balanceResult.newBalance - totalAmount,
-      balanceAfter: balanceResult.newBalance,
-      refType: 'reward',
-      ref: `weekly_streak_${newStreak}`,
-      refName: `Weekly Reward (${newStreak} week streak)`,
-    });
 
     // Calculate next claim time
     const nextClaim = new Date(Date.now() + REWARD_CONFIG.weekly.cooldownMs).toISOString();
@@ -633,6 +646,9 @@ async function claimWeeklyReward(userId) {
         bonusPercent,
         bonusAmount,
         totalAmount,
+        tier,
+        tierMultiplier,
+        tierBonusPercent,
       },
       newStreak,
       newBalance: balanceResult.newBalance,
@@ -674,6 +690,8 @@ async function getRewardStatus(userId) {
       getStreakState(userId, 'weekly'),
     ]);
 
+    const tier = user.tier || 'free';
+
     // Calculate daily status. shouldResetStreak considers protection charges,
     // so an at-risk streak is preserved (and a charge is held in reserve until
     // the next claim actually consumes it).
@@ -682,7 +700,7 @@ async function getRewardStatus(userId) {
     const dailyStreakWillReset = dailyResetCheck.reset;
     const dailyEffectiveStreak = dailyStreakWillReset ? 0 : dailyState.currentStreak;
     const dailyNextStreak = dailyEffectiveStreak + 1;
-    const dailyPotentialReward = calculateRewardAmount('daily', dailyNextStreak);
+    const dailyPotentialReward = calculateRewardAmount('daily', dailyNextStreak, tier);
 
     // Calculate weekly status
     const weeklyClaimCheck = canClaimReward(weeklyState.lastClaimTimestamp, 'weekly');
@@ -690,10 +708,13 @@ async function getRewardStatus(userId) {
     const weeklyStreakWillReset = weeklyResetCheck.reset;
     const weeklyEffectiveStreak = weeklyStreakWillReset ? 0 : weeklyState.currentStreak;
     const weeklyNextStreak = weeklyEffectiveStreak + 1;
-    const weeklyPotentialReward = calculateRewardAmount('weekly', weeklyNextStreak);
+    const weeklyPotentialReward = calculateRewardAmount('weekly', weeklyNextStreak, tier);
 
     return {
       success: true,
+      tier,
+      tierMultiplier: getTierMultiplier(tier),
+      tierBonusPercent: getTierBonusPercent(tier),
       daily: {
         canClaim: dailyClaimCheck.canClaim,
         currentStreak: dailyEffectiveStreak,
@@ -873,12 +894,14 @@ async function claimTutorialReward(userId, step, totemId = null) {
       }
     }
 
-    // 5. Award Essence
+    // 5. Award Essence (auto-logs to Transactions)
     let newBalance = null;
     if (reward.essenceReward > 0) {
       const balanceResult = await addEssence(userId, reward.essenceReward, {
         type: 'reward_tutorial',
         ref: `tutorial_step_${step}`,
+        refType: 'tutorial',
+        refName: reward.name,
       });
 
       if (!balanceResult.success) {
@@ -917,20 +940,6 @@ async function claimTutorialReward(userId, step, totemId = null) {
     };
 
     await putItem(REWARDS_CLAIMS_TABLE, claimRecord);
-
-    // 8. Log transaction for audit (if essence was awarded)
-    if (reward.essenceReward > 0) {
-      await logTransaction(userId, {
-        type: 'reward_tutorial',
-        currency: 'essence',
-        amount: reward.essenceReward,
-        balanceBefore: newBalance - reward.essenceReward,
-        balanceAfter: newBalance,
-        refType: 'tutorial',
-        ref: `tutorial_step_${step}`,
-        refName: reward.name,
-      });
-    }
 
     console.log(`[Rewards] User ${userId} claimed tutorial step ${step}: ${reward.essenceReward} Essence, ${reward.experienceReward} XP`);
 

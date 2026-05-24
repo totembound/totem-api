@@ -485,6 +485,30 @@ app.post('/v1/totems/:id/evolve', authenticateJWT, async (req, res) => {
   }
 });
 
+// Choose a trait for Learned or Awakened slot
+app.post('/v1/totems/:id/traits/choose', authenticateJWT, async (req, res) => {
+  try {
+    if (totemRoutes?.chooseTrait) {
+      const result = await totemRoutes.chooseTrait(req.user, req.params.id, req.body);
+      if (!result.success && result.error?.code) {
+        const status =
+          result.error.code === 'TOTEM_NOT_FOUND' ? 404 :
+            result.error.code === 'STAGE_LOCKED' ? 403 :
+              result.error.code === 'SLOT_TAKEN' ? 409 :
+                400;
+        return res.status(status).json(result);
+      }
+      res.json(result);
+    }
+    else {
+      res.status(503).json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'chooseTrait handler missing' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
 // Set totem nickname
 app.post('/v1/totems/:id/nickname', authenticateJWT, async (req, res) => {
   try {
@@ -1023,6 +1047,37 @@ app.post('/v1/rewards/tutorial', authenticateJWT, async (req, res) => {
     }
     else {
       res.json({ success: true, data: { claimed: true, reward: { essence: 25 } } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+// Daily Quests routes
+app.get('/v1/rewards/quests', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.getDailyQuests) {
+      const result = await rewardRoutes.getDailyQuests(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Daily quests not implemented' } });
+    }
+  }
+  catch (error) {
+    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
+  }
+});
+
+app.post('/v1/rewards/quests/claim', authenticateJWT, async (req, res) => {
+  try {
+    if (rewardRoutes?.claimDailyQuests) {
+      const result = await rewardRoutes.claimDailyQuests(req.user);
+      res.json(result);
+    }
+    else {
+      res.json({ success: false, error: { code: 'NOT_IMPLEMENTED', message: 'Daily quests not implemented' } });
     }
   }
   catch (error) {

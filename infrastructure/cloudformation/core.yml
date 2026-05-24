@@ -32,6 +32,8 @@ Resources:
 
   UsersTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-Users"
@@ -75,6 +77,8 @@ Resources:
 
   TotemsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-Totems"
@@ -97,6 +101,8 @@ Resources:
 
   ChallengeProgressTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-ChallengeProgress"
@@ -117,6 +123,8 @@ Resources:
 
   ExpeditionStateTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-ExpeditionState"
@@ -137,6 +145,8 @@ Resources:
 
   RewardStateTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-RewardState"
@@ -157,6 +167,8 @@ Resources:
 
   AchievementProgressTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-AchievementProgress"
@@ -177,6 +189,8 @@ Resources:
 
   RewardsClaimsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-RewardsClaims"
@@ -197,6 +211,8 @@ Resources:
 
   TransactionsTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-Transactions"
@@ -242,6 +258,8 @@ Resources:
 
   ShopTable:
     Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       TableName: !Sub
         - "${Prefix}-Shop"

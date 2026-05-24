@@ -138,26 +138,26 @@ describe('Rewards Service', () => {
   describe('calculateRewardAmount', () => {
     it('should calculate daily reward correctly for new player (no bonus on first claim)', () => {
       const result = calculateRewardAmount('daily', 1);
-      expect(result.baseAmount).toBe(10);
+      expect(result.baseAmount).toBe(30);
       expect(result.bonusPercent).toBe(0); // (1-1) * 5% = 0%
       expect(result.bonusAmount).toBe(0);
-      expect(result.totalAmount).toBe(10);
+      expect(result.totalAmount).toBe(30);
     });
 
     it('should calculate daily reward with 10 day streak', () => {
       const result = calculateRewardAmount('daily', 10);
-      expect(result.baseAmount).toBe(10);
+      expect(result.baseAmount).toBe(30);
       expect(result.bonusPercent).toBe(45); // (10-1) * 5% = 45%
-      expect(result.bonusAmount).toBe(4); // floor(10 * 0.45) = 4
-      expect(result.totalAmount).toBe(14);
+      expect(result.bonusAmount).toBe(13); // floor(30 * 0.45) = 13
+      expect(result.totalAmount).toBe(43);
     });
 
     it('should calculate daily reward at max streak', () => {
       const result = calculateRewardAmount('daily', 21);
-      expect(result.baseAmount).toBe(10);
+      expect(result.baseAmount).toBe(30);
       expect(result.bonusPercent).toBe(100); // (21-1) * 5% = 100%
-      expect(result.bonusAmount).toBe(10); // floor(10 * 1.0) = 10
-      expect(result.totalAmount).toBe(20);
+      expect(result.bonusAmount).toBe(30); // floor(30 * 1.0) = 30
+      expect(result.totalAmount).toBe(60);
     });
 
     it('should calculate weekly reward correctly for new player (no bonus on first claim)', () => {
@@ -174,6 +174,62 @@ describe('Rewards Service', () => {
       expect(result.bonusPercent).toBe(100); // (11-1) * 10% = 100%
       expect(result.bonusAmount).toBe(100); // floor(100 * 1.0) = 100
       expect(result.totalAmount).toBe(200);
+    });
+
+    // -----------------------------------------------------------------------
+    // Tier multiplier: premium = 2x base, vip = 3x base, applied before streak
+    // -----------------------------------------------------------------------
+    it('defaults to free tier (1x) when tier omitted or unknown', () => {
+      const omitted = calculateRewardAmount('daily', 1);
+      const unknown = calculateRewardAmount('daily', 1, 'enterprise');
+      expect(omitted.tierMultiplier).toBe(1);
+      expect(omitted.totalAmount).toBe(30);
+      expect(unknown.tierMultiplier).toBe(1);
+      expect(unknown.totalAmount).toBe(30);
+    });
+
+    it('applies premium 2x to daily base before streak', () => {
+      const result = calculateRewardAmount('daily', 1, 'premium');
+      expect(result.tierMultiplier).toBe(2);
+      expect(result.tierBonusPercent).toBe(100);
+      expect(result.boostedBase).toBe(60);
+      expect(result.bonusPercent).toBe(0);
+      expect(result.totalAmount).toBe(60);
+    });
+
+    it('applies vip 3x to daily base before streak', () => {
+      const result = calculateRewardAmount('daily', 1, 'vip');
+      expect(result.tierMultiplier).toBe(3);
+      expect(result.tierBonusPercent).toBe(200);
+      expect(result.boostedBase).toBe(90);
+      expect(result.totalAmount).toBe(90);
+    });
+
+    it('stacks vip 3x with max daily streak bonus', () => {
+      // 30 base × 3 (vip) × 2.00 (max streak) = 180
+      const result = calculateRewardAmount('daily', 21, 'vip');
+      expect(result.tierMultiplier).toBe(3);
+      expect(result.bonusPercent).toBe(100);
+      expect(result.boostedBase).toBe(90);
+      expect(result.bonusAmount).toBe(90);
+      expect(result.totalAmount).toBe(180);
+    });
+
+    it('stacks premium 2x with max daily streak bonus', () => {
+      // 30 × 2 × 2.00 = 120
+      const result = calculateRewardAmount('daily', 21, 'premium');
+      expect(result.totalAmount).toBe(120);
+    });
+
+    it('applies tier multiplier to weekly rewards too', () => {
+      // 100 × 3 × 2.00 = 600
+      const vipMax = calculateRewardAmount('weekly', 11, 'vip');
+      expect(vipMax.tierMultiplier).toBe(3);
+      expect(vipMax.totalAmount).toBe(600);
+
+      // 100 × 2 × 1.00 = 200
+      const premiumFirst = calculateRewardAmount('weekly', 1, 'premium');
+      expect(premiumFirst.totalAmount).toBe(200);
     });
   });
 
@@ -285,7 +341,7 @@ describe('Rewards Service', () => {
 
       expect(result.success).toBe(true);
       expect(result.reward.type).toBe('daily');
-      expect(result.reward.baseAmount).toBe(10);
+      expect(result.reward.baseAmount).toBe(30);
       expect(result.reward.streakAtClaim).toBe(1);
       expect(result.newStreak).toBe(1);
       expect(result.newBalance).toBe(1010);
@@ -293,11 +349,14 @@ describe('Rewards Service', () => {
 
       expect(dbClient.addEssence).toHaveBeenCalledWith(
         'usr_test123',
-        10, // base amount for streak 1
-        { type: 'reward_daily', ref: expect.stringMatching(/^daily_\d{4}-\d{2}-\d{2}$/) }
+        30, // base amount for streak 1
+        {
+          type: 'reward_daily',
+          ref: expect.stringMatching(/^daily_\d{4}-\d{2}-\d{2}$/),
+          refType: 'reward',
+          refName: 'Daily Reward (1 day streak)',
+        },
       );
-
-      expect(dbClient.logTransaction).toHaveBeenCalled();
     });
 
     it('should increment streak on consecutive daily claim', async () => {
@@ -448,7 +507,12 @@ describe('Rewards Service', () => {
       expect(dbClient.addEssence).toHaveBeenCalledWith(
         'usr_test123',
         100, // 100 base, no bonus on first claim
-        { type: 'reward_weekly', ref: expect.stringMatching(/^weekly_\d{4}-\d{2}-\d{2}$/) }
+        {
+          type: 'reward_weekly',
+          ref: expect.stringMatching(/^weekly_\d{4}-\d{2}-\d{2}$/),
+          refType: 'reward',
+          refName: 'Weekly Reward (1 week streak)',
+        },
       );
     });
 
@@ -516,7 +580,7 @@ describe('Rewards Service', () => {
       expect(result.success).toBe(true);
       expect(result.daily.canClaim).toBe(true);
       expect(result.daily.currentStreak).toBe(0);
-      expect(result.daily.potentialReward.baseAmount).toBe(10);
+      expect(result.daily.potentialReward.baseAmount).toBe(30);
       expect(result.daily.potentialReward.bonusPercent).toBe(0); // Streak 1 = no bonus (first claim)
       expect(result.weekly.canClaim).toBe(true);
       expect(result.weekly.currentStreak).toBe(0);
@@ -633,7 +697,7 @@ describe('Rewards Service', () => {
 
   describe('Reward Configuration', () => {
     it('should have correct daily configuration', () => {
-      expect(REWARD_CONFIG.daily.baseAmount).toBe(10);
+      expect(REWARD_CONFIG.daily.baseAmount).toBe(30);
       expect(REWARD_CONFIG.daily.streakBonusPercent).toBe(5);
       expect(REWARD_CONFIG.daily.maxStreakBonusPercent).toBe(100);
       expect(REWARD_CONFIG.daily.cooldownHours).toBe(24);
@@ -967,10 +1031,14 @@ describe('Rewards Service', () => {
       expect(dbClient.addEssence).toHaveBeenCalledWith(
         'usr_test123',
         50,
-        { type: 'reward_tutorial', ref: 'tutorial_step_1' }
+        {
+          type: 'reward_tutorial',
+          ref: 'tutorial_step_1',
+          refType: 'tutorial',
+          refName: 'Claim Your Spiritkeeper Reward',
+        },
       );
       expect(dbClient.putItem).toHaveBeenCalled();
-      expect(dbClient.logTransaction).toHaveBeenCalled();
       // No totem update for step 1 (experienceReward is 0)
       expect(dbClient.updateTotem).not.toHaveBeenCalled();
     });

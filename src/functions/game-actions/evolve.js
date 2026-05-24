@@ -18,6 +18,20 @@ const {
   MAX_STAGE,
 } = require('./helpers');
 const { onTotemEvolved } = require('../../services/achievements-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
+const { STAGE_GATES } = require('../../config/traits');
+
+/**
+ * Determine if this evolution unlocked a trait choice for the totem.
+ * Returns 'learned' / 'awakened' if the new stage hits a gate and the slot
+ * is still empty; otherwise null.
+ */
+function getTraitChoiceUnlocked(totem, newStage) {
+  const traits = totem.traits || {};
+  if (newStage >= STAGE_GATES.awakened && !traits.awakened) return 'awakened';
+  if (newStage >= STAGE_GATES.learned && !traits.learned) return 'learned';
+  return null;
+}
 
 /**
  * Evolve a totem to the next stage
@@ -136,6 +150,8 @@ async function evolve(user, totemId) {
       },
       message: `Your totem evolved from ${oldStageName} to ${newStageName}!`,
       achievements,
+      quests: await emitQuestProgress(userId, 'ACTION_EVOLVE', { totemId, newStage }),
+      traitChoiceUnlocked: getTraitChoiceUnlocked(totem, newStage),
     },
   };
 }

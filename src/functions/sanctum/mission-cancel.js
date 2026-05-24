@@ -31,7 +31,8 @@ async function cancelCouncilMission(user, body) {
   try {
     const result = await sanctumService.cancelCouncilMission(user.userId, totemId);
     return result;
-  } catch (error) {
+  }
+  catch (error) {
     console.error('Failed to cancel council mission:', error);
     return {
       success: false,

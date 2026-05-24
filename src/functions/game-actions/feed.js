@@ -26,6 +26,7 @@ const {
   buildActionResult,
 } = require('./helpers');
 const { onGameAction, checkBalancedCare } = require('../../services/achievements-service');
+const { emitQuestProgress } = require('../../services/daily-quests-service');
 const { addTotemXp } = require('../../services/totem-xp');
 
 /**
@@ -126,10 +127,11 @@ async function feed(user, totemId) {
 
   // 7. Update user's total feed count and trigger achievement check
   let totalFeedCount;
+  let userRecord;
   // Prestige unlocks (if any) come from the XP chokepoint.
-  let achievements = [...(xpResult.achievements || [])];
+  const achievements = [...(xpResult.achievements || [])];
   try {
-    const userRecord = await getUser(userId);
+    userRecord = await getUser(userId);
     totalFeedCount = (userRecord?.stats?.totalFeedCount || 0) + 1;
     await updateUser(userId, { 'stats.totalFeedCount': totalFeedCount });
     const achResults = await onGameAction(userId, 'feed', totalFeedCount, totemId);
@@ -174,6 +176,7 @@ async function feed(user, totemId) {
       essenceSpent: cost,
       newEssenceBalance: balanceResult.newBalance,
       achievements,
+      quests: await emitQuestProgress(userId, 'ACTION_FEED', { totemId }, { user: userRecord }),
     },
   };
 }

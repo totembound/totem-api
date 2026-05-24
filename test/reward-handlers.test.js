@@ -120,14 +120,16 @@ describe('Reward Handlers', () => {
     it('should include streak info in response', async () => {
       rewardsService.claimDailyReward.mockResolvedValue({
         success: true,
-        reward: { totalAmount: 10, bonusAmount: 0 },
+        reward: { totalAmount: 10, bonusAmount: 0, streakAtClaim: 1 },
         newStreak: 1,
         nextClaimTime: '2024-01-16T00:00:00.000Z',
       });
 
       const result = await claimDaily(testUser);
-      expect(result.data.reward.streakDays).toBe(1);
+      expect(result.data.newStreak).toBe(1);
+      expect(result.data.reward.streakAtClaim).toBe(1);
       expect(result.data.nextClaimAt).toBeDefined();
+      expect(result.data.nextClaimTime).toBeDefined();
     });
   });
 
@@ -535,9 +537,16 @@ describe('Reward Handlers', () => {
         );
       });
 
-      it('should log transaction', async () => {
+      it('should pass audit metadata to deductEssence (logs via auto-log path)', async () => {
         await purchaseProtection(testUser, { tier: 0 }, 'daily');
-        expect(dbClient.logTransaction).toHaveBeenCalled();
+        expect(dbClient.deductEssence).toHaveBeenCalledWith(
+          testUser.userId, 50,
+          expect.objectContaining({
+            type: 'protection_purchase',
+            refType: 'protection',
+            refName: expect.stringContaining('Daily Protection'),
+          }),
+        );
       });
 
       it('should stack charges across multiple purchases', async () => {

@@ -84,6 +84,9 @@ const ACHIEVEMENT_IDS = {
   PERSISTENCE_REWARD: 'ach_persistence-reward',
   // Batch 3 — prestige (driven by XP threshold crossings via totem-xp chokepoint)
   PRESTIGE_PROGRESSION: 'ach_prestige-progression',
+  // Daily Quests — fires from daily-quests-service batchClaim
+  QUEST_SET_MASTER: 'ach_quest-set-master',
+  THEME_MASTER: 'ach_theme-master',
 };
 
 // =============================================================================
@@ -145,6 +148,8 @@ const TRIGGER_TO_ACHIEVEMENTS = {
   TENURE_CHECK: [ACHIEVEMENT_IDS.TENURE_MASTER],
   TOTEM_PRESTIGED: [ACHIEVEMENT_IDS.PRESTIGE_PROGRESSION],
   MISSION_COMPLETED: [ACHIEVEMENT_IDS.COUNCIL_MISSIONS, ACHIEVEMENT_IDS.FOUNDING_RITUAL],
+  QUEST_SET_COMPLETED: [ACHIEVEMENT_IDS.QUEST_SET_MASTER],
+  QUEST_THEMED_CLAIM: [ACHIEVEMENT_IDS.THEME_MASTER],
 };
 
 // =============================================================================
@@ -180,6 +185,9 @@ const ACHIEVEMENT_MILESTONES = {
   [ACHIEVEMENT_IDS.PERSISTENCE_REWARD]: [30, 90, 365],
   // Batch 3 — prestige-progression: total prestige levels across all totems
   [ACHIEVEMENT_IDS.PRESTIGE_PROGRESSION]: [1, 3, 5, 10, 25, 50, 100],
+  // Daily Quests
+  [ACHIEVEMENT_IDS.QUEST_SET_MASTER]: [1, 7, 30, 100, 365],
+  [ACHIEVEMENT_IDS.THEME_MASTER]: [10, 30, 90, 270],
 };
 
 const ONETIME_ACHIEVEMENTS = [
@@ -481,6 +489,19 @@ const MILESTONE_REWARDS = {
     { essence: 3000, xp: 300, name: 'Cosmic Resonance' },      // 25
     { essence: 6000, xp: 400, name: 'Realm Shapers' },         // 50
     { essence: 12000, xp: 500, name: 'Infinite Pantheon' },    // 100
+  ],
+  [ACHIEVEMENT_IDS.QUEST_SET_MASTER]: [
+    { essence: 25, xp: 0, name: 'Devoted Seeker' },            // 1 set
+    { essence: 75, xp: 0, name: 'Weekly Pilgrim' },            // 7 sets
+    { essence: 200, xp: 0, name: 'Lunar Devotee' },            // 30 sets
+    { essence: 500, xp: 0, name: 'Centurion of Quests' },      // 100 sets
+    { essence: 1500, xp: 0, name: 'Year of the Spirits' },     // 365 sets
+  ],
+  [ACHIEVEMENT_IDS.THEME_MASTER]: [
+    { essence: 50, xp: 0, name: 'Theme Apprentice' },          // 10 themed claims
+    { essence: 150, xp: 0, name: 'Pathwalker' },               // 30 themed claims
+    { essence: 400, xp: 0, name: 'Thematic Sage' },            // 90 themed claims
+    { essence: 1000, xp: 0, name: 'Master of the Cycle' },     // 270 themed claims
   ],
 };
 
@@ -988,6 +1009,14 @@ async function checkAchievement(userId, trigger, data = {}) {
           else if (achievementId === ACHIEVEMENT_IDS.COUNCIL_MISSIONS) {
             value = data.totalMissionCount || 0;
           }
+          break;
+
+        case 'QUEST_SET_COMPLETED':
+          value = data.totalQuestSetCount || 0;
+          break;
+
+        case 'QUEST_THEMED_CLAIM':
+          value = data.totalThemedClaimCount || 0;
           break;
 
         default:
@@ -1758,6 +1787,26 @@ async function onMissionCompleted(userId, { missionType, totalMissionCount }) {
   return checkAchievement(userId, 'MISSION_COMPLETED', { missionType, totalMissionCount });
 }
 
+/**
+ * Call when a daily quest set is completed AND the bonus reward has been claimed.
+ * @param {string} userId
+ * @param {object} options
+ * @param {number} options.totalQuestSetCount - Total bonus claims by this user (running counter on user.stats)
+ */
+async function onQuestSetClaimed(userId, { totalQuestSetCount }) {
+  return checkAchievement(userId, 'QUEST_SET_COMPLETED', { totalQuestSetCount });
+}
+
+/**
+ * Call when a themed daily quest (slot 3 affinity or slot 4 domain) is claimed.
+ * @param {string} userId
+ * @param {object} options
+ * @param {number} options.totalThemedClaimCount - Total themed claims by this user
+ */
+async function onQuestThemedClaimed(userId, { totalThemedClaimCount }) {
+  return checkAchievement(userId, 'QUEST_THEMED_CLAIM', { totalThemedClaimCount });
+}
+
 // =============================================================================
 // EXPORTS
 // =============================================================================
@@ -1800,6 +1849,8 @@ module.exports = {
   onElderSeated,
   onSanctumClaimed,
   onMissionCompleted,
+  onQuestSetClaimed,
+  onQuestThemedClaimed,
 
   // Batch 1 helpers
   checkBalancedCare,

@@ -33,7 +33,8 @@ function installDependencies() {
     });
     console.log(chalk.green(`  ✓ Installed dependencies`));
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     console.error(chalk.red(`  ✗ Failed to install dependencies`));
     console.error(error.message);
     return false;
@@ -65,7 +66,8 @@ function packageFunction() {
         '-DestinationPath', zipFilePath,
         '-Force',
       ]);
-    } else {
+    }
+    else {
       execFileSync('zip', ['-r', zipFilePath, '.'], { cwd: functionDir });
     }
 
@@ -73,7 +75,8 @@ function packageFunction() {
     const fileSizeInMB = (stats.size / (1024 * 1024)).toFixed(2);
     console.log(chalk.green(`  ✓ Created ${path.basename(zipFilePath)} (${fileSizeInMB} MB)`));
     return true;
-  } catch (error) {
+  }
+  catch (error) {
     console.error(chalk.red(`  ✗ Failed to create ZIP`));
     console.error(error.message);
     return false;
@@ -99,7 +102,8 @@ if (packageFunction()) {
   console.log(chalk.bold.green('\n✅ Package ready for deployment!\n'));
   console.log(chalk.cyan(`Package: ${PACKAGE_DIR}/${FUNCTION_NAME}-${VERSION}.zip`));
   console.log(chalk.cyan(`Lambda handler: lambda.handler\n`));
-} else {
+}
+else {
   console.log(chalk.bold.red('\n❌ Packaging failed.\n'));
   process.exit(1);
 }
