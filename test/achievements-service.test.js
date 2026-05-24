@@ -24,7 +24,13 @@ jest.mock('../src/common/db-client', () => ({
   },
 }));
 
+// Mock loot-service — achievements lazily requires grantLootItem to grant box rewards.
+jest.mock('../src/services/loot-service', () => ({
+  grantLootItem: jest.fn(),
+}));
+
 const dbClient = require('../src/common/db-client');
+const lootService = require('../src/services/loot-service');
 const {
   // Constants
   ACHIEVEMENT_IDS,
@@ -70,6 +76,9 @@ describe('Achievements Service', () => {
     dbClient.logTransaction.mockResolvedValue({});
     dbClient.getTotem.mockResolvedValue({ experience: 100 });
     dbClient.updateTotem.mockResolvedValue({});
+    lootService.grantLootItem.mockImplementation((userId, boxId) =>
+      Promise.resolve({ id: `loot_${boxId}`, boxId, source: 'achievement' })
+    );
   });
 
   // =============================================================================
@@ -161,6 +170,38 @@ describe('Achievements Service', () => {
       const reward = ONE_TIME_REWARDS[ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR];
       expect(reward.essence).toBe(250);
       expect(reward.xp).toBe(150);
+    });
+  });
+
+  // =============================================================================
+  // LOOT BOX REWARD INTEGRITY (#1)
+  // =============================================================================
+
+  describe('Loot box reward integrity', () => {
+    const lootBoxes = require('../src/data/loot-boxes.json').boxes;
+
+    // Collect every lootBoxId referenced by a reward config, with where it came from.
+    const collectRefs = () => {
+      const refs = [];
+      Object.entries(ONE_TIME_REWARDS).forEach(([achId, r]) => {
+        if (r.lootBoxId) refs.push({ where: achId, boxId: r.lootBoxId });
+      });
+      Object.entries(MILESTONE_REWARDS).forEach(([achId, arr]) => {
+        arr.forEach((r, i) => {
+          if (r.lootBoxId) refs.push({ where: `${achId}[${i}]`, boxId: r.lootBoxId });
+        });
+      });
+      return refs;
+    };
+
+    it('references at least one loot box (guards against the check silently passing)', () => {
+      expect(collectRefs().length).toBeGreaterThan(0);
+    });
+
+    it('every lootBoxId in reward configs maps to a real loot box definition', () => {
+      const invalid = collectRefs().filter(({ boxId }) => !lootBoxes[boxId]);
+      // Empty array = all references resolve. A failure prints the offending {where, boxId}.
+      expect(invalid).toEqual([]);
     });
   });
 
@@ -282,6 +323,42 @@ describe('Achievements Service', () => {
       expect(dbClient.addEssence).toHaveBeenCalledWith(testUserId, 10, expect.objectContaining({
         ref: `${ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION}_m0`,
       }));
+    });
+
+    // --- Loot box reward branch (#3) ---
+
+    it('should grant a loot box when lootBoxId is provided', async () => {
+      const result = await distributeAchievementReward(
+        testUserId, ACHIEVEMENT_IDS.LOGIN_PROGRESSION, 'Monthly Master', 100, 0, null, 1, 'essence_box_small'
+      );
+
+      expect(lootService.grantLootItem).toHaveBeenCalledWith(testUserId, 'essence_box_small', 'achievement');
+      expect(result.lootBox).toEqual({
+        id: 'loot_essence_box_small',
+        boxId: 'essence_box_small',
+        source: 'achievement',
+      });
+      expect(result.essence).toBe(100);
+    });
+
+    it('should not grant a loot box when lootBoxId is absent', async () => {
+      const result = await distributeAchievementReward(
+        testUserId, ACHIEVEMENT_IDS.RARE_COLLECTOR, 'Rare Collector', 50, 0
+      );
+
+      expect(lootService.grantLootItem).not.toHaveBeenCalled();
+      expect(result.lootBox).toBeUndefined();
+    });
+
+    it('should still award essence if the loot grant fails', async () => {
+      lootService.grantLootItem.mockRejectedValue(new Error('grant failed'));
+
+      const result = await distributeAchievementReward(
+        testUserId, ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION, 'Master Curator', 150, 0, null, 4, 'uncommon_totem_box'
+      );
+
+      expect(result.essence).toBe(150);
+      expect(result.lootBox).toBeUndefined();
     });
   });
 
@@ -493,6 +570,61 @@ describe('Achievements Service', () => {
         expect(result.unlocked).toBe(true);
         expect(result.rewards.xp).toBe(25); // First Evolution = 25 XP
         expect(result.rewards.essence).toBe(25);
+      });
+    });
+
+    describe('Loot box milestone rewards (#2)', () => {
+      it('should grant the Uncommon Totem Box when collector 32-totem tier unlocks', async () => {
+        // Already through milestone index 3 (12 totems); reaching 32 unlocks index 4 only.
+        dbClient.getItem.mockResolvedValue({
+          pk: `USER#${testUserId}`,
+          sk: `ACH#${ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION}`,
+          currentValue: 12,
+          milestoneIndex: 3,
+          isComplete: false,
+          milestones: [0, 1, 2, 3].map(index => ({ index, unlockedAt: '2024-01-01T00:00:00.000Z' })),
+        });
+
+        const result = await checkAndUnlockMilestone(
+          testUserId, ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION, 32
+        );
+
+        expect(result.newMilestones).toEqual([4]);
+        expect(lootService.grantLootItem).toHaveBeenCalledWith(testUserId, 'uncommon_totem_box', 'achievement');
+        expect(result.rewards.lootBoxes).toEqual([
+          { id: 'loot_uncommon_totem_box', boxId: 'uncommon_totem_box', source: 'achievement' },
+        ]);
+      });
+
+      it('should grant the Small Essence Box when login 30-day tier unlocks', async () => {
+        // Already through the 7-day tier (index 0); reaching 30 unlocks index 1 only.
+        dbClient.getItem.mockResolvedValue({
+          pk: `USER#${testUserId}`,
+          sk: `ACH#${ACHIEVEMENT_IDS.LOGIN_PROGRESSION}`,
+          currentValue: 7,
+          milestoneIndex: 0,
+          isComplete: false,
+          milestones: [{ index: 0, unlockedAt: '2024-01-01T00:00:00.000Z' }],
+        });
+
+        const result = await checkAndUnlockMilestone(
+          testUserId, ACHIEVEMENT_IDS.LOGIN_PROGRESSION, 30
+        );
+
+        expect(result.newMilestones).toEqual([1]);
+        expect(lootService.grantLootItem).toHaveBeenCalledWith(testUserId, 'essence_box_small', 'achievement');
+        expect(result.rewards.lootBoxes).toHaveLength(1);
+        expect(result.rewards.lootBoxes[0].boxId).toBe('essence_box_small');
+      });
+
+      it('should not grant a box for a plain milestone (collector 1-totem tier)', async () => {
+        const result = await checkAndUnlockMilestone(
+          testUserId, ACHIEVEMENT_IDS.COLLECTOR_PROGRESSION, 1
+        );
+
+        expect(result.newMilestones).toEqual([0]);
+        expect(lootService.grantLootItem).not.toHaveBeenCalled();
+        expect(result.rewards.lootBoxes).toBeUndefined();
       });
     });
   });

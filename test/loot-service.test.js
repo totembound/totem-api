@@ -113,12 +113,13 @@ describe('Loot Service', () => {
       expect(box.config.rarityId).toBe(2);
     });
 
-    it('should return essence_box_small definition', () => {
+    it('should return essence_box_small definition (now uncommon rarity)', () => {
       const box = getBoxDefinition('essence_box_small');
       expect(box).toBeDefined();
       expect(box.type).toBe('essence_box');
       expect(box.config.minAmount).toBe(200);
       expect(box.config.maxAmount).toBe(500);
+      expect(box.rarity).toBe('uncommon'); // bumped from 'common'
     });
 
     it('should return essence_box_large definition', () => {
@@ -128,19 +129,38 @@ describe('Loot Service', () => {
       expect(box.config.maxAmount).toBe(2500);
     });
 
+    it('should return epic_totem_box definition (Epic, rarityId 3)', () => {
+      const box = getBoxDefinition('epic_totem_box');
+      expect(box).toBeDefined();
+      expect(box.type).toBe('totem_box');
+      expect(box.config.rarityId).toBe(3);
+      expect(box.rarity).toBe('epic');
+    });
+
+    it('should return essence_box_huge definition (3000-5000, epic)', () => {
+      const box = getBoxDefinition('essence_box_huge');
+      expect(box).toBeDefined();
+      expect(box.type).toBe('essence_box');
+      expect(box.config.minAmount).toBe(3000);
+      expect(box.config.maxAmount).toBe(5000);
+      expect(box.rarity).toBe('epic');
+    });
+
     it('should return null for unknown box ID', () => {
       expect(getBoxDefinition('nonexistent_box')).toBeNull();
     });
   });
 
   describe('getAllBoxDefinitions', () => {
-    it('should return all 4 box types', () => {
+    it('should return all 6 box types', () => {
       const boxes = getAllBoxDefinitions();
-      expect(Object.keys(boxes)).toHaveLength(4);
+      expect(Object.keys(boxes)).toHaveLength(6);
       expect(boxes).toHaveProperty('uncommon_totem_box');
       expect(boxes).toHaveProperty('rare_totem_box');
+      expect(boxes).toHaveProperty('epic_totem_box');
       expect(boxes).toHaveProperty('essence_box_small');
       expect(boxes).toHaveProperty('essence_box_large');
+      expect(boxes).toHaveProperty('essence_box_huge');
     });
   });
 
@@ -320,6 +340,47 @@ describe('Loot Service', () => {
 
         await expect(claimLootItem(testUserId, mockLootId))
           .rejects.toThrow('Failed to add essence: DB error');
+      });
+    });
+
+    describe('Huge essence box claim', () => {
+      beforeEach(() => {
+        dbClient.queryItems.mockResolvedValue([{
+          pk: `USER#${testUserId}`,
+          sk: `LOOT#${mockLootId}`,
+          id: mockLootId,
+          boxId: 'essence_box_huge',
+          status: 'unclaimed',
+        }]);
+      });
+
+      it('should award essence within the 3000-5000 range', async () => {
+        const result = await claimLootItem(testUserId, mockLootId);
+
+        expect(result.result.type).toBe('essence');
+        const call = dbClient.addEssence.mock.calls[0];
+        expect(call[1]).toBeGreaterThanOrEqual(3000);
+        expect(call[1]).toBeLessThanOrEqual(5000);
+      });
+    });
+
+    describe('Epic totem box claim', () => {
+      beforeEach(() => {
+        dbClient.queryItems.mockResolvedValue([{
+          pk: `USER#${testUserId}`,
+          sk: `LOOT#${mockLootId}`,
+          id: mockLootId,
+          boxId: 'epic_totem_box',
+          status: 'unclaimed',
+        }]);
+      });
+
+      it('should create an Epic (rarityId 3) totem with the chosen species', async () => {
+        const result = await claimLootItem(testUserId, mockLootId, { speciesId: 0 });
+
+        expect(result.result.type).toBe('totem');
+        expect(result.result.totem.rarityId).toBe(3);
+        expect(result.result.totem.rarityName).toBe('Epic');
       });
     });
 

@@ -333,11 +333,11 @@ const MILESTONE_REWARDS = {
     { essence: 10, xp: 0, name: 'Chosen Keeper' },         // 1 totem
     { essence: 25, xp: 0, name: 'Novice Curator' },        // 3 totems
     { essence: 50, xp: 0, name: 'Dedicated Keeper' },      // 6 totems
-    { essence: 100, xp: 0, name: 'Established Guardian' }, // 12 totems
-    { essence: 150, xp: 0, name: 'Master Curator' },       // 32 totems
-    { essence: 200, xp: 0, name: 'Arcane Librarian' },     // 64 totems
-    { essence: 300, xp: 0, name: 'Ethereal Archivist' },   // 128 totems
-    { essence: 500, xp: 0, name: 'Legendary Sage' },       // 256 totems
+    { essence: 100, xp: 0, lootBoxId: 'uncommon_totem_box', name: 'Established Guardian' }, // 12 totems
+    { essence: 150, xp: 0, lootBoxId: 'uncommon_totem_box', name: 'Master Curator' },   // 32 totems
+    { essence: 200, xp: 0, lootBoxId: 'rare_totem_box', name: 'Arcane Librarian' },     // 64 totems
+    { essence: 300, xp: 0, lootBoxId: 'rare_totem_box', name: 'Ethereal Archivist' },   // 128 totems
+    { essence: 500, xp: 0, lootBoxId: 'epic_totem_box', name: 'Legendary Sage' },       // 256 totems
   ],
   [ACHIEVEMENT_IDS.EVOLUTION_PROGRESSION]: [
     { essence: 25, xp: 25, name: 'First Evolution' },      // Stage 1
@@ -347,10 +347,10 @@ const MILESTONE_REWARDS = {
   ],
   [ACHIEVEMENT_IDS.LOGIN_PROGRESSION]: [
     { essence: 50, xp: 0, name: 'Week Warrior' },          // 7 days
-    { essence: 100, xp: 0, name: 'Monthly Master' },       // 30 days
-    { essence: 200, xp: 0, name: 'Seasonal Spirit' },      // 90 days
-    { essence: 300, xp: 0, name: 'Seasonal Guardian' },    // 180 days
-    { essence: 500, xp: 0, name: 'Eternal Spirit Keeper' },// 365 days
+    { essence: 100, xp: 0, lootBoxId: 'essence_box_small', name: 'Monthly Master' },        // 30 days
+    { essence: 200, xp: 0, lootBoxId: 'essence_box_large', name: 'Seasonal Spirit' },       // 90 days
+    { essence: 300, xp: 0, lootBoxId: 'essence_box_large', name: 'Seasonal Guardian' },     // 180 days
+    { essence: 500, xp: 0, lootBoxId: 'essence_box_huge', name: 'Eternal Spirit Keeper' },  // 365 days
   ],
   [ACHIEVEMENT_IDS.FEED_PROGRESSION]: [
     { essence: 25, xp: 25, name: 'Caring Keeper' },        // 100 feeds
@@ -552,9 +552,10 @@ function getRewardConfig(achievementId, milestoneIndex = null) {
  * @param {number} xpReward - XP amount to award
  * @param {string|null} totemId - Optional totem ID for XP rewards
  * @param {number|null} milestoneIndex - Milestone index (for logging)
- * @returns {Promise<{ essence: number, xp: number, newEssenceBalance?: number, newTotemExp?: number }>}
+ * @param {string|null} lootBoxId - Optional loot box id to grant (e.g. 'rare_totem_box')
+ * @returns {Promise<{ essence: number, xp: number, newEssenceBalance?: number, newTotemExp?: number, lootBox?: object }>}
  */
-async function distributeAchievementReward(userId, achievementId, rewardName, essenceReward, xpReward, totemId = null, milestoneIndex = null) {
+async function distributeAchievementReward(userId, achievementId, rewardName, essenceReward, xpReward, totemId = null, milestoneIndex = null, lootBoxId = null) {
   const rewards = { essence: 0, xp: 0 };
 
   // Award Essence if > 0
@@ -614,6 +615,21 @@ async function distributeAchievementReward(userId, achievementId, rewardName, es
     }
     catch (err) {
       console.error(`[Achievement] Error awarding XP for ${achievementId}:`, err.message);
+    }
+  }
+
+  // Grant a loot box if specified (escalating reward on marquee milestones).
+  // The box lands unclaimed in the player's Loot Boxes card to open later.
+  if (lootBoxId) {
+    try {
+      // Lazy require avoids a circular dependency — loot-service triggers achievements on totem-box claim.
+      const { grantLootItem } = require('./loot-service');
+      const lootResult = await grantLootItem(userId, lootBoxId, 'achievement');
+      rewards.lootBox = { id: lootResult.id, boxId: lootResult.boxId, source: 'achievement' };
+      console.log(`[Achievement] Granted loot box "${lootBoxId}" to ${userId} for "${rewardName}"`);
+    }
+    catch (err) {
+      console.error(`[Achievement] Error granting loot box "${lootBoxId}" for ${achievementId}:`, err.message);
     }
   }
 
@@ -746,7 +762,8 @@ async function checkAndUnlockMilestone(userId, achievementId, currentValue, tote
           rewardConfig.essence,
           rewardConfig.xp,
           totemId,
-          null
+          null,
+          rewardConfig.lootBoxId
         );
         result.rewards = rewardResult;
       }
@@ -774,7 +791,8 @@ async function checkAndUnlockMilestone(userId, achievementId, currentValue, tote
             rewardConfig.essence,
             rewardConfig.xp,
             totemId,
-            i
+            i,
+            rewardConfig.lootBoxId
           );
 
           // Accumulate rewards
@@ -785,6 +803,10 @@ async function checkAndUnlockMilestone(userId, achievementId, currentValue, tote
           }
           if (rewardResult.newTotemExp !== undefined) {
             result.rewards.newTotemExp = rewardResult.newTotemExp;
+          }
+          if (rewardResult.lootBox) {
+            if (!result.rewards.lootBoxes) result.rewards.lootBoxes = [];
+            result.rewards.lootBoxes.push(rewardResult.lootBox);
           }
         }
       }
