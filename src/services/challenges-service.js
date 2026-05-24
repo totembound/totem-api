@@ -38,7 +38,7 @@ const { checkEvolutionRequirements } = require('../functions/game-actions/helper
 const { checkActionAvailability } = require('../common/totem-utils');
 
 // =============================================================================
-// CHALLENGE DEFINITIONS (10 Challenges - synced from frontend challenges.json)
+// CHALLENGE DEFINITIONS (11 Challenges - synced from frontend challenges.json)
 // =============================================================================
 
 const CHALLENGES = [
@@ -95,16 +95,29 @@ const CHALLENGES = [
     enabled: true,
   },
   {
-    id: 'chl_spirit-path',
-    name: 'Spirit Path Navigation',
-    description: 'Navigate a magical path of vanishing tiles, racing from start to finish.',
+    id: 'chl_riverside-dodge',
+    name: 'Riverside Dodge',
+    description: 'Evade piranhas leaping from the river. Dodge HIGH, MIDDLE, or LOW — but the controls are inverted.',
     type: 'agility',
     affinity: 'agility',
     requirements: { stage: 0, strength: 5, agility: 10, wisdom: 5 },
     maxDailyAttempts: 5,
+    maxScore: 1000,
+    xpReward: { base: 20, perPoint: 0.01 },
+    essenceReward: 10,
+    enabled: true,
+  },
+  {
+    id: 'chl_spirit-path',
+    name: 'Spirit Path Navigation',
+    description: 'Navigate a magical path of vanishing tiles, racing from start to finish.',
+    type: 'balance',
+    affinity: 'balance',
+    requirements: { stage: 1, strength: 1, agility: 1, wisdom: 1 },
+    maxDailyAttempts: 5,
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
-    essenceReward: 10,  // Tier 1 (display Stage 1)
+    essenceReward: 15,  // Tier 2 (stage 1)
     enabled: true,
   },
   {
