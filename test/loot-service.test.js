@@ -284,7 +284,7 @@ describe('Loot Service', () => {
       });
 
       it('should throw when unavailable species selected', async () => {
-        await expect(claimLootItem(testUserId, mockLootId, { speciesId: 9 })) // Raven - unavailable
+        await expect(claimLootItem(testUserId, mockLootId, { speciesId: 10 })) // Snake - unavailable
           .rejects.toThrow('Selected species is not available');
       });
 

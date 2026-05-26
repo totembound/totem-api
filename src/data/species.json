@@ -225,7 +225,7 @@
       "affinity": "Wisdom",
       "domain": "Air",
       "locationId": 18,
-      "available": false,
+      "available": true,
       "image": "/totems/ravenplacecard.png",
       "baseStats": {
         "strength": 5,
