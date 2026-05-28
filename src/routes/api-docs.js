@@ -3043,17 +3043,13 @@
  *   get:
  *     tags: [Admin]
  *     summary: List all users (admin only)
- *     description: Paginated user list with search. Requires admin role.
+ *     description: |
+ *       Cursor-paginated user list with optional search. Requires admin role.
+ *       Pass the `nextCursor` returned in `pagination` as the `cursor` query
+ *       param to fetch the next page. `hasMore` is true iff `nextCursor` is set.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *           minimum: 1
- *         description: Page number (1-based)
  *       - in: query
  *         name: limit
  *         schema:
@@ -3061,7 +3057,12 @@
  *           default: 25
  *           minimum: 1
  *           maximum: 100
- *         description: Items per page
+ *         description: Page size
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *         description: Opaque cursor token from the previous response's `nextCursor`. Omit on the first page.
  *       - in: query
  *         name: search
  *         schema:
@@ -3069,7 +3070,7 @@
  *         description: Filter by email or display name (contains match)
  *     responses:
  *       200:
- *         description: Paginated user list
+ *         description: One page of users
  *         content:
  *           application/json:
  *             schema:
@@ -3097,10 +3098,10 @@
  *                 pagination:
  *                   type: object
  *                   properties:
- *                     page: { type: integer, example: 1 }
  *                     limit: { type: integer, example: 25 }
- *                     total: { type: integer, example: 150 }
- *                     totalPages: { type: integer, example: 6 }
+ *                     count: { type: integer, example: 25, description: "Items in this page" }
+ *                     nextCursor: { type: string, nullable: true, description: "Opaque token for the next page, or null when done" }
+ *                     hasMore: { type: boolean, example: true }
  *       403:
  *         description: Insufficient permissions (not admin)
  */
@@ -3306,48 +3307,45 @@
  *   get:
  *     tags: [Admin]
  *     summary: List transactions (admin only)
- *     description: Paginated transaction log with optional filters by user, type, and date range.
+ *     description: |
+ *       Cursor-paginated transaction log. Either `userId` or `type` is REQUIRED —
+ *       unbounded cross-slice queries are rejected (400 INVALID_QUERY) to keep
+ *       RCU cost predictable as the ledger grows. Pass the response's
+ *       `nextCursor` back in `cursor` to fetch the next page.
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number (1-based)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 25
- *           maximum: 100
- *         description: Items per page
- *       - in: query
  *         name: userId
- *         schema:
- *           type: string
- *         description: Filter by user ID
+ *         schema: { type: string }
+ *         description: Filter by user ID (uses user-ts-index GSI). Required unless `type` is set.
  *       - in: query
  *         name: type
- *         schema:
- *           type: string
- *         description: "Filter by transaction type (e.g. admin_grant, action_feed, reward_signup)"
+ *         schema: { type: string }
+ *         description: "Filter by transaction type (uses type-ts-index GSI). Required unless `userId` is set. Examples: admin_grant, reward_daily, shop_sale, protection_purchase."
+ *       - in: query
+ *         name: currency
+ *         schema: { type: string, enum: [essence, gems] }
+ *         description: Optional currency filter (FilterExpression after the GSI lookup)
  *       - in: query
  *         name: startTime
- *         schema:
- *           type: string
- *           format: date-time
- *         description: Start of date range (inclusive)
+ *         schema: { type: string, format: date-time }
+ *         description: Inclusive lower bound on `ts`
  *       - in: query
  *         name: endTime
- *         schema:
- *           type: string
- *           format: date-time
- *         description: End of date range (inclusive)
+ *         schema: { type: string, format: date-time }
+ *         description: Inclusive upper bound on `ts`
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 25, maximum: 100 }
+ *         description: Page size
+ *       - in: query
+ *         name: cursor
+ *         schema: { type: string }
+ *         description: Opaque token from a prior response's `nextCursor`. Omit on the first page.
  *     responses:
  *       200:
- *         description: Paginated transaction list
+ *         description: One page of transactions
  *         content:
  *           application/json:
  *             schema:
@@ -3365,20 +3363,23 @@
  *                           id: { type: string }
  *                           userId: { type: string }
  *                           type: { type: string }
- *                           currency: { type: string }
+ *                           currency: { type: string, enum: [essence, gems] }
  *                           amount: { type: number }
  *                           balanceBefore: { type: number }
  *                           balanceAfter: { type: number }
  *                           refType: { type: string, nullable: true }
+ *                           refId: { type: string, nullable: true }
  *                           refName: { type: string, nullable: true }
  *                           ts: { type: string, format: date-time }
  *                 pagination:
  *                   type: object
  *                   properties:
- *                     page: { type: integer }
  *                     limit: { type: integer }
- *                     total: { type: integer }
- *                     totalPages: { type: integer }
+ *                     count: { type: integer, description: "Items in this page" }
+ *                     nextCursor: { type: string, nullable: true }
+ *                     hasMore: { type: boolean }
+ *       400:
+ *         description: Neither userId nor type given (INVALID_QUERY), or unknown currency (INVALID_CURRENCY)
  *       403:
  *         description: Insufficient permissions
  */
