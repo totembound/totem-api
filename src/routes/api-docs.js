@@ -3325,8 +3325,8 @@
  *         description: "Filter by transaction type (uses type-ts-index GSI). Required unless `userId` is set. Examples: admin_grant, reward_daily, shop_sale, protection_purchase."
  *       - in: query
  *         name: currency
- *         schema: { type: string, enum: [essence, gems] }
- *         description: Optional currency filter (FilterExpression after the GSI lookup)
+ *         schema: { type: string, enum: [essence, gems, xp] }
+ *         description: Optional currency filter (FilterExpression after the GSI lookup). XP rows come from achievement and council-mission claims.
  *       - in: query
  *         name: startTime
  *         schema: { type: string, format: date-time }
@@ -3363,7 +3363,7 @@
  *                           id: { type: string }
  *                           userId: { type: string }
  *                           type: { type: string }
- *                           currency: { type: string, enum: [essence, gems] }
+ *                           currency: { type: string, enum: [essence, gems, xp] }
  *                           amount: { type: number }
  *                           balanceBefore: { type: number }
  *                           balanceAfter: { type: number }

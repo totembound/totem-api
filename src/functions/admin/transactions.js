@@ -39,10 +39,10 @@ async function list(req, res) {
       });
     }
 
-    if (currency && !['essence', 'gems'].includes(currency)) {
+    if (currency && !['essence', 'gems', 'xp'].includes(currency)) {
       return res.status(400).json({
         success: false,
-        error: { code: 'INVALID_CURRENCY', message: 'currency must be "essence" or "gems"' },
+        error: { code: 'INVALID_CURRENCY', message: 'currency must be "essence", "gems", or "xp"' },
       });
     }
 

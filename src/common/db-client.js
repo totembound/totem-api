@@ -1043,10 +1043,42 @@ async function listAllTransactions({ limit = 50, cursor, userId, type, currency,
 
   if (exclusiveStartKey) params.ExclusiveStartKey = exclusiveStartKey;
 
-  const response = await docClient.send(new QueryCommand(params));
+  // Fast path: no FilterExpression — one Query, return the natural page.
+  if (!params.FilterExpression) {
+    params.Limit = limit;
+    const response = await docClient.send(new QueryCommand(params));
+    return {
+      items: response.Items || [],
+      nextCursor: encodeCursor(response.LastEvaluatedKey),
+    };
+  }
+
+  // Filter-aware path: a FilterExpression (e.g. type narrowing the userId GSI,
+  // or currency filter) is applied AFTER DynamoDB reads each page. A single
+  // Query with `Limit: N` would return between 0 and N matches — useless UX for
+  // selective filters. So we iterate, accumulating matches across Query pages
+  // until we have at least `limit` matches OR we exhaust data OR we hit a
+  // safety cap on rows scanned (prevents runaway cost on very selective filters).
+  const MAX_SCAN = Math.max(limit * 10, 200);
+  const PER_ITER = Math.max(limit, 25);
+  const collected = [];
+  let lastKey = exclusiveStartKey;
+  let scanned = 0;
+
+  do {
+    const iterParams = { ...params, Limit: Math.min(PER_ITER, MAX_SCAN - scanned) };
+    if (lastKey) iterParams.ExclusiveStartKey = lastKey;
+    else delete iterParams.ExclusiveStartKey;
+
+    const response = await docClient.send(new QueryCommand(iterParams));
+    collected.push(...(response.Items || []));
+    scanned += response.ScannedCount || (response.Items || []).length;
+    lastKey = response.LastEvaluatedKey;
+  } while (collected.length < limit && lastKey && scanned < MAX_SCAN);
+
   return {
-    items: response.Items || [],
-    nextCursor: encodeCursor(response.LastEvaluatedKey),
+    items: collected,
+    nextCursor: encodeCursor(lastKey),
   };
 }
 
