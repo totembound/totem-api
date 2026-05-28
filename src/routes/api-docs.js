@@ -1682,25 +1682,24 @@
  * /v1/rewards/daily/protection:
  *   post:
  *     tags: [Rewards]
- *     summary: Buy daily streak protection
- *     description: "Purchase protection to prevent losing daily streak if you miss a day. Tier 0: 50 Essence, 1-day protection, requires 7-day streak. Tier 1: 250 Essence, 7-day protection, requires 14-day streak."
+ *     summary: Buy daily streak-saver charges
+ *     description: "Buy consumable streak-saver charges that top up toward a cap of 7. Charges are spent only when you miss a day. Pricing: 50 Essence per charge, or 250 for a full 7-pack (bulk discount). Requires a 7-day streak. Omit `quantity` to fill to the cap."
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               tier:
+ *               quantity:
  *                 type: number
- *                 enum: [0, 1]
- *                 default: 0
- *                 description: "Protection tier (0 = 1 day/50 Essence, 1 = 7 days/250 Essence)"
+ *                 minimum: 1
+ *                 description: "Charges to add (1..headroom). Omit to fill to the cap (7)."
  *     responses:
  *       200:
- *         description: Protection purchased
+ *         description: Charges purchased
  *         content:
  *           application/json:
  *             schema:
@@ -1711,17 +1710,17 @@
  *                   type: object
  *                   properties:
  *                     rewardType: { type: string, example: daily }
- *                     tier: { type: number }
+ *                     chargesAdded: { type: number }
  *                     cost: { type: number }
- *                     durationSeconds: { type: number }
- *                     protectionExpiry: { type: string }
+ *                     protectionCharges: { type: number, description: "New total banked charges" }
+ *                     maxCharges: { type: number, example: 7 }
  *                     newBalance: { type: number }
  *       402:
  *         description: Insufficient Essence
  *       403:
- *         description: Streak too low for selected tier
+ *         description: Streak too low
  *       409:
- *         description: Already has active protection
+ *         description: At cap (CHARGES_FULL) or requested quantity exceeds headroom (EXCEEDS_CAP)
  */
 
 /**
@@ -1729,30 +1728,30 @@
  * /v1/rewards/weekly/protection:
  *   post:
  *     tags: [Rewards]
- *     summary: Buy weekly streak protection
- *     description: "Purchase protection for weekly streak. Tier 0 only: 500 Essence, 14-day protection, requires 4-week streak."
+ *     summary: Buy weekly streak-saver charges
+ *     description: "Buy consumable streak-saver charges that top up toward a cap of 2. Charges are spent only when you miss a week. 250 Essence per charge. Requires a 4-week streak. Omit `quantity` to fill to the cap."
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               tier:
+ *               quantity:
  *                 type: number
- *                 enum: [0]
- *                 default: 0
+ *                 minimum: 1
+ *                 description: "Charges to add (1..headroom). Omit to fill to the cap (2)."
  *     responses:
  *       200:
- *         description: Protection purchased
+ *         description: Charges purchased
  *       402:
  *         description: Insufficient Essence
  *       403:
  *         description: Streak too low
  *       409:
- *         description: Already has active protection
+ *         description: At cap (CHARGES_FULL) or requested quantity exceeds headroom (EXCEEDS_CAP)
  */
 
 /**
