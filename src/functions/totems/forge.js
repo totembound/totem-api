@@ -220,6 +220,27 @@ async function forgeTotem(user, body = {}) {
     throw err;
   }
 
+  // ── Get updated totem count and Essence balance ──
+  // Read these BEFORE logging so the ledger row can carry the real balance
+  // through (forge is essence-neutral, amount: 0, but chain-validation queries
+  // need balanceBefore === balanceAfter === currentBalance to stitch correctly).
+  let totalTotemCount = 1;
+  let essenceBalance = 0;
+  try {
+    const [allTotems, userData] = await Promise.all([
+      getUserTotems(userId),
+      getUser(userId),
+    ]);
+    totalTotemCount = allTotems.length;
+    essenceBalance = userData?.currencies?.essence || 0;
+
+    // Update stats.totalTotems
+    await updateUser(userId, { 'stats.totalTotems': totalTotemCount });
+  }
+  catch (err) {
+    console.warn('[forge] Failed to update stats:', err.message);
+  }
+
   // ── Log transaction with enriched analytics fields ──
   // Uses logTransaction for consistent PK/SK/ID generation, then updateItem for forge-specific fields
   try {
@@ -227,8 +248,8 @@ async function forgeTotem(user, body = {}) {
       type: 'totem_forge',
       currency: 'essence',
       amount: 0,
-      balanceBefore: 0,
-      balanceAfter: 0,
+      balanceBefore: essenceBalance,
+      balanceAfter: essenceBalance,
       ref: newTotemData.id,
       refType: 'forge',
       refName: `${fusionType}_fusion_${RARITIES[rarityId]?.name || rarityId}_to_${RARITIES[newRarityId]?.name || newRarityId}`,
@@ -249,24 +270,6 @@ async function forgeTotem(user, body = {}) {
   }
   catch (err) {
     console.warn('[forge] Failed to log transaction:', err.message);
-  }
-
-  // ── Get updated totem count and Essence balance ──
-  let totalTotemCount = 1;
-  let essenceBalance = 0;
-  try {
-    const [allTotems, userData] = await Promise.all([
-      getUserTotems(userId),
-      getUser(userId),
-    ]);
-    totalTotemCount = allTotems.length;
-    essenceBalance = userData?.currencies?.essence || 0;
-
-    // Update stats.totalTotems
-    await updateUser(userId, { 'stats.totalTotems': totalTotemCount });
-  }
-  catch (err) {
-    console.warn('[forge] Failed to update stats:', err.message);
   }
 
   // ── Trigger achievements ──
