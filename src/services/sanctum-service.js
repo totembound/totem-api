@@ -577,7 +577,20 @@ async function claimSanctum(userId) {
   const user = await require('../common/db-client').getUser(userId);
   const newEssenceBalance = user?.currencies?.essence || 0;
 
-  // 6. Check sanctum claim achievements (non-blocking)
+  // 6. Log the Essence credit to the ledger so reconciliation queries chain
+  // through sanctum claims. transactWrite above bypasses logTransaction, so we
+  // post the credit explicitly here, mirroring the council-mission-claim path.
+  await logTransaction(userId, {
+    type: 'reward_sanctum',
+    currency: 'essence',
+    amount: totalEarnings,
+    balanceBefore: newEssenceBalance - totalEarnings,
+    balanceAfter: newEssenceBalance,
+    refType: 'sanctum',
+    refName: `Sanctum Claim (${seats.length} seat${seats.length === 1 ? '' : 's'})`,
+  });
+
+  // 7. Check sanctum claim achievements (non-blocking)
   let achievements = [];
   try {
     // Get current claim count from achievement progress (incremental)

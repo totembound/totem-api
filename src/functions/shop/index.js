@@ -6,14 +6,12 @@
  * - POST /api/shop/purchase - Purchase a listed totem
  * - POST /api/shop/cancel - Cancel a listing
  * - GET /api/shop/listings - Browse marketplace listings
- * - GET /api/shop/my-listings - View user's own listings
  */
 
 const { listTotem, LISTING_FEE, MIN_ASKING_PRICE, MAX_ASKING_PRICE } = require('./list-totem');
 const { purchase, calculateTransactionFee, TRANSACTION_FEE_PERCENT } = require('./purchase');
 const { cancel } = require('./cancel');
 const { getListings, DEFAULT_LIMIT, MAX_LIMIT, VALID_SORT_OPTIONS } = require('./listings');
-const { getMyListings, VALID_STATUS_FILTERS } = require('./my-listings');
 const { purchaseBundle, getSpecialOfferBundles, SPECIAL_OFFER_BUNDLES } = require('./purchase-bundle');
 
 /**
@@ -40,7 +38,6 @@ async function getConfig(_user) {
       },
       filters: {
         sortOptions: VALID_SORT_OPTIONS,
-        statusOptions: VALID_STATUS_FILTERS,
       },
     },
   };
@@ -60,7 +57,6 @@ module.exports = {
   purchase,
   cancel,
   getListings,
-  getMyListings,
   getConfig,
 
   // Bundle purchase handlers
@@ -79,6 +75,5 @@ module.exports = {
   DEFAULT_LIMIT,
   MAX_LIMIT,
   VALID_SORT_OPTIONS,
-  VALID_STATUS_FILTERS,
   SPECIAL_OFFER_BUNDLES,
 };

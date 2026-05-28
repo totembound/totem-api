@@ -410,6 +410,39 @@ describe('Sanctum Service', () => {
       expect(transactItems[1].Update.TableName).toBe('TotemBound-ExpeditionState');
     });
 
+    it('should log the Essence credit to the ledger (chain reconciliation)', async () => {
+      // Regression: claimSanctum used to credit Essence via transactWrite without
+      // calling logTransaction, leaving a hole in the per-user ledger chain.
+      const seatedAt = new Date('2026-03-20T00:00:00Z');
+      const lastClaimed = new Date('2026-03-27T00:00:00Z');
+
+      dbClient.queryItems.mockResolvedValue([{
+        seatIndex: 0,
+        totemId: testTotemId,
+        totemName: 'Foxy',
+        seatedAt: seatedAt.toISOString(),
+        lastClaimedAt: lastClaimed.toISOString(),
+      }]);
+      dbClient.transactWrite.mockResolvedValue({});
+      // Post-credit balance returned by getUser; the log row's balanceBefore
+      // should equal balanceAfter - amount so chain queries stitch through.
+      dbClient.getUser.mockResolvedValue({ currencies: { essence: 500 } });
+
+      const result = await sanctumService.claimSanctum(testUserId);
+      expect(result.success).toBe(true);
+      const totalClaimed = result.data.totalClaimed;
+
+      expect(dbClient.logTransaction).toHaveBeenCalledWith(testUserId, expect.objectContaining({
+        type: 'reward_sanctum',
+        currency: 'essence',
+        amount: totalClaimed,
+        balanceBefore: 500 - totalClaimed,
+        balanceAfter: 500,
+        refType: 'sanctum',
+        refName: expect.stringContaining('Sanctum Claim'),
+      }));
+    });
+
     it('should update all lastClaimedAt for multiple seats', async () => {
       const seatedAt = new Date('2026-03-20T00:00:00Z');
       const lastClaimed = new Date('2026-03-27T00:00:00Z');

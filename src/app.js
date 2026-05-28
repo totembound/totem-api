@@ -975,7 +975,7 @@ app.post('/v1/rewards/daily/protection', authenticateJWT, async (req, res) => {
       }
       else {
         const statusCode = result.error?.code === 'INSUFFICIENT_ESSENCE' ? 402 :
-          result.error?.code === 'ALREADY_PROTECTED' ? 409 :
+          result.error?.code === 'CHARGES_FULL' || result.error?.code === 'EXCEEDS_CAP' ? 409 :
             result.error?.code === 'INSUFFICIENT_STREAK' ? 403 : 400;
         res.status(statusCode).json(result);
       }
@@ -998,7 +998,7 @@ app.post('/v1/rewards/weekly/protection', authenticateJWT, async (req, res) => {
       }
       else {
         const statusCode = result.error?.code === 'INSUFFICIENT_ESSENCE' ? 402 :
-          result.error?.code === 'ALREADY_PROTECTED' ? 409 :
+          result.error?.code === 'CHARGES_FULL' || result.error?.code === 'EXCEEDS_CAP' ? 409 :
             result.error?.code === 'INSUFFICIENT_STREAK' ? 403 : 400;
         res.status(statusCode).json(result);
       }
@@ -1131,21 +1131,6 @@ app.get('/v1/shop/listings', authenticateJWT, async (req, res) => {
     }
     else {
       res.json({ success: true, data: { listings: [], pagination: { count: 0, hasMore: false } } });
-    }
-  }
-  catch (error) {
-    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
-  }
-});
-
-app.get('/v1/shop/my-listings', authenticateJWT, async (req, res) => {
-  try {
-    if (shopRoutes?.getMyListings) {
-      const result = await shopRoutes.getMyListings(req.user, req.query);
-      res.json(result);
-    }
-    else {
-      res.json({ success: true, data: { listings: [], summary: { total: 0, active: 0, sold: 0, cancelled: 0 } } });
     }
   }
   catch (error) {

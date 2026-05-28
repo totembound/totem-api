@@ -3,19 +3,17 @@
  *
  * POST /v1/rewards/:type/protection
  *
- * Allows users to purchase streak protection. Protection is now a consumable
- * charge model rather than a time-window: each purchase grants N charges that
- * are spent only when a streak would actually reset. No expiry.
+ * Streak protection is a consumable-charge model: each charge is spent only
+ * when a streak would actually reset (no expiry). Players buy charges to TOP UP
+ * toward a per-type holding cap, so they can refill after spending some without
+ * having to drain to zero first.
  *
- * Protection Tiers:
- * Daily:
- *   - Tier 0: 50 Essence, 1 charge,  requires 7-day streak
- *   - Tier 1: 250 Essence, 7 charges, requires 14-day streak (bulk discount)
- * Weekly:
- *   - Tier 0: 500 Essence, 2 charges, requires 4-week streak
+ * Pricing is per-charge, with a bulk discount for buying a full daily week:
+ *   Daily:  50 Essence/charge, cap 7, requires 7-day streak. Full 7-pack: 250.
+ *   Weekly: 250 Essence/charge, cap 2, requires 4-week streak.
  *
- * To prevent unbounded stockpiling, a per-type cap limits the total charges a
- * user can hold simultaneously.
+ * Request body: { quantity } — number of charges to add. Omitted/null means
+ * "fill to the cap" (buy exactly the remaining headroom).
  */
 
 const { getItem, updateItem, TABLES } = require('../../common/db-client');
@@ -23,23 +21,29 @@ const { deductEssence } = require('../../common/db-client');
 
 const REWARDS_CLAIMS_TABLE = TABLES.REWARDS_CLAIMS;
 
-const PROTECTION_TIERS = {
-  daily: [
-    { tier: 0, cost: 50, charges: 1, requiredStreak: 7 },
-    { tier: 1, cost: 250, charges: 7, requiredStreak: 14 },
-  ],
-  weekly: [
-    { tier: 0, cost: 500, charges: 2, requiredStreak: 4 },
-  ],
+const PROTECTION_CONFIG = {
+  daily: {
+    costPerCharge: 50,
+    maxCharges: 7,
+    requiredStreak: 7,
+    // Buying a full week of cover in one purchase is discounted.
+    bulk: { quantity: 7, cost: 250 },
+  },
+  weekly: {
+    costPerCharge: 250,
+    maxCharges: 2,
+    requiredStreak: 4,
+  },
 };
 
-// Caps each user's banked charges. Matches the highest-tier capacity so a
-// single max-tier purchase always succeeds; subsequent buys must wait until
-// charges are spent.
-const MAX_CHARGES = {
-  daily: 7,
-  weekly: 2,
-};
+// Cost to add `quantity` charges, applying a full-pack bulk discount if it
+// exactly matches the configured bulk quantity.
+function chargeCost(config, quantity) {
+  if (config.bulk && quantity === config.bulk.quantity) {
+    return config.bulk.cost;
+  }
+  return quantity * config.costPerCharge;
+}
 
 async function purchaseProtection(user, body, rewardType) {
   if (!user || !user.userId) {
@@ -50,7 +54,6 @@ async function purchaseProtection(user, body, rewardType) {
   }
 
   const userId = user.userId;
-  const tierIndex = body?.tier ?? 0;
 
   if (!['daily', 'weekly'].includes(rewardType)) {
     return {
@@ -59,19 +62,8 @@ async function purchaseProtection(user, body, rewardType) {
     };
   }
 
-  const tiers = PROTECTION_TIERS[rewardType];
-  if (tierIndex < 0 || tierIndex >= tiers.length) {
-    return {
-      success: false,
-      error: {
-        code: 'INVALID_TIER',
-        message: `Invalid tier ${tierIndex}. Valid tiers for ${rewardType}: 0-${tiers.length - 1}`,
-      },
-    };
-  }
-
-  const tierConfig = tiers[tierIndex];
-  const maxCharges = MAX_CHARGES[rewardType];
+  const config = PROTECTION_CONFIG[rewardType];
+  const unit = rewardType === 'daily' ? 'day' : 'week';
 
   try {
     const streakKey = {
@@ -88,12 +80,12 @@ async function purchaseProtection(user, body, rewardType) {
     }
 
     const currentStreak = streakState.currentStreak || 0;
-    if (currentStreak < tierConfig.requiredStreak) {
+    if (currentStreak < config.requiredStreak) {
       return {
         success: false,
         error: {
           code: 'INSUFFICIENT_STREAK',
-          message: `Requires ${tierConfig.requiredStreak}-${rewardType === 'daily' ? 'day' : 'week'} streak. Current: ${currentStreak}.`,
+          message: `Requires ${config.requiredStreak}-${unit} streak. Current: ${currentStreak}.`,
         },
       };
     }
@@ -108,23 +100,47 @@ async function purchaseProtection(user, body, rewardType) {
       }
     }
 
-    const newCharges = currentCharges + tierConfig.charges;
-    if (newCharges > maxCharges) {
+    const headroom = config.maxCharges - currentCharges;
+    if (headroom <= 0) {
       return {
         success: false,
         error: {
           code: 'CHARGES_FULL',
-          message: `You already have ${currentCharges} ${rewardType} protection charge${currentCharges === 1 ? '' : 's'} (max ${maxCharges}). Use them before buying more.`,
+          message: `Streak Saver is full (${currentCharges}/${config.maxCharges}). Use a charge before buying more.`,
           protectionCharges: currentCharges,
+          maxCharges: config.maxCharges,
         },
       };
     }
 
-    const deductResult = await deductEssence(userId, tierConfig.cost, {
+    // No explicit quantity → top all the way up to the cap.
+    const requested = body?.quantity ?? headroom;
+    const quantity = Math.floor(Number(requested));
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return {
+        success: false,
+        error: { code: 'INVALID_QUANTITY', message: 'Quantity must be a positive whole number.' },
+      };
+    }
+    if (quantity > headroom) {
+      return {
+        success: false,
+        error: {
+          code: 'EXCEEDS_CAP',
+          message: `Can only add ${headroom} more charge${headroom === 1 ? '' : 's'} (cap ${config.maxCharges}, have ${currentCharges}).`,
+          protectionCharges: currentCharges,
+          maxCharges: config.maxCharges,
+          available: headroom,
+        },
+      };
+    }
+
+    const cost = chargeCost(config, quantity);
+    const deductResult = await deductEssence(userId, cost, {
       type: 'protection_purchase',
-      ref: `${rewardType}_tier${tierIndex}`,
+      ref: `${rewardType}_x${quantity}`,
       refType: 'protection',
-      refName: `${rewardType === 'daily' ? 'Daily' : 'Weekly'} Protection (Tier ${tierIndex})`,
+      refName: `${rewardType === 'daily' ? 'Daily' : 'Weekly'} Protection (x${quantity})`,
     });
 
     if (!deductResult.success) {
@@ -132,30 +148,29 @@ async function purchaseProtection(user, body, rewardType) {
         success: false,
         error: {
           code: 'INSUFFICIENT_ESSENCE',
-          message: `Not enough Essence. Need ${tierConfig.cost}, have ${deductResult.currentBalance || 0}.`,
+          message: `Not enough Essence. Need ${cost}, have ${deductResult.currentBalance || 0}.`,
         },
       };
     }
 
+    const newCharges = currentCharges + quantity;
     await updateItem(REWARDS_CLAIMS_TABLE, streakKey, {
       protectionCharges: newCharges,
-      protectionTier: tierIndex,
       protectionPurchasedAt: new Date().toISOString(),
-      // Clear any legacy expiry-based protection — charges replace it.
+      // Charges replace any legacy expiry-window protection.
       protectionExpiry: null,
     });
 
-    console.log(`[Protection] User ${userId} purchased ${rewardType} tier ${tierIndex}: +${tierConfig.charges} charges (now ${newCharges}/${maxCharges}) for ${tierConfig.cost} Essence.`);
+    console.log(`[Protection] User ${userId} bought ${rewardType} x${quantity} (now ${newCharges}/${config.maxCharges}) for ${cost} Essence.`);
 
     return {
       success: true,
       data: {
         rewardType,
-        tier: tierIndex,
-        cost: tierConfig.cost,
-        chargesAdded: tierConfig.charges,
+        chargesAdded: quantity,
+        cost,
         protectionCharges: newCharges,
-        maxCharges,
+        maxCharges: config.maxCharges,
         newBalance: deductResult.newBalance,
       },
     };
@@ -169,4 +184,4 @@ async function purchaseProtection(user, body, rewardType) {
   }
 }
 
-module.exports = { purchaseProtection, PROTECTION_TIERS, MAX_CHARGES };
+module.exports = { purchaseProtection, PROTECTION_CONFIG };
