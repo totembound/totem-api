@@ -1168,21 +1168,6 @@ app.post('/v1/shop/purchase', authenticateJWT, async (req, res) => {
   }
 });
 
-app.post('/v1/shop/cancel', authenticateJWT, async (req, res) => {
-  try {
-    if (shopRoutes?.cancel) {
-      const result = await shopRoutes.cancel(req.user, req.body);
-      res.json(result);
-    }
-    else {
-      res.json({ success: true, data: { message: 'Cancel listing (stub)' } });
-    }
-  }
-  catch (error) {
-    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
-  }
-});
-
 app.get('/v1/shop', authenticateJWT, async (req, res) => {
   try {
     if (shopRoutes?.getItems) {

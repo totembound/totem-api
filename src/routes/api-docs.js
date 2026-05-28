@@ -1987,32 +1987,6 @@
  *         description: Insufficient Essence or listing not found
  */
 
-/**
- * @swagger
- * /v1/shop/cancel:
- *   post:
- *     tags: [Shop]
- *     summary: Cancel a marketplace listing
- *     description: Cancel your active listing and get the totem back
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [listingId]
- *             properties:
- *               listingId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Listing cancelled, totem returned
- *       400:
- *         description: Listing not found or not owned by user
- */
-
 // ============================================
 // Special Bundle Endpoints (2)
 // ============================================
