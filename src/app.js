@@ -1138,21 +1138,6 @@ app.get('/v1/shop/listings', authenticateJWT, async (req, res) => {
   }
 });
 
-app.get('/v1/shop/my-listings', authenticateJWT, async (req, res) => {
-  try {
-    if (shopRoutes?.getMyListings) {
-      const result = await shopRoutes.getMyListings(req.user, req.query);
-      res.json(result);
-    }
-    else {
-      res.json({ success: true, data: { listings: [], summary: { total: 0, active: 0, sold: 0, cancelled: 0 } } });
-    }
-  }
-  catch (error) {
-    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
-  }
-});
-
 app.post('/v1/shop/list', authenticateJWT, async (req, res) => {
   try {
     if (shopRoutes?.listTotem) {

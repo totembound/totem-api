@@ -1936,37 +1936,6 @@
 
 /**
  * @swagger
- * /v1/shop/my-listings:
- *   get:
- *     tags: [Shop]
- *     summary: Get my marketplace listings
- *     description: Returns all listings created by the authenticated user with summary stats
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User's listings
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: object
- *                   properties:
- *                     listings: { type: array, items: { type: object } }
- *                     summary:
- *                       type: object
- *                       properties:
- *                         total: { type: number }
- *                         active: { type: number }
- *                         sold: { type: number }
- *                         cancelled: { type: number }
- */
-
-/**
- * @swagger
  * /v1/shop/list:
  *   post:
  *     tags: [Shop]

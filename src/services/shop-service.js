@@ -662,43 +662,6 @@ async function getUnboundListings(filters = {}) {
 }
 
 /**
- * Get user's active listings
- *
- * @param {string} userId - User ID
- * @returns {Promise<{ success: boolean, listings?: array }>}
- */
-async function getMyListings(userId) {
-  try {
-    const command = new QueryCommand({
-      TableName: SHOP_TABLE,
-      IndexName: 'seller-index',
-      KeyConditionExpression: '#originalOwnerId = :userId',
-      FilterExpression: '#status = :active',
-      ExpressionAttributeNames: {
-        '#originalOwnerId': 'originalOwnerId',
-        '#status': 'status',
-      },
-      ExpressionAttributeValues: {
-        ':userId': userId,
-        ':active': 'active',
-      },
-      ScanIndexForward: false, // Most recent first
-    });
-
-    const response = await docClient.send(command);
-
-    return {
-      success: true,
-      listings: response.Items || [],
-    };
-  }
-  catch (error) {
-    console.error('[Shop] Error getting user listings:', error);
-    return { success: false, error: error.message || 'Failed to get listings' };
-  }
-}
-
-/**
  * Get a specific listing by totem ID
  *
  * @param {string} totemId - Totem ID
@@ -780,7 +743,6 @@ module.exports = {
 
   // Query operations
   getUnboundListings,
-  getMyListings,
   getListing,
   getShopStats,
 };

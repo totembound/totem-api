@@ -66,7 +66,6 @@ const {
   purchaseUnboundTotem,
   cancelListing,
   getUnboundListings,
-  getMyListings,
   getListing,
 } = require('../src/services/shop-service');
 
@@ -519,34 +518,6 @@ describe('Shop Service', () => {
       dbClient.docClient.send.mockRejectedValue(new Error('Query failed'));
 
       const result = await getUnboundListings();
-
-      expect(result.success).toBe(false);
-    });
-  });
-
-  describe('getMyListings', () => {
-    it('should query by seller index', async () => {
-      dbClient.docClient.send.mockResolvedValue({ Items: [makeMockListing()] });
-
-      const result = await getMyListings(testUserId);
-
-      expect(result.success).toBe(true);
-      expect(result.listings).toHaveLength(1);
-    });
-
-    it('should return empty for user with no listings', async () => {
-      dbClient.docClient.send.mockResolvedValue({ Items: [] });
-
-      const result = await getMyListings(testUserId);
-
-      expect(result.success).toBe(true);
-      expect(result.listings).toHaveLength(0);
-    });
-
-    it('should handle errors', async () => {
-      dbClient.docClient.send.mockRejectedValue(new Error('Query failed'));
-
-      const result = await getMyListings(testUserId);
 
       expect(result.success).toBe(false);
     });
