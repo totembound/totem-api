@@ -4,13 +4,11 @@
  * Routes:
  * - POST /api/shop/list - List a totem for sale
  * - POST /api/shop/purchase - Purchase a listed totem
- * - POST /api/shop/cancel - Cancel a listing
  * - GET /api/shop/listings - Browse marketplace listings
  */
 
 const { listTotem, LISTING_FEE, MIN_ASKING_PRICE, MAX_ASKING_PRICE } = require('./list-totem');
 const { purchase, calculateTransactionFee, TRANSACTION_FEE_PERCENT } = require('./purchase');
-const { cancel } = require('./cancel');
 const { getListings, DEFAULT_LIMIT, MAX_LIMIT, VALID_SORT_OPTIONS } = require('./listings');
 const { purchaseBundle, getSpecialOfferBundles, SPECIAL_OFFER_BUNDLES } = require('./purchase-bundle');
 
@@ -55,7 +53,6 @@ module.exports = {
   // Main handlers
   listTotem,
   purchase,
-  cancel,
   getListings,
   getConfig,
 

@@ -1,7 +1,7 @@
 /**
  * Shop Handler Tests
  *
- * Tests for shop listing, purchase, cancel, marketplace,
+ * Tests for shop listing, purchase, marketplace,
  * exchange-gems, and shop config handlers.
  */
 
@@ -23,7 +23,6 @@ jest.mock('../src/common/db-client', () => ({
 // Mock shop-service
 jest.mock('../src/services/shop-service', () => ({
   listTotemForSale: jest.fn(),
-  cancelListing: jest.fn(),
   getListing: jest.fn(),
   purchaseUnboundTotem: jest.fn(),
   getUnboundListings: jest.fn(),
@@ -34,7 +33,6 @@ const dbClient = require('../src/common/db-client');
 const shopService = require('../src/services/shop-service');
 
 const { listTotem } = require('../src/functions/shop/list-totem');
-const { cancel } = require('../src/functions/shop/cancel');
 const { purchase } = require('../src/functions/shop/purchase');
 const { getListings } = require('../src/functions/shop/listings');
 
@@ -111,74 +109,6 @@ describe('Shop Handlers', () => {
       const result = await listTotem(testUser, { totemId: 'ttm_abc' });
       expect(result.success).toBe(false);
       expect(result.error.code).toBe('LISTING_FAILED');
-    });
-  });
-
-  // ===========================================================================
-  // CANCEL LISTING
-  // ===========================================================================
-
-  describe('cancel', () => {
-    beforeEach(() => {
-      shopService.getListing.mockResolvedValue({
-        success: true,
-        listing: makeListing(),
-      });
-      shopService.cancelListing.mockResolvedValue({});
-      dbClient.getTotem.mockResolvedValue({ id: 'ttm_abc', name: 'Wolfie' });
-    });
-
-    it('should cancel a listing successfully', async () => {
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(true);
-      expect(result.data.totemId).toBe('ttm_abc');
-      expect(result.data.note).toContain('non-refundable');
-    });
-
-    it('should require totemId', async () => {
-      const result = await cancel(testUser, {});
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('MISSING_FIELD');
-    });
-
-    it('should reject invalid totemId format', async () => {
-      const result = await cancel(testUser, { totemId: 'bad_id' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('INVALID_ID');
-    });
-
-    it('should return NOT_LISTED when listing not found', async () => {
-      shopService.getListing.mockResolvedValue({ success: false });
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('NOT_LISTED');
-    });
-
-    it('should return UNAUTHORIZED when not the seller', async () => {
-      shopService.getListing.mockResolvedValue({
-        success: true,
-        listing: makeListing({ originalOwnerId: 'usr_other' }),
-      });
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('UNAUTHORIZED');
-    });
-
-    it('should return INVALID_STATUS when listing is sold', async () => {
-      shopService.getListing.mockResolvedValue({
-        success: true,
-        listing: makeListing({ status: 'sold' }),
-      });
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('INVALID_STATUS');
-    });
-
-    it('should handle cancel service error', async () => {
-      shopService.cancelListing.mockRejectedValue(new Error('fail'));
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('CANCEL_FAILED');
     });
   });
 
