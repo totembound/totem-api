@@ -14,6 +14,7 @@
  * Run from any directory with: node /home/dpatten/repos/totem-api/scripts/e2e-traits.js
  */
 
+const fs = require('fs');
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
   DynamoDBDocumentClient,
@@ -23,12 +24,19 @@ const {
   UpdateCommand,
   GetCommand,
 } = require('@aws-sdk/lib-dynamodb');
-const { execSync } = require('child_process');
 
-const API = 'http://localhost:3001';
-const USER_ID = 'usr_a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-const EMAIL = 'testplayer1@example.com';
-const PASSWORD = 'TestPassword123!';
+// Local-only test harness. All credentials and endpoints are read from env vars
+// with developer-local fallbacks. The fallbacks intentionally match the values
+// the local Docker stack uses (DynamoDB Local + the seeded TestPlayer1 fixture);
+// no real-environment secret is ever stored here.
+const API = process.env.E2E_API_URL || 'http://localhost:3001';
+const USER_ID = process.env.E2E_USER_ID || 'usr_a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+const EMAIL = process.env.E2E_EMAIL || 'testplayer1@example.com';
+// Local-fixture password for the seeded TestPlayer1 account; override with
+// E2E_PASSWORD when running against any non-local environment.
+const PASSWORD = process.env.E2E_PASSWORD || 'TestPassword123!'; // nosemgrep: hardcoded-password
+const DDB_ENDPOINT = process.env.E2E_DDB_ENDPOINT || 'http://localhost:8000';
+const LOG_PATH = process.env.E2E_LOG_PATH || '/tmp/totem-api.log';
 
 const TOTEMS_TBL = 'TotemBound-Totems';
 const TXNS_TBL = 'TotemBound-Transactions';
@@ -36,11 +44,17 @@ const EXP_STATE_TBL = 'TotemBound-ExpeditionState';
 const USERS_TBL = 'TotemBound-Users';
 const CHL_TBL = 'TotemBound-ChallengeProgress';
 
+// DynamoDB Local accepts any credentials; "local"/"local" is the convention
+// across the dev stack. Real-environment runs should use SDK default credential
+// provider chain via E2E_DDB_ENDPOINT pointing at the real DDB.
 const ddb = DynamoDBDocumentClient.from(
   new DynamoDBClient({
-    endpoint: 'http://localhost:8000',
+    endpoint: DDB_ENDPOINT,
     region: 'us-west-2',
-    credentials: { accessKeyId: 'local', secretAccessKey: 'local' },
+    credentials: {
+      accessKeyId: process.env.E2E_DDB_ACCESS_KEY || 'local',
+      secretAccessKey: process.env.E2E_DDB_SECRET_KEY || 'local',
+    },
   }),
 );
 
@@ -223,14 +237,6 @@ async function fetchUserTransactions(sinceISO) {
   return all.filter(t => !sinceISO || t.ts >= sinceISO);
 }
 
-// Build a fresh expedition team that can be reused without happiness draining.
-async function seedFreshTeam(leadId, leadTraits, leadSpecies = 0) {
-  await seedTotem(leadId, leadTraits, { speciesId: leadSpecies });
-  await seedTotem(`${leadId}_m1`, { innate: null, learned: null, awakened: null }, { speciesId: leadSpecies });
-  await seedTotem(`${leadId}_m2`, { innate: null, learned: null, awakened: null }, { speciesId: leadSpecies });
-  return [leadId, `${leadId}_m1`, `${leadId}_m2`];
-}
-
 // ---------------------------------------------------------------------------
 // MAIN
 // ---------------------------------------------------------------------------
@@ -339,11 +345,10 @@ async function main() {
   const WIS_CHL = 'chl_ancient-runes';   // maxScore 2000, base XP 20, essence 10
   const SCORE = 1190;
 
-  // Plain baselines (one per challenge)
+  // Plain baselines (one per challenge). We only consume the XP baseline today;
+  // essence/happiness diffs are asserted via per-trait recordDelta further down.
   const rPlainStr = await api('POST', `/v1/challenges/${STR_CHL}/complete`, { totemId: 'ttm_e2e_plain_chl_str', score: SCORE });
   const baseStrXp = rPlainStr.body?.data?.xpEarned;
-  const baseStrEss = rPlainStr.body?.data?.essenceEarned;
-  const baseStrHap = rPlainStr.body?.data?.happinessEarned;
   if (!rPlainStr.body?.success) discrepancies.push(`Plain str chl failed: ${JSON.stringify(rPlainStr.body)}`);
 
   const rPlainAgi = await api('POST', `/v1/challenges/${AGI_CHL}/complete`, { totemId: 'ttm_e2e_plain_chl_agi', score: SCORE });
@@ -698,7 +703,6 @@ async function main() {
   const startSage = await api('POST', '/v1/sanctum/missions/start', { totemId: 'ttm_e2e_sage', missionType: MISSION });
   let sageOK = false;
   if (startSage.body?.success) {
-    sageOK = true;
     await ddb.send(new UpdateCommand({
       TableName: EXP_STATE_TBL,
       Key: { pk: `SANCTUM#${USER_ID}`, sk: `MISSION#ACTIVE#ttm_e2e_sage` },
@@ -706,7 +710,7 @@ async function main() {
       ExpressionAttributeValues: { ':e': new Date(Date.now() - 3600 * 1000).toISOString() },
     }));
     const claim = await api('POST', '/v1/sanctum/missions/claim', { totemId: 'ttm_e2e_sage' });
-    sageOK = sageOK && (claim.body?.success === true);
+    sageOK = claim.body?.success === true;
   }
   results.push({
     trait: 'Sage',
@@ -757,16 +761,17 @@ async function main() {
   });
 
   // -------------------------------------------------------------------
-  // 8. Log tail
+  // 8. Log tail (read the file directly — no shell invocation)
   // -------------------------------------------------------------------
   let logSummary = '';
   try {
-    const tail = execSync('tail -300 /tmp/totem-api.log', { encoding: 'utf8' });
-    const lines = tail.split('\n').filter(l => /\bERROR\b|\bWARN\b|Failed|failed/.test(l));
-    logSummary = lines.slice(-20).join('\n');
+    const all = fs.readFileSync(LOG_PATH, 'utf8').split('\n');
+    const tail = all.slice(Math.max(0, all.length - 300));
+    const flagged = tail.filter(l => /\bERROR\b|\bWARN\b|Failed|failed/.test(l));
+    logSummary = flagged.slice(-20).join('\n');
   }
   catch (e) {
-    logSummary = `tail failed: ${e.message}`;
+    logSummary = `log read failed: ${e.message}`;
   }
 
   // -------------------------------------------------------------------
