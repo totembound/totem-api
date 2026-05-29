@@ -656,6 +656,97 @@ describe('Game Actions', () => {
   });
 
   // =============================================================================
+  // TRAIT EFFECTS — care handlers fold resolver bonuses (Phase 2)
+  // =============================================================================
+
+  describe('trait effects on care actions', () => {
+    const traits = (overrides = {}) => ({ innate: null, learned: null, awakened: null, ...overrides });
+
+    describe('train', () => {
+      it('Quick Learner (+10% XP) → 50 → 55 XP', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits({ learned: 'trt_quick_learner' }) }));
+        const result = await train(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.xpGained).toBe(55);
+      });
+
+      it('Thrifty (−10% cost) → 20 → 18 Essence', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits({ learned: 'trt_thrifty' }) }));
+        const result = await train(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.essenceSpent).toBe(18);
+        expect(dbClient.deductEssence).toHaveBeenCalledWith(testUser.userId, 18, expect.any(Object));
+      });
+
+      it('Gentle (+2 happinessFlat) → train happinessChange −10 → −8', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits({ innate: 'trt_gentle' }) }));
+        const result = await train(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.statChanges.happinessChange).toBe(-8);
+      });
+
+      it('Quick Learner (learned) + Mentor aura (awakened) stack: 50 → 60 XP', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({
+          traits: traits({ learned: 'trt_quick_learner', awakened: 'trt_mentor' }),
+        }));
+        const result = await train(testUser, testTotemId);
+        // ×1.10 (Quick Learner) × ×1.10 (Mentor on aura) → 60.5 → round → 61
+        expect(result.data.xpGained).toBe(61);
+      });
+
+      it('no traits → baseline 50 XP, 20 cost, −10 happiness', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits() }));
+        const result = await train(testUser, testTotemId);
+        expect(result.data.xpGained).toBe(50);
+        expect(result.data.essenceSpent).toBe(20);
+        expect(result.data.statChanges.happinessChange).toBe(-10);
+      });
+    });
+
+    describe('feed', () => {
+      it('Hardy (+2 happinessFlat) → feed happinessChange +10 → +12', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits({ innate: 'trt_hardy' }) }));
+        const result = await feed(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.statChanges.happinessChange).toBe(12);
+      });
+
+      it('Thrifty (−10% cost) → 10 → 9 Essence', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits({ learned: 'trt_thrifty' }) }));
+        const result = await feed(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.essenceSpent).toBe(9);
+      });
+
+      it('Diligent Forager does not overshoot hunger cap of 100', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({
+          stats: { happiness: 50, hunger: 20, strength: 10, agility: 8, wisdom: 6 },
+          traits: traits({ learned: 'trt_diligent_forager' }),
+        }));
+        const result = await feed(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.statChanges.hunger).toBe(100);
+      });
+    });
+
+    describe('treat', () => {
+      it('Playful (+2 happinessFlat) → treat happinessChange +10 → +12', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits({ innate: 'trt_playful' }) }));
+        const result = await treat(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.statChanges.happinessChange).toBe(12);
+      });
+
+      it('Thrifty (−10% cost) → 20 → 18 Essence', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({ traits: traits({ learned: 'trt_thrifty' }) }));
+        const result = await treat(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.essenceSpent).toBe(18);
+      });
+    });
+  });
+
+  // =============================================================================
   // BATCH 1: evolve passes rarityId + speciesId
   // =============================================================================
 

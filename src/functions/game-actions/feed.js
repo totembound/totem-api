@@ -28,6 +28,7 @@ const {
 const { onGameAction, checkBalancedCare } = require('../../services/achievements-service');
 const { emitQuestProgress } = require('../../services/daily-quests-service');
 const { addTotemXp } = require('../../services/totem-xp');
+const { resolveTraitBonuses } = require('../../config/trait-effects');
 
 /**
  * Feed a totem
@@ -84,8 +85,10 @@ async function feed(user, totemId) {
     };
   }
 
-  // 4. Deduct Essence cost
-  const cost = config.cost;
+  // 4. Resolve trait bonuses (self-scope) and deduct Essence cost.
+  // Thrifty: ×0.90 cost; Hardy: +2 happinessFlat; Diligent Forager: +10% hunger restore.
+  const bonuses = resolveTraitBonuses(totem, { action: actionType });
+  const cost = Math.floor(config.cost * bonuses.essenceCostMultiplier);
   const balanceResult = await deductEssence(userId, cost, { type: 'action_feed', ref: totemId, refType: 'totem' });
   if (!balanceResult.success) {
     return {
@@ -99,11 +102,11 @@ async function feed(user, totemId) {
     };
   }
 
-  // 5. Calculate XP gain - FIXED value from contract (0 XP for feed)
-  const xpGained = getXpGain(actionType);
+  // 5. Calculate XP gain — feed grants no XP (multiplier is a no-op on 0).
+  const xpGained = Math.round(getXpGain(actionType) * bonuses.xpMultiplier);
 
-  // 5. Calculate stat changes - FIXED happiness change from contract (+10)
-  const statChanges = calculateStatChanges(actionType, totem);
+  // 5. Calculate stat changes — happinessFlat and hungerRestoreBonusPct fold here.
+  const statChanges = calculateStatChanges(actionType, totem, bonuses);
 
   // 6. Update totem in database (chokepoint applies XP + prestige check atomically)
   const now = new Date().toISOString();
@@ -119,7 +122,7 @@ async function feed(user, totemId) {
   const xpResult = await addTotemXp(userId, totem, xpGained, {
     extraUpdates: {
       'stats.happiness': statChanges.happiness,
-      'stats.hunger': statChanges.hunger || 100,
+      'stats.hunger': statChanges.hunger ?? 100,
       feedHistory: prunedHistory,
       lastActionDates: newLastActionDates,
     },
