@@ -27,6 +27,7 @@ const {
 const { generateId } = require('../common/id-utils');
 const { onExpeditionCompleted } = require('./achievements-service');
 const { addTotemXp } = require('./totem-xp');
+const { resolveTraitBonuses } = require('../config/trait-effects');
 
 // =============================================================================
 // EXPEDITION DEFINITIONS (15 total - synced with frontend expeditions.json)
@@ -729,9 +730,15 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
     }
   }
 
-  // Calculate timing
+  // Calculate timing — fold trait durationMultiplier (Pathfinder −10% on the team).
+  // Bonuses resolved over the 3-totem team (de-duped by trait id).
+  const startBonuses = resolveTraitBonuses(
+    teamTotems.map((t) => t.totem),
+    { system: 'expedition', earnsEssence: true },
+  );
   const now = new Date();
-  const endsAt = new Date(now.getTime() + expedition.durationMinutes * 60 * 1000);
+  const effectiveDurationMs = expedition.durationMinutes * 60 * 1000 * startBonuses.durationMultiplier;
+  const endsAt = new Date(now.getTime() + Math.round(effectiveDurationMs));
   const expId = generateExpeditionId();
 
   // Create active expedition record
@@ -851,10 +858,42 @@ async function claimExpeditionReward(userId, totemId) {
   const scoreResult = calculateExpeditionScore(leadTotem, expedition);
   const multipliers = getScoreMultipliers(scoreResult.tier);
 
-  // Calculate rewards with score multiplier
-  const expReward = calculateExpReward(activeExpedition.expeditionId, multipliers.xpMultiplier);
-  const essenceReward = calculateEssenceReward(activeExpedition.expeditionId, multipliers.essenceMultiplier);
-  const runesEarned = rollForRunes(expedition, multipliers.runeMultiplier);
+  // Load the 3-totem team early so trait auras / Kindred Soul resolve on it.
+  const allTotemIds = activeExpedition.totemIds || [totemId];
+  const teamForBonuses = [];
+  for (const tid of allTotemIds) {
+    const t = tid === totemId ? leadTotem : await getTotem(userId, tid);
+    if (t) teamForBonuses.push(t);
+  }
+  const traitBonuses = resolveTraitBonuses(teamForBonuses, {
+    system: 'expedition',
+    earnsEssence: true,
+    loot: 'rune',
+  });
+
+  // Calculate rewards with score multiplier × trait overlays.
+  //  Mentor / Kindred Soul fold into XP via xpMultiplier (aura scope).
+  //  Curious / Merchant's Eye / Mentor add to essenceRewardMultiplier.
+  //  Treasure Seeker / Relic Bearer push runeChanceBonus → rune multiplier.
+  // lootBoxChanceBonus (Wanderer Lord) has no expedition attach point today —
+  // expeditions don't roll loot boxes; that aura is dormant until loot-box drops exist.
+  const expReward = calculateExpReward(
+    activeExpedition.expeditionId,
+    multipliers.xpMultiplier * traitBonuses.xpMultiplier,
+  );
+  const essenceReward = calculateEssenceReward(
+    activeExpedition.expeditionId,
+    multipliers.essenceMultiplier * traitBonuses.essenceRewardMultiplier,
+  );
+  // Treasure Seeker / Relic Bearer bump `runeChanceBonus`; Lucky's generic
+  // "rare drop" bumps `lootChanceBonus` (resolved via the `loot:rune` scope
+  // token also matching `loot:any`). Both ride on the same rune multiplier.
+  const runesEarned = rollForRunes(
+    expedition,
+    multipliers.runeMultiplier
+      + traitBonuses.runeChanceBonus
+      + traitBonuses.lootChanceBonus,
+  );
 
   // Award Essence to user
   let newEssenceBalance = null;
@@ -883,16 +922,13 @@ async function claimExpeditionReward(userId, totemId) {
   // Routes through addTotemXp so prestige threshold crossings fire the
   // prestige-progression achievement. Collect any prestige unlocks for the
   // response so the frontend can toast + patch state without a refresh.
-  const allTotemIds = activeExpedition.totemIds || [totemId];
+  // Reuses the team already loaded above for trait resolution.
   const totemExpUpdates = {};
   const prestigeAchievements = [];
-  for (const tid of allTotemIds) {
-    const t = tid === totemId ? leadTotem : await getTotem(userId, tid);
-    if (t) {
-      const xpResult = await addTotemXp(userId, t, expReward);
-      totemExpUpdates[tid] = xpResult.newExperience;
-      if (xpResult.achievements?.length) prestigeAchievements.push(...xpResult.achievements);
-    }
+  for (const t of teamForBonuses) {
+    const xpResult = await addTotemXp(userId, t, expReward);
+    totemExpUpdates[t.id] = xpResult.newExperience;
+    if (xpResult.achievements?.length) prestigeAchievements.push(...xpResult.achievements);
   }
 
   // Create history record

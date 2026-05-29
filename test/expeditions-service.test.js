@@ -673,6 +673,151 @@ describe('Expeditions Service', () => {
   });
 
   // =============================================================================
+  // TRAIT EFFECTS (Phase 2) — team-scope resolver
+  // =============================================================================
+
+  describe('trait effects on expeditions', () => {
+    const baseTotem = (overrides = {}) => ({
+      pk: 'USER#usr_test123',
+      sk: `TOTEM#${overrides.id || testTotemId}`,
+      id: overrides.id || testTotemId,
+      userId: testUserId,
+      speciesId: 2,
+      stage: 2,
+      experience: 100,
+      stats: { happiness: 50 },
+      traits: { innate: null, learned: null, awakened: null },
+      ...overrides,
+    });
+
+    const completedExpedition = {
+      pk: 'USER#usr_test123',
+      sk: `EXPEDITION#ACTIVE#${testTotemId}`,
+      id: mockExpId,
+      odUserId: testUserId,
+      totemId: testTotemId,
+      totemIds: [testTotemId, 'ttm_m1', 'ttm_m2'],
+      expeditionId: 'exp_celestial-mapping',
+      startedAt: new Date(Date.now() - 7200000).toISOString(),
+      endsAt: new Date(Date.now() - 1800000).toISOString(),
+      status: 'in_progress',
+      claimed: false,
+    };
+
+    beforeEach(() => {
+      jest.spyOn(Math, 'random').mockReturnValue(0.5); // deterministic variance
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 1000 });
+      dbClient.addRunes.mockResolvedValue({ success: true, newBalances: { lesser: 0, greater: 0, ancient: 0 } });
+      dbClient.queryItems.mockResolvedValue([]);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    function mockTeam({ leadTraits = {}, member1Traits = {}, member2Traits = {} } = {}) {
+      const lead = baseTotem({ id: testTotemId, traits: { innate: null, learned: null, awakened: null, ...leadTraits } });
+      const m1 = baseTotem({ id: 'ttm_m1', traits: { innate: null, learned: null, awakened: null, ...member1Traits } });
+      const m2 = baseTotem({ id: 'ttm_m2', traits: { innate: null, learned: null, awakened: null, ...member2Traits } });
+      dbClient.getItem.mockResolvedValue(completedExpedition);
+      dbClient.getTotem.mockImplementation((_uid, tid) =>
+        Promise.resolve(tid === testTotemId ? lead : tid === 'ttm_m1' ? m1 : m2),
+      );
+      return { lead, m1, m2 };
+    }
+
+    it('baseline: no traits → baseline essence reward', async () => {
+      mockTeam();
+      const result = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      expect(result.success).toBe(true);
+      const baseline = result.rewards.essence;
+      expect(baseline).toBeGreaterThan(0);
+    });
+
+    it('Curious (+5% expedition essence) on the lead totem bumps essence reward', async () => {
+      // Capture baseline first.
+      mockTeam();
+      const base = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      jest.clearAllMocks();
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 1000 });
+      dbClient.addRunes.mockResolvedValue({ success: true, newBalances: { lesser: 0, greater: 0, ancient: 0 } });
+      dbClient.queryItems.mockResolvedValue([]);
+      mockTeam({ leadTraits: { innate: 'trt_curious' } });
+      const boosted = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      expect(boosted.rewards.essence).toBeGreaterThan(base.rewards.essence);
+    });
+
+    it('Mentor aura on a teammate folds +10% XP for the whole team', async () => {
+      mockTeam();
+      const base = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      jest.clearAllMocks();
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 1000 });
+      dbClient.addRunes.mockResolvedValue({ success: true, newBalances: { lesser: 0, greater: 0, ancient: 0 } });
+      dbClient.queryItems.mockResolvedValue([]);
+      mockTeam({ member1Traits: { awakened: 'trt_mentor' } });
+      const boosted = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      expect(boosted.rewards.experience).toBeGreaterThan(base.rewards.experience);
+    });
+
+    it('two Mentors on the team de-dupe (apply once, same as one)', async () => {
+      mockTeam({ leadTraits: { awakened: 'trt_mentor' } });
+      const oneMentor = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      jest.clearAllMocks();
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 1000 });
+      dbClient.addRunes.mockResolvedValue({ success: true, newBalances: { lesser: 0, greater: 0, ancient: 0 } });
+      dbClient.queryItems.mockResolvedValue([]);
+      mockTeam({
+        leadTraits: { awakened: 'trt_mentor' },
+        member1Traits: { awakened: 'trt_mentor' },
+      });
+      const twoMentors = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      expect(twoMentors.rewards.experience).toBe(oneMentor.rewards.experience);
+    });
+
+    it('Kindred Soul fires only when another same-species teammate is present', async () => {
+      // Same species
+      mockTeam({ leadTraits: { awakened: 'trt_kindred_soul' } });
+      const withSibling = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      const xpWithSibling = withSibling.rewards.experience;
+
+      jest.clearAllMocks();
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      dbClient.putItem.mockResolvedValue({});
+      dbClient.deleteItem.mockResolvedValue({});
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 1000 });
+      dbClient.addRunes.mockResolvedValue({ success: true, newBalances: { lesser: 0, greater: 0, ancient: 0 } });
+      dbClient.queryItems.mockResolvedValue([]);
+
+      // Different species for teammates → no bonus
+      const lead = baseTotem({ id: testTotemId, speciesId: 2, traits: { innate: null, learned: null, awakened: 'trt_kindred_soul' } });
+      const m1 = baseTotem({ id: 'ttm_m1', speciesId: 7 });
+      const m2 = baseTotem({ id: 'ttm_m2', speciesId: 8 });
+      dbClient.getItem.mockResolvedValue(completedExpedition);
+      dbClient.getTotem.mockImplementation((_uid, tid) =>
+        Promise.resolve(tid === testTotemId ? lead : tid === 'ttm_m1' ? m1 : m2),
+      );
+      const aloneByKind = await expeditionsService.claimExpeditionReward(testUserId, testTotemId);
+      expect(xpWithSibling).toBeGreaterThan(aloneByKind.rewards.experience);
+    });
+  });
+
+  // =============================================================================
   // ACTIVE EXPEDITIONS QUERY
   // =============================================================================
 
