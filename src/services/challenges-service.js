@@ -36,6 +36,7 @@ const {
 const { onChallengeCompleted } = require('./achievements-service');
 const { checkEvolutionRequirements } = require('../functions/game-actions/helpers');
 const { checkActionAvailability } = require('../common/totem-utils');
+const { resolveTraitBonuses } = require('../config/trait-effects');
 
 // =============================================================================
 // CHALLENGE DEFINITIONS (11 Challenges - synced from frontend challenges.json)
@@ -260,7 +261,12 @@ function checkDailyAttempts(progress, maxDailyAttempts) {
 }
 
 /**
- * Check if a totem meets the requirements for a challenge
+ * Check if a totem meets the requirements for a challenge.
+ *
+ * Folds in trait stat bonuses (Stubborn / Restless / Dreamer) scoped to this
+ * challenge's affinity, so a totem that's a hair under the gate can still
+ * enter if a matching trait closes the gap. Stage gating is unaffected.
+ *
  * @param {object} totem - The totem object
  * @param {object} challenge - The challenge definition
  * @returns {{ qualified: boolean, reason?: string }}
@@ -269,6 +275,14 @@ function checkRequirements(totem, challenge) {
   const { requirements } = challenge;
   const totemStats = totem.stats || {};
   const totemStage = totem.stage || 0;
+
+  // Resolve self-scope bonuses against this challenge's affinity. Only
+  // statBonus matters here — costs and rewards are applied later inside
+  // completeChallenge. If the totem has no traits, the resolver returns
+  // identity defaults so the math collapses to the base-stat comparison.
+  const reqBonuses = resolveTraitBonuses(totem, { challenge: challenge.affinity });
+  const effectiveStat = (key) =>
+    (totemStats[key] || 0) + (reqBonuses.statBonus?.[key] || 0);
 
   // Check stage requirement (both totem stage and requirements use 0-indexed data values)
   // Stage 0 = Hatchling, 1 = Juvenile, 2 = Adult, 3 = Elder, 4 = Ascended
@@ -282,36 +296,39 @@ function checkRequirements(totem, challenge) {
     };
   }
 
-  // Check strength requirement
-  if ((totemStats.strength || 0) < requirements.strength) {
+  // Check strength requirement (trait stat bonus folds in).
+  const effStr = effectiveStat('strength');
+  if (effStr < requirements.strength) {
     return {
       qualified: false,
-      reason: `Totem needs at least ${requirements.strength} strength (currently ${totemStats.strength || 0})`,
+      reason: `Totem needs at least ${requirements.strength} strength (currently ${effStr})`,
       requirement: 'strength',
       required: requirements.strength,
-      current: totemStats.strength || 0,
+      current: effStr,
     };
   }
 
-  // Check agility requirement
-  if ((totemStats.agility || 0) < requirements.agility) {
+  // Check agility requirement (trait stat bonus folds in).
+  const effAgi = effectiveStat('agility');
+  if (effAgi < requirements.agility) {
     return {
       qualified: false,
-      reason: `Totem needs at least ${requirements.agility} agility (currently ${totemStats.agility || 0})`,
+      reason: `Totem needs at least ${requirements.agility} agility (currently ${effAgi})`,
       requirement: 'agility',
       required: requirements.agility,
-      current: totemStats.agility || 0,
+      current: effAgi,
     };
   }
 
-  // Check wisdom requirement
-  if ((totemStats.wisdom || 0) < requirements.wisdom) {
+  // Check wisdom requirement (trait stat bonus folds in).
+  const effWis = effectiveStat('wisdom');
+  if (effWis < requirements.wisdom) {
     return {
       qualified: false,
-      reason: `Totem needs at least ${requirements.wisdom} wisdom (currently ${totemStats.wisdom || 0})`,
+      reason: `Totem needs at least ${requirements.wisdom} wisdom (currently ${effWis})`,
       requirement: 'wisdom',
       required: requirements.wisdom,
-      current: totemStats.wisdom || 0,
+      current: effWis,
     };
   }
 
@@ -447,11 +464,35 @@ async function completeChallenge(userId, challengeId, totemId, score) {
     };
   }
 
-  // 7. Calculate XP reward based on score (using contract formula)
-  const xpEarned = calculateXpReward(challenge.maxScore, score);
+  // 7. Resolve trait bonuses for this challenge (self-scope: no team yet — arena Q3).
+  // Brave / Skilled Fighter / Nimble / Studious carry `successChanceBonus`. Instead
+  // of patching every mini-game, we inflate the *submitted score* here at the
+  // service boundary (capped at maxScore) so every downstream calc — XP, Essence,
+  // high-score, progress totals visible to the player — flows from the boosted
+  // value. `totalScore` (cumulative analytics) stays on the raw submission.
+  const bonuses = resolveTraitBonuses(totem, {
+    challenge: challenge.affinity,
+    earnsEssence: true,
+  });
+  // Each matching stat-bonus point adds +1% to the score on this affinity.
+  // Stubborn (str), Restless (agi), Dreamer (wis) — innate-tier so the lift
+  // stays small. Until Arena (Q3 2026) wires stats into a proper roll, the
+  // score-boost path is the only place these traits can manifest.
+  const affinityStat = bonuses.statBonus?.[challenge.affinity] || 0;
+  const scoreBoostPct = bonuses.successChanceBonus + affinityStat * 0.01;
+  const effectiveScore = Math.min(
+    challenge.maxScore,
+    Math.round(score * (1 + scoreBoostPct)),
+  );
 
-  // 7b. Award Essence reward
-  const essenceReward = challenge.essenceReward || 0;
+  // 7a. XP reward based on the boosted score, then × xpMultiplier
+  //     (Clever +5% on challenge:any; Mentor +10% via aura token).
+  const baseXp = calculateXpReward(challenge.maxScore, effectiveScore);
+  const xpEarned = Math.round(baseXp * bonuses.xpMultiplier);
+
+  // 7b. Award Essence reward, folded by essenceRewardMultiplier (Merchant's Eye +10%).
+  const baseEssence = challenge.essenceReward || 0;
+  const essenceReward = Math.round(baseEssence * bonuses.essenceRewardMultiplier);
   let newEssenceBalance = null;
   if (essenceReward > 0) {
     const essenceResult = await addEssence(userId, essenceReward, {
@@ -467,9 +508,12 @@ async function completeChallenge(userId, challengeId, totemId, score) {
   const newXp = currentXp + xpEarned;
   const currentStage = totem.stage || 0;
 
-  // Calculate new happiness (capped at 100)
+  // Happiness reward folded by happinessRewardMultiplier (Persistent +20%).
   const currentHappiness = totem.stats?.happiness || 50;
-  const newHappiness = Math.min(100, currentHappiness + CHALLENGE_HAPPINESS_REWARD);
+  const happinessReward = Math.round(
+    CHALLENGE_HAPPINESS_REWARD * bonuses.happinessRewardMultiplier,
+  );
+  const newHappiness = Math.min(100, currentHappiness + happinessReward);
 
   await updateTotem(userId, totemId, {
     experience: newXp,
@@ -578,7 +622,7 @@ async function completeChallenge(userId, challengeId, totemId, score) {
 
   // 11. Build response
   const essenceMsg = essenceReward > 0 ? `, ${essenceReward} Essence` : '';
-  const happinessMsg = `, +${CHALLENGE_HAPPINESS_REWARD} Happiness`;
+  const happinessMsg = `, +${happinessReward} Happiness`;
   return {
     success: true,
     data: {
@@ -587,7 +631,7 @@ async function completeChallenge(userId, challengeId, totemId, score) {
       totemId,
       score,
       xpEarned,
-      happinessEarned: CHALLENGE_HAPPINESS_REWARD,
+      happinessEarned: happinessReward,
       essenceEarned: essenceReward,
       newEssenceBalance,
       totem: {
