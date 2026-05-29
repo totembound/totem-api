@@ -133,6 +133,44 @@ describe('Sanctum Service', () => {
       // floor(0.5 * 1.0 * 10) = floor(5.0) = 5
       expect(sanctumService.calculateSeatEarnings(seat, now)).toBe(5);
     });
+
+    // Phase 2 trait effects (Shy / Loyal)
+    it('Shy seatEarnRateMultiplier ×1.05 raises earnings', () => {
+      // 100 hours since claim, tenure 100 hrs → 1.2x
+      const now = new Date('2026-03-28T12:00:00Z');
+      const seatedAt = new Date('2026-03-24T08:00:00Z'); // ~100h ago
+      const lastClaimed = new Date('2026-03-24T08:00:00Z');
+      const seat = { seatedAt: seatedAt.toISOString(), lastClaimedAt: lastClaimed.toISOString() };
+      const baseline = sanctumService.calculateSeatEarnings(seat, now);
+      const boosted = sanctumService.calculateSeatEarnings(seat, now, {
+        seatEarnRateMultiplier: 1.05,
+        tenureBonusMultiplier: 1,
+      });
+      expect(boosted).toBeGreaterThan(baseline);
+    });
+
+    it('Loyal tenureBonusMultiplier ×1.05 raises earnings', () => {
+      const now = new Date('2026-03-28T12:00:00Z');
+      const seatedAt = new Date('2026-03-24T08:00:00Z'); // ~100h ago
+      const lastClaimed = new Date('2026-03-24T08:00:00Z');
+      const seat = { seatedAt: seatedAt.toISOString(), lastClaimedAt: lastClaimed.toISOString() };
+      const baseline = sanctumService.calculateSeatEarnings(seat, now);
+      const boosted = sanctumService.calculateSeatEarnings(seat, now, {
+        seatEarnRateMultiplier: 1,
+        tenureBonusMultiplier: 1.05,
+      });
+      expect(boosted).toBeGreaterThan(baseline);
+    });
+
+    it('null/undefined bonuses → behaves like baseline (identity)', () => {
+      const now = new Date('2026-03-28T12:00:00Z');
+      const seatedAt = new Date('2026-03-24T08:00:00Z');
+      const lastClaimed = new Date('2026-03-24T08:00:00Z');
+      const seat = { seatedAt: seatedAt.toISOString(), lastClaimedAt: lastClaimed.toISOString() };
+      expect(sanctumService.calculateSeatEarnings(seat, now, null)).toBe(
+        sanctumService.calculateSeatEarnings(seat, now),
+      );
+    });
   });
 
   // ===========================================================================
