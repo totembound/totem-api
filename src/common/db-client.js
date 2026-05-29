@@ -857,40 +857,78 @@ async function updateChallengeProgress(userId, challengeId, updates) {
 // ============================================
 
 /**
- * List all users (admin)
- * Scans Users table for all PROFILE records with optional search filter.
- * Returns the full array — caller handles pagination slicing.
- * @param {object} options - { search }
+ * Cursor encode/decode for opaque pagination tokens.
+ *
+ * DynamoDB returns LastEvaluatedKey as an object; we base64-encode the JSON so
+ * clients treat the cursor as opaque (lets us change the underlying key shape
+ * without breaking API consumers).
  */
-async function listUsers({ search } = {}) {
-  const baseFilter = 'sk = :profile';
-  const exprValues = { ':profile': 'PROFILE' };
-  let filterExpression = baseFilter;
+function encodeCursor(lastEvaluatedKey) {
+  if (!lastEvaluatedKey) return null;
+  return Buffer.from(JSON.stringify(lastEvaluatedKey)).toString('base64');
+}
+
+function decodeCursor(cursor) {
+  if (!cursor) return undefined;
+  try {
+    return JSON.parse(Buffer.from(cursor, 'base64').toString('utf8'));
+  }
+  catch {
+    return undefined;
+  }
+}
+
+/**
+ * List users (admin) — single page with cursor pagination.
+ *
+ * Returns one page of profile records, filtered by optional search.
+ *
+ * NOTE: With a FilterExpression, DynamoDB scans up to `limit` rows then filters,
+ * so a page may return fewer items than `limit` while still having a `nextCursor`.
+ * Treat `nextCursor` (not item count) as the "more available" signal. A
+ * `displayNameLower-index` GSI is a future improvement; scan is acceptable until
+ * ~5K users.
+ *
+ * @param {object} options - { limit, cursor, search }
+ * @returns {Promise<{ items: Array, nextCursor: string|null }>}
+ */
+async function listUsers({ limit = 50, cursor, search } = {}) {
+  const params = {
+    TableName: TABLES.USERS,
+    FilterExpression: 'sk = :profile',
+    ExpressionAttributeValues: { ':profile': 'PROFILE' },
+    Limit: limit,
+  };
 
   if (search) {
-    filterExpression += ' AND (contains(email, :search) OR contains(displayName, :search))';
-    exprValues[':search'] = search.toLowerCase();
+    params.FilterExpression += ' AND (contains(email, :search) OR contains(displayName, :search))';
+    params.ExpressionAttributeValues[':search'] = search.toLowerCase();
   }
 
-  const allItems = [];
-  let lastKey = undefined;
+  const exclusiveStartKey = decodeCursor(cursor);
+  if (exclusiveStartKey) params.ExclusiveStartKey = exclusiveStartKey;
 
+  const response = await docClient.send(new ScanCommand(params));
+  return {
+    items: response.Items || [],
+    nextCursor: encodeCursor(response.LastEvaluatedKey),
+  };
+}
+
+/**
+ * Walk every page of listUsers — only used by /v1/admin/stats for aggregate
+ * counts. Inherently expensive at scale (full-table scan); slated for
+ * replacement by counter rows in a future PR (P2 of the scaling plan).
+ */
+async function scanAllUsers({ search } = {}) {
+  const items = [];
+  let cursor;
   do {
-    const params = {
-      TableName: TABLES.USERS,
-      FilterExpression: filterExpression,
-      ExpressionAttributeValues: exprValues,
-    };
-    if (lastKey) {
-      params.ExclusiveStartKey = lastKey;
-    }
-
-    const response = await docClient.send(new ScanCommand(params));
-    allItems.push(...(response.Items || []));
-    lastKey = response.LastEvaluatedKey;
-  } while (lastKey);
-
-  return allItems;
+    const page = await listUsers({ limit: 100, cursor, search });
+    items.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor);
+  return items;
 }
 
 /**
@@ -915,12 +953,26 @@ async function countTotems() {
 }
 
 /**
- * List recent transactions across all users (admin)
- * Scans Transactions table, returns most recent first.
+ * List transactions (admin) — single page with cursor pagination.
+ *
+ * Requires `userId` or `type` to pick a partition key. Either uses the
+ * `user-ts-index` GSI (when userId is set) or the `type-ts-index` GSI (when
+ * type is set). Optional FilterExpression layers narrow further by the other
+ * field and/or `currency`.
+ *
+ * @param {object} options - { limit, cursor, userId, type, currency, startTime, endTime }
+ * @returns {Promise<{ items: Array, nextCursor: string|null }>}
  */
-async function listAllTransactions({ limit = 50, userId, type, startTime, endTime } = {}) {
-  // If filtering by userId, use the user-ts-index GSI
+async function listAllTransactions({ limit = 50, cursor, userId, type, currency, startTime, endTime } = {}) {
+  if (!userId && !type) {
+    throw new Error('listAllTransactions requires userId or type');
+  }
+
+  const exclusiveStartKey = decodeCursor(cursor);
+  let params;
+
   if (userId) {
+    // user-ts-index GSI: PK=userId, SK=ts
     let keyCondition = 'userId = :userId';
     const exprValues = { ':userId': userId };
 
@@ -934,7 +986,7 @@ async function listAllTransactions({ limit = 50, userId, type, startTime, endTim
       exprValues[':start'] = startTime;
     }
 
-    const params = {
+    params = {
       TableName: TABLES.TRANSACTIONS,
       IndexName: 'user-ts-index',
       KeyConditionExpression: keyCondition,
@@ -943,25 +995,101 @@ async function listAllTransactions({ limit = 50, userId, type, startTime, endTim
       ScanIndexForward: false,
     };
 
-    // Add type filter if specified
+    // Layer additional filters (type, currency) — these are FilterExpression
+    // (post-fetch), acceptable since the GSI already narrowed by user.
+    const filters = [];
     if (type) {
-      params.FilterExpression = '#type = :type';
       params.ExpressionAttributeNames = { '#type': 'type' };
+      filters.push('#type = :type');
       params.ExpressionAttributeValues[':type'] = type;
     }
+    if (currency) {
+      filters.push('currency = :currency');
+      params.ExpressionAttributeValues[':currency'] = currency;
+    }
+    if (filters.length) params.FilterExpression = filters.join(' AND ');
+  }
+  else {
+    // type-ts-index GSI: PK=type, SK=ts
+    let keyCondition = '#type = :type';
+    const exprNames = { '#type': 'type' };
+    const exprValues = { ':type': type };
 
+    if (startTime && endTime) {
+      keyCondition += ' AND ts BETWEEN :start AND :end';
+      exprValues[':start'] = startTime;
+      exprValues[':end'] = endTime;
+    }
+    else if (startTime) {
+      keyCondition += ' AND ts >= :start';
+      exprValues[':start'] = startTime;
+    }
+
+    params = {
+      TableName: TABLES.TRANSACTIONS,
+      IndexName: 'type-ts-index',
+      KeyConditionExpression: keyCondition,
+      ExpressionAttributeNames: exprNames,
+      ExpressionAttributeValues: exprValues,
+      Limit: limit,
+      ScanIndexForward: false,
+    };
+
+    if (currency) {
+      params.FilterExpression = 'currency = :currency';
+      params.ExpressionAttributeValues[':currency'] = currency;
+    }
+  }
+
+  if (exclusiveStartKey) params.ExclusiveStartKey = exclusiveStartKey;
+
+  // Fast path: no FilterExpression — one Query, return the natural page.
+  if (!params.FilterExpression) {
+    params.Limit = limit;
     const response = await docClient.send(new QueryCommand(params));
-    return response.Items || [];
+    return {
+      items: response.Items || [],
+      nextCursor: encodeCursor(response.LastEvaluatedKey),
+    };
   }
 
-  // If filtering by type, use type-ts-index GSI
-  if (type) {
-    return getTransactionsByType(type, { startTime, endTime, limit });
-  }
+  // Filter-aware path: a FilterExpression (e.g. type narrowing the userId GSI,
+  // or currency filter) is applied AFTER DynamoDB reads each page. A single
+  // Query with `Limit: N` would return between 0 and N matches — useless UX for
+  // selective filters. So we iterate, accumulating matches across Query pages
+  // until we have at least `limit` matches OR we exhaust data OR we hit a
+  // safety cap on rows scanned (prevents runaway cost on very selective filters).
+  const MAX_SCAN = Math.max(limit * 10, 200);
+  const PER_ITER = Math.max(limit, 25);
+  const collected = [];
+  let lastKey = exclusiveStartKey;
+  let scanned = 0;
 
-  // No filters — full scan (limited)
+  do {
+    const iterParams = { ...params, Limit: Math.min(PER_ITER, MAX_SCAN - scanned) };
+    if (lastKey) iterParams.ExclusiveStartKey = lastKey;
+    else delete iterParams.ExclusiveStartKey;
+
+    const response = await docClient.send(new QueryCommand(iterParams));
+    collected.push(...(response.Items || []));
+    scanned += response.ScannedCount || (response.Items || []).length;
+    lastKey = response.LastEvaluatedKey;
+  } while (collected.length < limit && lastKey && scanned < MAX_SCAN);
+
+  return {
+    items: collected,
+    nextCursor: encodeCursor(lastKey),
+  };
+}
+
+/**
+ * Recent transactions across all users/types — only used by /v1/admin/stats.
+ * Pure Scan with optional time window; expensive, slated for replacement by
+ * counter rows / time-bucketed aggregates in a future PR (P2).
+ */
+async function scanRecentTransactions({ limit = 500, startTime, endTime } = {}) {
   const allItems = [];
-  let lastKey = undefined;
+  let lastKey;
   let remaining = limit;
 
   do {
@@ -993,7 +1121,6 @@ async function listAllTransactions({ limit = 50, userId, type, startTime, endTim
     lastKey = response.LastEvaluatedKey;
   } while (lastKey && remaining > 0);
 
-  // Sort by ts descending (scan doesn't guarantee order)
   allItems.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
   return allItems.slice(0, limit);
 }
@@ -1076,6 +1203,10 @@ module.exports = {
 
   // Admin operations
   listUsers,
+  scanAllUsers,
   countTotems,
   listAllTransactions,
+  scanRecentTransactions,
+  encodeCursor,
+  decodeCursor,
 };

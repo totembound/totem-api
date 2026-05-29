@@ -13,6 +13,7 @@
 // Mock db-client before any requires
 jest.mock('../src/common/db-client', () => ({
   listUsers: jest.fn(),
+  scanAllUsers: jest.fn(),
   getUser: jest.fn(),
   updateUser: jest.fn(),
   getUserTotems: jest.fn(),
@@ -24,6 +25,7 @@ jest.mock('../src/common/db-client', () => ({
   deductGems: jest.fn(),
   countTotems: jest.fn(),
   listAllTransactions: jest.fn(),
+  scanRecentTransactions: jest.fn(),
 }));
 
 const db = require('../src/common/db-client');
@@ -108,8 +110,11 @@ beforeEach(() => {
 // GET /v1/admin/users
 // =============================================================================
 describe('GET /v1/admin/users (list)', () => {
-  it('returns paginated user list', async () => {
-    db.listUsers.mockResolvedValue([testUserRecord, testUserRecord2]);
+  it('returns a page of users with cursor pagination metadata', async () => {
+    db.listUsers.mockResolvedValue({
+      items: [testUserRecord, testUserRecord2],
+      nextCursor: null,
+    });
 
     const req = { query: {} };
     const res = mockRes();
@@ -120,36 +125,51 @@ describe('GET /v1/admin/users (list)', () => {
     const body = res.json.mock.calls[0][0];
     expect(body.success).toBe(true);
     expect(body.data.users).toHaveLength(2);
-    expect(body.pagination).toEqual({ page: 1, limit: 25, total: 2, totalPages: 1 });
+    expect(body.pagination).toEqual({ limit: 25, count: 2, nextCursor: null, hasMore: false });
   });
 
-  it('respects page and limit params', async () => {
-    db.listUsers.mockResolvedValue([testUserRecord, testUserRecord2]);
+  it('threads cursor and limit into listUsers and surfaces nextCursor', async () => {
+    db.listUsers.mockResolvedValue({
+      items: [testUserRecord],
+      nextCursor: 'eyJwayI6Iks5In0=',
+    });
 
-    const req = { query: { page: '2', limit: '1' } };
+    const req = { query: { limit: '50', cursor: 'eyJwayI6Iks4In0=' } };
     const res = mockRes();
 
     await list(req, res);
 
+    expect(db.listUsers).toHaveBeenCalledWith({
+      limit: 50,
+      cursor: 'eyJwayI6Iks4In0=',
+      search: null,
+    });
     const body = res.json.mock.calls[0][0];
-    expect(body.data.users).toHaveLength(1);
-    expect(body.data.users[0].id).toBe('usr_player2');
-    expect(body.pagination).toEqual({ page: 2, limit: 1, total: 2, totalPages: 2 });
+    expect(body.pagination).toEqual({
+      limit: 50,
+      count: 1,
+      nextCursor: 'eyJwayI6Iks5In0=',
+      hasMore: true,
+    });
   });
 
   it('passes search param to listUsers', async () => {
-    db.listUsers.mockResolvedValue([]);
+    db.listUsers.mockResolvedValue({ items: [], nextCursor: null });
 
     const req = { query: { search: 'player1' } };
     const res = mockRes();
 
     await list(req, res);
 
-    expect(db.listUsers).toHaveBeenCalledWith({ search: 'player1' });
+    expect(db.listUsers).toHaveBeenCalledWith({
+      limit: 25,
+      cursor: null,
+      search: 'player1',
+    });
   });
 
   it('clamps limit to max 100', async () => {
-    db.listUsers.mockResolvedValue([]);
+    db.listUsers.mockResolvedValue({ items: [], nextCursor: null });
 
     const req = { query: { limit: '999' } };
     const res = mockRes();
@@ -158,10 +178,11 @@ describe('GET /v1/admin/users (list)', () => {
 
     const body = res.json.mock.calls[0][0];
     expect(body.pagination.limit).toBe(100);
+    expect(db.listUsers).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }));
   });
 
   it('returns correct fields for each user', async () => {
-    db.listUsers.mockResolvedValue([testUserRecord]);
+    db.listUsers.mockResolvedValue({ items: [testUserRecord], nextCursor: null });
 
     const req = { query: {} };
     const res = mockRes();
@@ -551,9 +572,9 @@ describe('GET /v1/admin/stats', () => {
       { ...testUserRecord2, status: 'banned' },
     ];
 
-    db.listUsers.mockResolvedValue(users);
+    db.scanAllUsers.mockResolvedValue(users);
     db.countTotems.mockResolvedValue(5);
-    db.listAllTransactions.mockResolvedValue([
+    db.scanRecentTransactions.mockResolvedValue([
       { ...testTransaction, ts: `${today}T12:00:00.000Z` },
     ]);
 
@@ -575,9 +596,9 @@ describe('GET /v1/admin/stats', () => {
   });
 
   it('handles empty database', async () => {
-    db.listUsers.mockResolvedValue([]);
+    db.scanAllUsers.mockResolvedValue([]);
     db.countTotems.mockResolvedValue(0);
-    db.listAllTransactions.mockResolvedValue([]);
+    db.scanRecentTransactions.mockResolvedValue([]);
 
     const req = { query: {} };
     const res = mockRes();
@@ -596,11 +617,11 @@ describe('GET /v1/admin/stats', () => {
 // GET /v1/admin/transactions
 // =============================================================================
 describe('GET /v1/admin/transactions', () => {
-  it('returns paginated transaction list', async () => {
+  it('returns a page of transactions with cursor pagination metadata', async () => {
     const txns = [testTransaction, { ...testTransaction, id: 'txn_def', type: 'reward_signup' }];
-    db.listAllTransactions.mockResolvedValue(txns);
+    db.listAllTransactions.mockResolvedValue({ items: txns, nextCursor: null });
 
-    const req = { query: {} };
+    const req = { query: { userId: 'usr_player1' } };
     const res = mockRes();
 
     await listTransactions(req, res);
@@ -608,54 +629,89 @@ describe('GET /v1/admin/transactions', () => {
     expect(res.status).toHaveBeenCalledWith(200);
     const body = res.json.mock.calls[0][0];
     expect(body.data.transactions).toHaveLength(2);
-    expect(body.pagination).toEqual({ page: 1, limit: 25, total: 2, totalPages: 1 });
+    expect(body.pagination).toEqual({ limit: 25, count: 2, nextCursor: null, hasMore: false });
   });
 
-  it('passes filter params to listAllTransactions', async () => {
-    db.listAllTransactions.mockResolvedValue([]);
+  it('rejects 400 when neither userId nor type is given (no unbounded scans)', async () => {
+    const req = { query: {} };
+    const res = mockRes();
+
+    await listTransactions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    const body = res.json.mock.calls[0][0];
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('INVALID_QUERY');
+    expect(db.listAllTransactions).not.toHaveBeenCalled();
+  });
+
+  it('rejects 400 on invalid currency filter', async () => {
+    const req = { query: { userId: 'usr_player1', currency: 'doubloons' } };
+    const res = mockRes();
+
+    await listTransactions(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error.code).toBe('INVALID_CURRENCY');
+    expect(db.listAllTransactions).not.toHaveBeenCalled();
+  });
+
+  it('passes all filter params (incl. cursor + currency) to listAllTransactions', async () => {
+    db.listAllTransactions.mockResolvedValue({ items: [], nextCursor: null });
 
     const req = {
       query: {
         userId: 'usr_player1',
         type: 'admin_grant',
+        currency: 'essence',
         startTime: '2026-04-01T00:00:00.000Z',
         endTime: '2026-04-02T00:00:00.000Z',
+        cursor: 'eyJwayI6Iks0In0=',
+        limit: '50',
       },
     };
     const res = mockRes();
 
     await listTransactions(req, res);
 
-    expect(db.listAllTransactions).toHaveBeenCalledWith(expect.objectContaining({
+    expect(db.listAllTransactions).toHaveBeenCalledWith({
       userId: 'usr_player1',
       type: 'admin_grant',
+      currency: 'essence',
       startTime: '2026-04-01T00:00:00.000Z',
       endTime: '2026-04-02T00:00:00.000Z',
-    }));
+      cursor: 'eyJwayI6Iks0In0=',
+      limit: 50,
+    });
   });
 
-  it('respects page and limit params', async () => {
-    const txns = Array.from({ length: 5 }, (_, i) => ({
-      ...testTransaction,
-      id: `txn_${i}`,
-    }));
-    db.listAllTransactions.mockResolvedValue(txns);
+  it('surfaces nextCursor + hasMore when more pages exist', async () => {
+    db.listAllTransactions.mockResolvedValue({
+      items: [testTransaction],
+      nextCursor: 'eyJwayI6Iks1In0=',
+    });
 
-    const req = { query: { page: '2', limit: '2' } };
+    const req = { query: { type: 'reward_daily' } };
     const res = mockRes();
 
     await listTransactions(req, res);
 
     const body = res.json.mock.calls[0][0];
-    expect(body.data.transactions).toHaveLength(2);
-    expect(body.data.transactions[0].id).toBe('txn_2');
-    expect(body.pagination).toEqual({ page: 2, limit: 2, total: 5, totalPages: 3 });
+    expect(body.pagination).toEqual({
+      limit: 25,
+      count: 1,
+      nextCursor: 'eyJwayI6Iks1In0=',
+      hasMore: true,
+    });
   });
 
-  it('returns correct fields for each transaction', async () => {
-    db.listAllTransactions.mockResolvedValue([testTransaction]);
+  it('returns correct fields including refId for each transaction', async () => {
+    db.listAllTransactions.mockResolvedValue({
+      items: [{ ...testTransaction, refId: 'ttm_abc' }],
+      nextCursor: null,
+    });
 
-    const req = { query: {} };
+    const req = { query: { userId: 'usr_player1' } };
     const res = mockRes();
 
     await listTransactions(req, res);
@@ -670,6 +726,7 @@ describe('GET /v1/admin/transactions', () => {
       balanceBefore: 2010,
       balanceAfter: 2000,
       refType: null,
+      refId: 'ttm_abc',
       refName: null,
       ts: '2026-04-01T12:00:00.000Z',
     });

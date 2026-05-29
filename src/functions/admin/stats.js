@@ -4,14 +4,17 @@
  * GET /v1/admin/stats — Dashboard overview metrics
  */
 
-const { listUsers, countTotems, listAllTransactions } = require('../../common/db-client');
+const { scanAllUsers, countTotems, scanRecentTransactions } = require('../../common/db-client');
 
 async function get(req, res) {
   try {
+    // These walk-all helpers are inherently expensive at scale; the dashboard
+    // will move to counter rows + time-bucketed aggregates in a future PR
+    // (P2 of the scaling plan).
     const [allUsers, totemCount, recentTransactions] = await Promise.all([
-      listUsers(),
+      scanAllUsers(),
       countTotems(),
-      listAllTransactions({ limit: 500 }),
+      scanRecentTransactions({ limit: 500 }),
     ]);
 
     const now = new Date();
