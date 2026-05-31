@@ -71,8 +71,8 @@ const {
 // =============================================================================
 
 describe('Challenge Definitions', () => {
-  test('should have exactly 11 challenges', () => {
-    expect(CHALLENGES).toHaveLength(11);
+  test('should have exactly 12 challenges', () => {
+    expect(CHALLENGES).toHaveLength(12);
   });
 
   test('should have 3 strength challenges', () => {
@@ -90,9 +90,9 @@ describe('Challenge Definitions', () => {
     expect(wisdomChallenges).toHaveLength(3);
   });
 
-  test('should have 2 balance challenges', () => {
+  test('should have 3 balance challenges', () => {
     const balanceChallenges = CHALLENGES.filter((c) => c.type === 'balance');
-    expect(balanceChallenges).toHaveLength(2);
+    expect(balanceChallenges).toHaveLength(3);
   });
 
   test('all challenges should have required properties', () => {
@@ -385,7 +385,7 @@ describe('getAvailableChallenges', () => {
     };
     const available = getAvailableChallenges(totem);
 
-    expect(available).toHaveLength(11);
+    expect(available).toHaveLength(12);
   });
 
   test('should exclude disabled challenges', () => {
@@ -408,8 +408,8 @@ describe('getUnavailableChallenges', () => {
     };
     const unavailable = getUnavailableChallenges(totem);
 
-    // Should be 10 (all except garden pest patrol)
-    expect(unavailable).toHaveLength(10);
+    // Should be 11 (all except garden pest patrol)
+    expect(unavailable).toHaveLength(11);
     unavailable.forEach((c) => {
       expect(c).toHaveProperty('reason');
       expect(c).toHaveProperty('unmetRequirement');
@@ -450,7 +450,7 @@ describe('getAllChallenges', () => {
   test('should return all enabled challenges', () => {
     const challenges = getAllChallenges();
 
-    expect(challenges).toHaveLength(11);
+    expect(challenges).toHaveLength(12);
   });
 });
 
@@ -777,12 +777,12 @@ describe('getChallengeStatus', () => {
     jest.clearAllMocks();
   });
 
-  test('should return status for all 11 challenges', async () => {
+  test('should return status for all 12 challenges', async () => {
     mockDbClient.queryItems.mockResolvedValue([]);
 
     const statuses = await getChallengeStatus('usr_123');
 
-    expect(statuses).toHaveLength(11);
+    expect(statuses).toHaveLength(12);
     statuses.forEach((status) => {
       expect(status).toHaveProperty('challengeId');
       expect(status).toHaveProperty('name');

@@ -121,6 +121,19 @@ const CHALLENGES = [
     enabled: true,
   },
   {
+    id: 'chl_spirit-labyrinth',
+    name: 'Spirit Labyrinth',
+    description: 'Navigate the fog-shrouded spirit labyrinth. Find the exit before time runs out.',
+    type: 'balance',
+    affinity: 'balance',
+    requirements: { stage: 2, strength: 1, agility: 1, wisdom: 1 },
+    maxDailyAttempts: 5,
+    maxScore: 3000,
+    xpReward: { base: 30, perPoint: 0.01 },
+    essenceReward: 20,  // Tier 3 (stage 2)
+    enabled: true,
+  },
+  {
     id: 'chl_aerial-ring-dive',
     name: 'Aerial Ring Dive',
     description: 'Fly through shifting rings in the air. Agility improves control.',
