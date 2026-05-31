@@ -1504,6 +1504,7 @@ app.post('/v1/admin/broadcast/app-reload',   authenticateJWT, requireRole('admin
 app.post('/v1/admin/broadcast/force-logout', authenticateJWT, requireRole('admin'), adminMessaging.broadcastForceLogout);
 app.post('/v1/admin/users/:id/notification', authenticateJWT, requireRole('admin'), adminMessaging.userNotification);
 app.post('/v1/admin/users/:id/force-logout', authenticateJWT, requireRole('admin'), adminMessaging.userForceLogout);
+app.post('/v1/admin/users/:id/app-reload', authenticateJWT, requireRole('admin'), adminMessaging.userAppReload);
 
 // ============================================
 // Finalize - adds error/404 handlers (must be called last)
