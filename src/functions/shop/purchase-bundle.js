@@ -50,7 +50,7 @@ const {
 
 const { onTotemAcquired } = require('../../services/achievements-service');
 
-const { getTotemImageUrl } = require('../../config/totem-config');
+const { getTotemImageUrl, RARITIES } = require('../../config/totem-config');
 const { buildInitialTraits } = require('../../config/traits');
 
 // Load special offer bundles from config
@@ -104,8 +104,8 @@ function getRarityIdFromBundleRarity(totemRarity) {
  * Get rarity stat bonus
  */
 function getRarityStatBonus(rarityId) {
-  const bonuses = [0, 0, 1, 2, 4, 2]; // Common, Uncommon, Rare, Epic, Legendary, Limited
-  return bonuses[rarityId] || 0;
+  const rarity = RARITIES[rarityId];
+  return (rarity && rarity.statBonus) || 0;
 }
 
 /**

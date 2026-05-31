@@ -57,6 +57,14 @@ jest.mock('../src/services/achievements-service', () => ({
 
 jest.mock('../src/config/totem-config', () => ({
   getTotemImageUrl: jest.fn().mockReturnValue('https://example.com/totem.png'),
+  RARITIES: [
+    { id: 0, name: 'Common', statBonus: 0, dropChance: 75 },
+    { id: 1, name: 'Uncommon', statBonus: 1, dropChance: 15 },
+    { id: 2, name: 'Rare', statBonus: 2, dropChance: 7 },
+    { id: 3, name: 'Epic', statBonus: 3, dropChance: 2.5 },
+    { id: 4, name: 'Legendary', statBonus: 6, dropChance: 0.5 },
+    { id: 5, name: 'Limited', statBonus: 4, dropChance: 0 },
+  ],
 }));
 
 // ---------------------------------------------------------------------------
