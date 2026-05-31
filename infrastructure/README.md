@@ -14,7 +14,7 @@ Deploy in order (cross-stack references):
 |---|-------|----------|-----------------|
 | 1 | **core** | `cloudformation/core.yml` | 9 DynamoDB tables + IAM Lambda execution role |
 | 2 | **cognito** | `cloudformation/cognito.yml` | Cognito User Pool + App Client (24h token validity) |
-| 3 | **api** | `cloudformation/api.yml` | Lambda (nodejs20.x) + REST API Gateway + Cognito Authorizer |
+| 3 | **api** | `cloudformation/api.yml` | Lambda (nodejs22.x) + REST API Gateway + Cognito Authorizer |
 | 4 | **iot** | `cloudformation/iot.yml` | Cognito Identity Pool + IoT policies (real-time MQTT/WebSocket push) |
 
 ## Stack Names

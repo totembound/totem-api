@@ -181,7 +181,7 @@ function isSpeciesAvailable(speciesId) {
  * Calculate initial totem stats with rarity bonus
  * Stats match contract values exactly: base stats + rarity bonus
  * @param {object} baseStats - { strength, agility, wisdom }
- * @param {number} statBonus - Rarity stat bonus (Rare: +1, Epic: +2, Legendary: +4, Limited: +2)
+ * @param {number} statBonus - Rarity stat bonus (Uncommon: +1, Rare: +2, Epic: +3, Limited: +4, Legendary: +6)
  * @returns {object} - Full stats object
  */
 function calculateInitialStats(baseStats, statBonus = 0) {
@@ -244,7 +244,8 @@ function createTotem({
     rarity = { rarityId: forcedRarityId, rarityName: forcedRarity.name, statBonus: forcedRarity.statBonus || 0 };
   }
   else if (isLimited) {
-    rarity = { rarityId: 5, rarityName: 'Limited', statBonus: 2 };
+    const limitedRarity = RARITIES[5];
+    rarity = { rarityId: 5, rarityName: limitedRarity.name, statBonus: limitedRarity.statBonus || 0 };
   }
   else {
     rarity = determineRarity(luckBonus);
@@ -322,7 +323,7 @@ function createStarterTotem(userId) {
   // - Random uncommon color
   const species = selectRandomSpecies();
   const color = selectColor(1); // Uncommon
-  const stats = calculateInitialStats(species.baseStats, 0);
+  const stats = calculateInitialStats(species.baseStats, RARITIES[1].statBonus || 0);
 
   const totemId = generateId('totem');
   const now = new Date().toISOString();

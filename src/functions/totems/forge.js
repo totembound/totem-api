@@ -184,6 +184,10 @@ async function forgeTotem(user, body = {}) {
     forcedRarityId: newRarityId,
   });
 
+  // Provenance: mark as forged so it can be distinguished from naturally-dropped
+  // totems (e.g. a forged Legendary vs. a 0.5%-drop Legendary) in the UI/Codex.
+  newTotemData.forged = true;
+
   // ── Atomic transaction: delete 3 old + create 1 new ──
   const transactItems = [
     // Create new totem
@@ -327,6 +331,7 @@ async function forgeTotem(user, body = {}) {
         experience: newTotemData.experience,
         stats: newTotemData.stats,
         traits: newTotemData.traits,
+        forged: newTotemData.forged,
         image: getTotemImageUrl(newTotemData.speciesId, newTotemData.colorId, 0),
         createdAt: newTotemData.createdAt,
       },
