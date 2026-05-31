@@ -26,6 +26,7 @@ jest.mock('../src/common/db-client', () => ({
   countTotems: jest.fn(),
   listAllTransactions: jest.fn(),
   scanRecentTransactions: jest.fn(),
+  getLatestSnapshot: jest.fn(),
 }));
 
 const db = require('../src/common/db-client');
@@ -565,7 +566,12 @@ describe('PUT /v1/admin/users/:id/status (setStatus)', () => {
 // GET /v1/admin/stats
 // =============================================================================
 describe('GET /v1/admin/stats', () => {
-  it('returns aggregated dashboard metrics', async () => {
+  beforeEach(() => {
+    // Default: no precomputed snapshot → endpoint computes live.
+    db.getLatestSnapshot.mockResolvedValue(null);
+  });
+
+  it('returns aggregated dashboard metrics (live compute when no snapshot)', async () => {
     const today = new Date().toISOString().split('T')[0];
     const users = [
       { ...testUserRecord, stats: { ...testUserRecord.stats, lastLoginDate: today }, createdAt: `${today}T10:00:00.000Z` },
@@ -585,6 +591,7 @@ describe('GET /v1/admin/stats', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     const data = res.json.mock.calls[0][0].data;
+    expect(data.source).toBe('live');
     expect(data.users.total).toBe(2);
     expect(data.users.activeToday).toBe(1);
     expect(data.users.newToday).toBe(1);
@@ -607,9 +614,68 @@ describe('GET /v1/admin/stats', () => {
 
     expect(res.status).toHaveBeenCalledWith(200);
     const data = res.json.mock.calls[0][0].data;
+    expect(data.source).toBe('live');
     expect(data.users.total).toBe(0);
     expect(data.totems.total).toBe(0);
     expect(data.transactions.today.count).toBe(0);
+  });
+
+  it('serves the latest snapshot when it is fresh (no live scan)', async () => {
+    const snapshot = {
+      users: { total: 99, activeToday: 7, activeThisWeek: 20, newToday: 3, banned: 1, byTier: { free: 99 } },
+      totems: { total: 123 },
+      transactions: { today: { count: 4 }, thisWeek: { count: 30 }, byType: {}, essenceVolume: 5000, gemsVolume: 0 },
+      economy: { essenceInCirculation: 250000, gemsInCirculation: 9999 },
+      generatedAt: new Date().toISOString(), // fresh
+    };
+    db.getLatestSnapshot.mockResolvedValue(snapshot);
+
+    const req = { query: {} };
+    const res = mockRes();
+
+    await getStats(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const data = res.json.mock.calls[0][0].data;
+    expect(data.source).toBe('snapshot');
+    expect(data.users.total).toBe(99);
+    expect(data.economy.essenceInCirculation).toBe(250000);
+    // The expensive scans must NOT run when a fresh snapshot is served.
+    expect(db.scanAllUsers).not.toHaveBeenCalled();
+    expect(db.countTotems).not.toHaveBeenCalled();
+  });
+
+  it('falls back to live compute when the latest snapshot is stale', async () => {
+    const stale = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(); // 4h old
+    db.getLatestSnapshot.mockResolvedValue({ users: { total: 1 }, generatedAt: stale });
+    db.scanAllUsers.mockResolvedValue([]);
+    db.countTotems.mockResolvedValue(0);
+    db.scanRecentTransactions.mockResolvedValue([]);
+
+    const req = { query: {} };
+    const res = mockRes();
+
+    await getStats(req, res);
+
+    const data = res.json.mock.calls[0][0].data;
+    expect(data.source).toBe('live');
+    expect(db.scanAllUsers).toHaveBeenCalled();
+  });
+
+  it('bypasses the snapshot with ?fresh=1', async () => {
+    db.getLatestSnapshot.mockResolvedValue({ users: { total: 99 }, generatedAt: new Date().toISOString() });
+    db.scanAllUsers.mockResolvedValue([]);
+    db.countTotems.mockResolvedValue(0);
+    db.scanRecentTransactions.mockResolvedValue([]);
+
+    const req = { query: { fresh: '1' } };
+    const res = mockRes();
+
+    await getStats(req, res);
+
+    const data = res.json.mock.calls[0][0].data;
+    expect(data.source).toBe('live');
+    expect(db.getLatestSnapshot).not.toHaveBeenCalled();
   });
 });
 

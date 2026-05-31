@@ -42,6 +42,21 @@ async function get(req, res) {
     const from = req.query.from
       || new Date(now.getTime() - DEFAULT_WINDOW_MS[granularity]).toISOString();
 
+    // Validate caller-supplied bounds — garbage would otherwise produce a
+    // confusing empty result from the SK range query rather than an error.
+    if (Number.isNaN(Date.parse(from)) || Number.isNaN(Date.parse(to))) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_RANGE', message: 'from/to must be valid ISO timestamps' },
+      });
+    }
+    if (from > to) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_RANGE', message: 'from must be <= to' },
+      });
+    }
+
     const metrics = req.query.metrics
       ? String(req.query.metrics).split(',').map((m) => m.trim()).filter(Boolean)
       : null;

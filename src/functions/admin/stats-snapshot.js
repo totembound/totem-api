@@ -57,6 +57,21 @@ async function runSnapshot({ granularity = 'HOURLY', now = new Date() } = {}) {
 
   const snapshot = await computeSnapshot();
   const bucket = bucketStart(now, gran).toISOString();
+
+  // Never persist a partial snapshot. If a scan failed, the snapshot has null
+  // sections; writing it would (a) become the bucket's canonical row and (b) be
+  // frozen there by the idempotent write, so a later healthy run in the same
+  // bucket couldn't replace it — and /admin/stats would serve nulls as "fresh".
+  // Skip instead: a healthy run later in the same bucket writes the real row;
+  // if every run in the bucket is partial, there's simply no snapshot and the
+  // read endpoint falls back to a live compute.
+  if (snapshot.partial && snapshot.partial.length > 0) {
+    console.warn(
+      `[stats-snapshot] ${gran} bucket ${bucket} → SKIPPED (partial: ${snapshot.partial.join(',')}) — not persisting incomplete data`,
+    );
+    return { granularity: gran, bucket, written: false, skipped: 'partial', partial: snapshot.partial };
+  }
+
   const ttl = ttlForGranularity(now, gran);
 
   const item = {
@@ -69,8 +84,7 @@ async function runSnapshot({ granularity = 'HOURLY', now = new Date() } = {}) {
     transactions: snapshot.transactions,
     economy: snapshot.economy,
     generatedAt: snapshot.generatedAt,
-    ...(snapshot.partial ? { partial: snapshot.partial } : {}),
-    ...(ttl ? { ttl } : {}),
+    ...(ttl != null ? { ttl } : {}),
   };
 
   const { written } = await putStatsSnapshot(item);
