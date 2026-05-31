@@ -919,14 +919,25 @@ async function listUsers({ limit = 50, cursor, search } = {}) {
  * Walk every page of listUsers — only used by /v1/admin/stats for aggregate
  * counts. Inherently expensive at scale (full-table scan); slated for
  * replacement by counter rows in a future PR (P2 of the scaling plan).
+ *
+ * A `maxItems` safety cap bounds the walk so a runaway table can't hang the
+ * stats endpoint; hitting it logs a warning (aggregate counts are then a
+ * lower-bound and the migration to counter rows is overdue).
  */
-async function scanAllUsers({ search } = {}) {
+async function scanAllUsers({ search, maxItems = 20000 } = {}) {
   const items = [];
   let cursor;
   do {
     const page = await listUsers({ limit: 100, cursor, search });
     items.push(...page.items);
     cursor = page.nextCursor;
+    if (items.length >= maxItems) {
+      console.warn(
+        `[db-client] scanAllUsers hit the ${maxItems}-user safety cap — aggregate `
+        + 'stats are truncated. Migrate /admin/stats to counter rows (scaling plan P2).',
+      );
+      break;
+    }
   } while (cursor);
   return items;
 }
