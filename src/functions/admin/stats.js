@@ -1,73 +1,68 @@
 /**
  * Admin Stats Handler
  *
- * GET /v1/admin/stats — Dashboard overview metrics
+ * GET /v1/admin/stats — Dashboard overview metrics.
+ *
+ * The API runs on Lambda, so the durable "cache" is NOT in-process — it's the
+ * latest precomputed snapshot in AdminStatsHistory, written on a cron by the
+ * stats-snapshot Lambda (see functions/admin/stats-snapshot.js). This endpoint:
+ *   1. Reads the most recent HOURLY snapshot (a single cheap Query, shared across
+ *      the whole fleet) and returns it when it's recent enough.
+ *   2. Falls back to a LIVE compute (the expensive scans, hardened with
+ *      allSettled + a user-scan safety cap) when there's no snapshot yet or the
+ *      latest is stale — or when `?fresh=1` forces it.
+ * The response carries `source` ('snapshot' | 'live') and `generatedAt` so the
+ * UI can show freshness.
  */
 
-const { scanAllUsers, countTotems, scanRecentTransactions } = require('../../common/db-client');
+const { getLatestSnapshot } = require('../../common/db-client');
+const { computeSnapshot } = require('../../services/admin-stats-service');
+
+// How old the latest hourly snapshot may be before we recompute live. Hourly
+// snapshots land ~once an hour, so allow a little slack.
+const SNAPSHOT_MAX_AGE_MS = parseInt(process.env.ADMIN_STATS_SNAPSHOT_MAX_AGE_MS, 10)
+  || 90 * 60 * 1000; // 90 min
+
+function snapshotIsFresh(snapshot) {
+  if (!snapshot?.generatedAt) return false;
+  const age = Date.now() - new Date(snapshot.generatedAt).getTime();
+  return age >= 0 && age <= SNAPSHOT_MAX_AGE_MS;
+}
 
 async function get(req, res) {
   try {
-    // These walk-all helpers are inherently expensive at scale; the dashboard
-    // will move to counter rows + time-bucketed aggregates in a future PR
-    // (P2 of the scaling plan).
-    const [allUsers, totemCount, recentTransactions] = await Promise.all([
-      scanAllUsers(),
-      countTotems(),
-      scanRecentTransactions({ limit: 500 }),
-    ]);
+    const bypass = req.query.fresh === '1' || req.query.fresh === 'true';
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-    const weekAgo = new Date(now);
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoStr = weekAgo.toISOString().split('T')[0];
-
-    // User stats
-    const activeToday = allUsers.filter((u) => u.stats?.lastLoginDate === todayStr).length;
-    const activeThisWeek = allUsers.filter((u) => u.stats?.lastLoginDate >= weekAgoStr).length;
-    const newToday = allUsers.filter((u) => u.createdAt && u.createdAt.startsWith(todayStr)).length;
-    const bannedCount = allUsers.filter((u) => u.status === 'banned').length;
-
-    // Transaction stats (from recent 500)
-    const todayTxns = recentTransactions.filter((t) => t.ts && t.ts.startsWith(todayStr));
-    const weekTxns = recentTransactions.filter((t) => t.ts && t.ts >= weekAgo.toISOString());
-
-    // Group by type
-    const byType = {};
-    for (const t of recentTransactions) {
-      if (!byType[t.type]) {
-        byType[t.type] = { count: 0, essenceVolume: 0, gemsVolume: 0 };
+    if (!bypass) {
+      let latest = null;
+      try {
+        latest = await getLatestSnapshot('HOURLY');
       }
-      byType[t.type].count++;
-      if (t.currency === 'essence') {
-        byType[t.type].essenceVolume += Math.abs(t.amount || 0);
+      catch (err) {
+        // Table missing / read error → just fall through to live compute.
+        console.warn('[Admin] stats: snapshot read failed, computing live:', err.message);
       }
-      else if (t.currency === 'gems') {
-        byType[t.type].gemsVolume += Math.abs(t.amount || 0);
+
+      if (latest && snapshotIsFresh(latest)) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            users: latest.users,
+            totems: latest.totems,
+            transactions: latest.transactions,
+            economy: latest.economy,
+            generatedAt: latest.generatedAt,
+            source: 'snapshot',
+            ...(latest.partial ? { partial: latest.partial } : {}),
+          },
+        });
       }
     }
 
+    const snapshot = await computeSnapshot();
     return res.status(200).json({
       success: true,
-      data: {
-        users: {
-          total: allUsers.length,
-          activeToday,
-          activeThisWeek,
-          newToday,
-          banned: bannedCount,
-        },
-        totems: {
-          total: totemCount,
-        },
-        transactions: {
-          today: { count: todayTxns.length },
-          thisWeek: { count: weekTxns.length },
-          byType,
-        },
-        generatedAt: now.toISOString(),
-      },
+      data: { ...snapshot, source: 'live' },
     });
   }
   catch (error) {

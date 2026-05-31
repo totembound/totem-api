@@ -64,6 +64,7 @@ const TABLES = {
   EXPEDITION_STATE: process.env.DYNAMODB_EXPEDITIONS_TABLE || 'TotemBound-ExpeditionState',
   REWARD_STATE: process.env.DYNAMODB_REWARDS_TABLE || 'TotemBound-RewardState',
   REWARDS_CLAIMS: process.env.DYNAMODB_REWARDS_CLAIMS_TABLE || 'TotemBound-RewardsClaims',
+  ADMIN_STATS_HISTORY: process.env.DYNAMODB_ADMIN_STATS_HISTORY_TABLE || 'TotemBound-AdminStatsHistory',
 };
 
 // ============================================
@@ -919,14 +920,25 @@ async function listUsers({ limit = 50, cursor, search } = {}) {
  * Walk every page of listUsers — only used by /v1/admin/stats for aggregate
  * counts. Inherently expensive at scale (full-table scan); slated for
  * replacement by counter rows in a future PR (P2 of the scaling plan).
+ *
+ * A `maxItems` safety cap bounds the walk so a runaway table can't hang the
+ * stats endpoint; hitting it logs a warning (aggregate counts are then a
+ * lower-bound and the migration to counter rows is overdue).
  */
-async function scanAllUsers({ search } = {}) {
+async function scanAllUsers({ search, maxItems = 20000 } = {}) {
   const items = [];
   let cursor;
   do {
     const page = await listUsers({ limit: 100, cursor, search });
     items.push(...page.items);
     cursor = page.nextCursor;
+    if (items.length >= maxItems) {
+      console.warn(
+        `[db-client] scanAllUsers hit the ${maxItems}-user safety cap — aggregate `
+        + 'stats are truncated. Migrate /admin/stats to counter rows (scaling plan P2).',
+      );
+      break;
+    }
   } while (cursor);
   return items;
 }
@@ -1138,6 +1150,68 @@ async function getUserByStripeCustomerId(stripeCustomerId) {
 }
 
 // ============================================
+// Admin stats history (time-bucketed snapshots)
+//
+// pk: BUCKET#{HOURLY|DAILY|WEEKLY}   sk: TS#{iso bucket-start}
+// All access is a bounded Query on (pk, sk-range) — cheap and predictable.
+// ============================================
+
+/**
+ * Write a stats snapshot. Idempotent: a duplicate cron fire for the same bucket
+ * is a no-op (ConditionExpression on the sort key). Returns { written }.
+ */
+async function putStatsSnapshot(item) {
+  try {
+    await docClient.send(new PutCommand({
+      TableName: TABLES.ADMIN_STATS_HISTORY,
+      Item: item,
+      ConditionExpression: 'attribute_not_exists(sk)',
+    }));
+    return { written: true };
+  }
+  catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      return { written: false };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Most recent snapshot for a granularity (newest first, Limit 1), or null.
+ */
+async function getLatestSnapshot(granularity = 'HOURLY') {
+  const response = await docClient.send(new QueryCommand({
+    TableName: TABLES.ADMIN_STATS_HISTORY,
+    KeyConditionExpression: 'pk = :pk',
+    ExpressionAttributeValues: { ':pk': `BUCKET#${granularity.toUpperCase()}` },
+    ScanIndexForward: false,
+    Limit: 1,
+  }));
+  return (response.Items || [])[0] || null;
+}
+
+/**
+ * Time-series for trend charts: snapshots in [from, to] for a granularity,
+ * oldest → newest. `from`/`to` are ISO timestamps. Bounded by SK range.
+ */
+async function queryStatsTrends({ granularity = 'DAILY', from, to, limit = 500 } = {}) {
+  const params = {
+    TableName: TABLES.ADMIN_STATS_HISTORY,
+    KeyConditionExpression: 'pk = :pk AND sk BETWEEN :from AND :to',
+    ExpressionAttributeValues: {
+      ':pk': `BUCKET#${granularity.toUpperCase()}`,
+      ':from': `TS#${from}`,
+      ':to': `TS#${to}`,
+    },
+    ScanIndexForward: true,
+    Limit: limit,
+  };
+  const response = await docClient.send(new QueryCommand(params));
+  return response.Items || [];
+}
+
+// ============================================
 // Exports
 // ============================================
 
@@ -1209,4 +1283,9 @@ module.exports = {
   scanRecentTransactions,
   encodeCursor,
   decodeCursor,
+
+  // Admin stats history
+  putStatsSnapshot,
+  getLatestSnapshot,
+  queryStatsTrends,
 };

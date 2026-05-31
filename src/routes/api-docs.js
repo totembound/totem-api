@@ -3033,6 +3033,59 @@
  *                         thisWeek: { type: object, properties: { count: { type: integer } } }
  *                         byType: { type: object }
  *                     generatedAt: { type: string, format: date-time }
+ *                     source: { type: string, enum: [snapshot, live], description: "Whether the data came from the latest precomputed snapshot or a live compute." }
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/stats/trends:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Stats time series for trend charts (admin only)
+ *     description: |
+ *       Time-bucketed snapshots from AdminStatsHistory for charting. Requires admin role.
+ *       Reads are a bounded query over the requested window — cheap and predictable.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: granularity
+ *         schema: { type: string, enum: [hourly, daily, weekly], default: daily }
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date-time }
+ *         description: ISO lower bound. Defaults to a granularity-dependent window (24h / 30d / 12w).
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date-time }
+ *         description: ISO upper bound. Defaults to now.
+ *       - in: query
+ *         name: metrics
+ *         schema: { type: string }
+ *         description: "Comma-separated dot paths (e.g. users.activeToday,transactions.essenceVolume). Omit to return the full snapshot maps."
+ *     responses:
+ *       200:
+ *         description: Time series
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     granularity: { type: string, example: DAILY }
+ *                     from: { type: string, format: date-time }
+ *                     to: { type: string, format: date-time }
+ *                     count: { type: integer, example: 30 }
+ *                     points:
+ *                       type: array
+ *                       items: { type: object, properties: { ts: { type: string, format: date-time } } }
+ *       400:
+ *         description: Invalid granularity
  *       403:
  *         description: Insufficient permissions
  */
@@ -3599,6 +3652,55 @@
  *                     delivered: { type: boolean }
  *                     topic:     { type: string, example: "user:usr_abc" }
  *                     type:      { type: string, example: force_logout }
+ *                     reason:    { type: string }
+ *                     undeliveredReason: { type: string, example: user_not_registered }
+ *       400:
+ *         description: Invalid reason
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/app-reload:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Force a single user's clients to reload (admin only)
+ *     description: Publishes an `app_reload` command to the target user's IoT topic so their open tabs hard-reload the app.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Target user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Shipping a client hotfix" }
+ *     responses:
+ *       200:
+ *         description: App reload published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: "user:usr_abc" }
+ *                     type:      { type: string, example: app_reload }
  *                     reason:    { type: string }
  *                     undeliveredReason: { type: string, example: user_not_registered }
  *       400:

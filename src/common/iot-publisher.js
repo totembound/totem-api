@@ -272,6 +272,17 @@ async function publishAppReload(reason) {
 }
 
 /**
+ * Send an app reload command to a SINGLE user via their personal topic.
+ *
+ * @param {string} userId - Target user
+ * @param {string} reason - Reason for reload
+ */
+async function publishUserAppReload(userId, reason) {
+  const command = buildCommand('app_reload', { reason });
+  return publishToUser(userId, command);
+}
+
+/**
  * Broadcast a config update command to ALL connected users via global topic.
  *
  * @param {string[]} configKeys - Which config files changed
@@ -307,6 +318,7 @@ module.exports = {
   publishBalanceUpdate,
   publishNotification,
   publishForceLogout,
+  publishUserAppReload,
 
   // Global broadcast publishers (all connected users)
   publishAppReload,
