@@ -65,11 +65,11 @@ describe('Totem Creation Service', () => {
 
     it('should define stat bonuses per rarity', () => {
       expect(RARITIES[0].statBonus).toBe(0);  // Common
-      expect(RARITIES[1].statBonus).toBe(0);  // Uncommon
-      expect(RARITIES[2].statBonus).toBe(1);  // Rare
-      expect(RARITIES[3].statBonus).toBe(2);  // Epic
-      expect(RARITIES[4].statBonus).toBe(4);  // Legendary
-      expect(RARITIES[5].statBonus).toBe(2);  // Limited
+      expect(RARITIES[1].statBonus).toBe(1);  // Uncommon
+      expect(RARITIES[2].statBonus).toBe(2);  // Rare
+      expect(RARITIES[3].statBonus).toBe(3);  // Epic
+      expect(RARITIES[4].statBonus).toBe(6);  // Legendary
+      expect(RARITIES[5].statBonus).toBe(4);  // Limited
     });
 
     it('should define 12 species', () => {
@@ -209,7 +209,7 @@ describe('Totem Creation Service', () => {
     });
 
     it('should have correct statBonus for each rarity', () => {
-      const expectedBonuses = { 0: 0, 1: 0, 2: 1, 3: 2, 4: 4 };
+      const expectedBonuses = { 0: 0, 1: 1, 2: 2, 3: 3, 4: 6 };
       for (let i = 0; i < 1000; i++) {
         const result = determineRarity();
         expect(result.statBonus).toBe(expectedBonuses[result.rarityId]);
@@ -342,11 +342,11 @@ describe('Totem Creation Service', () => {
 
     it('should add rarity bonus to all stat types', () => {
       const baseStats = { strength: 8, agility: 6, wisdom: 10 };
-      const stats = calculateInitialStats(baseStats, 2); // Epic bonus
+      const stats = calculateInitialStats(baseStats, 3); // Epic bonus
 
-      expect(stats.strength).toBe(10);
-      expect(stats.agility).toBe(8);
-      expect(stats.wisdom).toBe(12);
+      expect(stats.strength).toBe(11);
+      expect(stats.agility).toBe(9);
+      expect(stats.wisdom).toBe(13);
     });
 
     it('should start with happiness 50 and hunger 100', () => {
@@ -356,13 +356,13 @@ describe('Totem Creation Service', () => {
       expect(stats.hunger).toBe(100);
     });
 
-    it('should add Legendary bonus (+4) correctly', () => {
+    it('should add Legendary bonus (+6) correctly', () => {
       const baseStats = { strength: 12, agility: 5, wisdom: 7 }; // Bear
-      const stats = calculateInitialStats(baseStats, 4);
+      const stats = calculateInitialStats(baseStats, 6);
 
-      expect(stats.strength).toBe(16);
-      expect(stats.agility).toBe(9);
-      expect(stats.wisdom).toBe(11);
+      expect(stats.strength).toBe(18);
+      expect(stats.agility).toBe(11);
+      expect(stats.wisdom).toBe(13);
     });
   });
 
@@ -469,10 +469,10 @@ describe('Totem Creation Service', () => {
     it('should apply rarity stat bonus to all stats', () => {
       // Force a specific species for consistent test
       const totem = createTotem({ userId: 'usr_test123', speciesId: 0, isLimited: true });
-      // Limited = +2 bonus. Goose base: 8/6/10
-      expect(totem.stats.strength).toBe(10);
-      expect(totem.stats.agility).toBe(8);
-      expect(totem.stats.wisdom).toBe(12);
+      // Limited = +4 bonus. Goose base: 8/6/10
+      expect(totem.stats.strength).toBe(12);
+      expect(totem.stats.agility).toBe(10);
+      expect(totem.stats.wisdom).toBe(14);
     });
 
     it('should set happiness to 50 and hunger to 100', () => {
@@ -503,12 +503,12 @@ describe('Totem Creation Service', () => {
       expect(uncommonIds).toContain(totem.colorId);
     });
 
-    it('should have no stat bonus (0 for Uncommon)', () => {
+    it('should have Uncommon stat bonus (+1)', () => {
       const totem = createStarterTotem('usr_new');
       const species = SPECIES[totem.speciesId];
-      expect(totem.stats.strength).toBe(species.baseStats.strength);
-      expect(totem.stats.agility).toBe(species.baseStats.agility);
-      expect(totem.stats.wisdom).toBe(species.baseStats.wisdom);
+      expect(totem.stats.strength).toBe(species.baseStats.strength + 1);
+      expect(totem.stats.agility).toBe(species.baseStats.agility + 1);
+      expect(totem.stats.wisdom).toBe(species.baseStats.wisdom + 1);
     });
 
     it('should start at stage 0 with 0 XP', () => {
