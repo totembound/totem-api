@@ -64,8 +64,8 @@ const CHALLENGES = [
     affinity: 'strength',
     requirements: { stage: 0, strength: 10, agility: 5, wisdom: 5 },
     maxDailyAttempts: 5,
-    maxScore: 2000,
-    xpReward: { base: 20, perPoint: 0.01 },
+    maxScore: 1000,
+    xpReward: { base: 10, perPoint: 0.01 },
     essenceReward: 10,  // Tier 1 (display Stage 1)
     enabled: true,
   },
@@ -104,7 +104,7 @@ const CHALLENGES = [
     requirements: { stage: 0, strength: 5, agility: 10, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 1000,
-    xpReward: { base: 20, perPoint: 0.01 },
+    xpReward: { base: 10, perPoint: 0.01 },
     essenceReward: 10,
     enabled: true,
   },
@@ -119,6 +119,19 @@ const CHALLENGES = [
     maxScore: 2000,
     xpReward: { base: 20, perPoint: 0.01 },
     essenceReward: 15,  // Tier 2 (stage 1)
+    enabled: true,
+  },
+  {
+    id: 'chl_spirit-labyrinth',
+    name: 'Spirit Labyrinth',
+    description: 'Navigate the fog-shrouded spirit labyrinth. Find the exit before time runs out.',
+    type: 'balance',
+    affinity: 'balance',
+    requirements: { stage: 2, strength: 1, agility: 1, wisdom: 1 },
+    maxDailyAttempts: 5,
+    maxScore: 3000,
+    xpReward: { base: 30, perPoint: 0.01 },
+    essenceReward: 20,  // Tier 3 (stage 2)
     enabled: true,
   },
   {
@@ -155,8 +168,8 @@ const CHALLENGES = [
     affinity: 'wisdom',
     requirements: { stage: 0, strength: 5, agility: 5, wisdom: 10 },
     maxDailyAttempts: 5,
-    maxScore: 2000,
-    xpReward: { base: 20, perPoint: 0.01 },
+    maxScore: 1000,
+    xpReward: { base: 10, perPoint: 0.01 },
     essenceReward: 10,  // Tier 1 (display Stage 1)
     enabled: true,
   },
