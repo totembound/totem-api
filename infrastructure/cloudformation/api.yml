@@ -150,7 +150,7 @@ Resources:
         Fn::ImportValue: !Sub
           - "${StackName}-LambdaExecutionRoleArn"
           - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CoreStackName]
-      Runtime: nodejs20.x
+      Runtime: nodejs22.x
       Timeout: 30
       MemorySize: 512
       ReservedConcurrentExecutions: 50
@@ -215,7 +215,7 @@ Resources:
         Fn::ImportValue: !Sub
           - "${StackName}-LambdaExecutionRoleArn"
           - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CoreStackName]
-      Runtime: nodejs20.x
+      Runtime: nodejs22.x
       Timeout: 60
       MemorySize: 512
       Environment:
