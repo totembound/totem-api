@@ -104,7 +104,7 @@ const CHALLENGES = [
     requirements: { stage: 0, strength: 5, agility: 10, wisdom: 5 },
     maxDailyAttempts: 5,
     maxScore: 1000,
-    xpReward: { base: 20, perPoint: 0.01 },
+    xpReward: { base: 10, perPoint: 0.01 },
     essenceReward: 10,
     enabled: true,
   },
