@@ -97,6 +97,39 @@ app.get('/api-docs.json', (req, res) => {
 finalize();
 
 // ============================================
+// Local stats-snapshot scheduler
+//
+// In AWS, EventBridge schedule rules invoke the stats-snapshot Lambda. Locally
+// there's no EventBridge, so we register node-cron jobs at the same cadences,
+// calling the SAME handler (the single source of truth). Disable with
+// LOCAL_SNAPSHOT_CRON=false. For ad-hoc runs use scripts/run-snapshot.js.
+// ============================================
+if (process.env.LOCAL_SNAPSHOT_CRON !== 'false') {
+  const cron = require('node-cron');
+  const { runSnapshot } = require('./functions/admin/stats-snapshot');
+
+  const schedules = [
+    { expr: '5 * * * *', granularity: 'HOURLY' },   // every hour at :05
+    { expr: '10 0 * * *', granularity: 'DAILY' },    // 00:10 UTC daily
+    { expr: '15 0 * * 0', granularity: 'WEEKLY' },   // Sunday 00:15 UTC
+  ];
+  for (const { expr, granularity } of schedules) {
+    cron.schedule(expr, () => {
+      runSnapshot({ granularity }).catch((e) =>
+        console.error(`[local-cron] ${granularity} snapshot failed:`, e.message));
+    }, { timezone: 'UTC' });
+  }
+
+  // Prime an hourly snapshot on boot so the dashboard has data immediately
+  // (idempotent — re-running within the same hour bucket is a no-op).
+  runSnapshot({ granularity: 'HOURLY' })
+    .then((r) => console.log(`[local-cron] startup HOURLY snapshot: ${r.written ? 'written' : 'exists'} (${r.bucket})`))
+    .catch((e) => console.error('[local-cron] startup snapshot failed:', e.message));
+
+  console.log('[local-cron] stats-snapshot scheduler registered (hourly/daily/weekly, UTC)');
+}
+
+// ============================================
 // Start Server
 // ============================================
 server.listen(PORT, () => {

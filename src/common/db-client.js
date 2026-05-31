@@ -64,6 +64,7 @@ const TABLES = {
   EXPEDITION_STATE: process.env.DYNAMODB_EXPEDITIONS_TABLE || 'TotemBound-ExpeditionState',
   REWARD_STATE: process.env.DYNAMODB_REWARDS_TABLE || 'TotemBound-RewardState',
   REWARDS_CLAIMS: process.env.DYNAMODB_REWARDS_CLAIMS_TABLE || 'TotemBound-RewardsClaims',
+  ADMIN_STATS_HISTORY: process.env.DYNAMODB_ADMIN_STATS_HISTORY_TABLE || 'TotemBound-AdminStatsHistory',
 };
 
 // ============================================
@@ -1149,6 +1150,68 @@ async function getUserByStripeCustomerId(stripeCustomerId) {
 }
 
 // ============================================
+// Admin stats history (time-bucketed snapshots)
+//
+// pk: BUCKET#{HOURLY|DAILY|WEEKLY}   sk: TS#{iso bucket-start}
+// All access is a bounded Query on (pk, sk-range) — cheap and predictable.
+// ============================================
+
+/**
+ * Write a stats snapshot. Idempotent: a duplicate cron fire for the same bucket
+ * is a no-op (ConditionExpression on the sort key). Returns { written }.
+ */
+async function putStatsSnapshot(item) {
+  try {
+    await docClient.send(new PutCommand({
+      TableName: TABLES.ADMIN_STATS_HISTORY,
+      Item: item,
+      ConditionExpression: 'attribute_not_exists(sk)',
+    }));
+    return { written: true };
+  }
+  catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      return { written: false };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Most recent snapshot for a granularity (newest first, Limit 1), or null.
+ */
+async function getLatestSnapshot(granularity = 'HOURLY') {
+  const response = await docClient.send(new QueryCommand({
+    TableName: TABLES.ADMIN_STATS_HISTORY,
+    KeyConditionExpression: 'pk = :pk',
+    ExpressionAttributeValues: { ':pk': `BUCKET#${granularity.toUpperCase()}` },
+    ScanIndexForward: false,
+    Limit: 1,
+  }));
+  return (response.Items || [])[0] || null;
+}
+
+/**
+ * Time-series for trend charts: snapshots in [from, to] for a granularity,
+ * oldest → newest. `from`/`to` are ISO timestamps. Bounded by SK range.
+ */
+async function queryStatsTrends({ granularity = 'DAILY', from, to, limit = 500 } = {}) {
+  const params = {
+    TableName: TABLES.ADMIN_STATS_HISTORY,
+    KeyConditionExpression: 'pk = :pk AND sk BETWEEN :from AND :to',
+    ExpressionAttributeValues: {
+      ':pk': `BUCKET#${granularity.toUpperCase()}`,
+      ':from': `TS#${from}`,
+      ':to': `TS#${to}`,
+    },
+    ScanIndexForward: true,
+    Limit: limit,
+  };
+  const response = await docClient.send(new QueryCommand(params));
+  return response.Items || [];
+}
+
+// ============================================
 // Exports
 // ============================================
 
@@ -1220,4 +1283,9 @@ module.exports = {
   scanRecentTransactions,
   encodeCursor,
   decodeCursor,
+
+  // Admin stats history
+  putStatsSnapshot,
+  getLatestSnapshot,
+  queryStatsTrends,
 };

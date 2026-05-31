@@ -313,6 +313,36 @@ Resources:
       SSESpecification:
         SSEEnabled: true
 
+  # Time-bucketed admin stats snapshots (analytics pipeline).
+  # pk: BUCKET#{HOURLY|DAILY|WEEKLY}  sk: TS#{iso bucket-start}
+  # TTL on `ttl` expires old hourly/daily rows automatically.
+  AdminStatsHistoryTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-AdminStatsHistory"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
   # ============================================
   # Lambda Execution Role
   # ============================================
@@ -366,6 +396,7 @@ Resources:
                   - !Sub "${TransactionsTable.Arn}/index/*"
                   - !GetAtt ShopTable.Arn
                   - !Sub "${ShopTable.Arn}/index/*"
+                  - !GetAtt AdminStatsHistoryTable.Arn
         - PolicyName: S3Access
           PolicyDocument:
             Version: '2012-10-17'

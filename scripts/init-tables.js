@@ -199,6 +199,22 @@ const tables = [
     ],
     BillingMode: 'PAY_PER_REQUEST',
   },
+  {
+    // Time-bucketed admin stats snapshots (analytics pipeline).
+    // pk: BUCKET#{HOURLY|DAILY|WEEKLY}  sk: TS#{iso bucket-start}
+    // (TTL on the `ttl` attribute is set in prod via CloudFormation; DynamoDB
+    // Local doesn't enforce TTL, so it's omitted here.)
+    TableName: 'TotemBound-AdminStatsHistory',
+    AttributeDefinitions: [
+      { AttributeName: 'pk', AttributeType: 'S' },
+      { AttributeName: 'sk', AttributeType: 'S' },
+    ],
+    KeySchema: [
+      { AttributeName: 'pk', KeyType: 'HASH' },
+      { AttributeName: 'sk', KeyType: 'RANGE' },
+    ],
+    BillingMode: 'PAY_PER_REQUEST',
+  },
 ];
 
 // ============================================

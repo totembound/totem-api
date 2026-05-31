@@ -196,6 +196,95 @@ Resources:
         S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"
 
   # ============================================
+  # Stats Snapshot Lambda + EventBridge schedules (analytics pipeline)
+  #
+  # Reuses the SAME deployment artifact as the API Lambda — only the Handler
+  # differs (functions/admin/stats-snapshot.handler is in the bundle). Writes
+  # time-bucketed snapshots to AdminStatsHistory so GET /v1/admin/stats can read
+  # the latest instead of live-scanning. Shares the core LambdaExecutionRole,
+  # which already grants AdminStatsHistory + table read access.
+  # ============================================
+  StatsSnapshotFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub
+        - "${Prefix}-stats-snapshot"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      Handler: functions/admin/stats-snapshot.handler
+      Role:
+        Fn::ImportValue: !Sub
+          - "${StackName}-LambdaExecutionRoleArn"
+          - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CoreStackName]
+      Runtime: nodejs20.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+          NODE_ENV: !Ref Environment
+          TABLE_PREFIX: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"
+
+  StatsSnapshotHourlyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Hourly admin stats snapshot
+      ScheduleExpression: "cron(5 * * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-hourly
+          Input: '{"granularity":"HOURLY"}'
+
+  StatsSnapshotDailyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Daily admin stats snapshot (00:10 UTC)
+      ScheduleExpression: "cron(10 0 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-daily
+          Input: '{"granularity":"DAILY"}'
+
+  StatsSnapshotWeeklyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Weekly admin stats snapshot (Sunday 00:15 UTC)
+      ScheduleExpression: "cron(15 0 ? * SUN *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-weekly
+          Input: '{"granularity":"WEEKLY"}'
+
+  StatsSnapshotHourlyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotHourlyRule.Arn
+
+  StatsSnapshotDailyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotDailyRule.Arn
+
+  StatsSnapshotWeeklyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotWeeklyRule.Arn
+
+  # ============================================
   # REST API Gateway
   # ============================================
   TotemBoundApi:
