@@ -64,7 +64,7 @@ const CHALLENGES = [
     affinity: 'strength',
     requirements: { stage: 0, strength: 10, agility: 5, wisdom: 5 },
     maxDailyAttempts: 5,
-    maxScore: 2000,
+    maxScore: 1000,
     xpReward: { base: 20, perPoint: 0.01 },
     essenceReward: 10,  // Tier 1 (display Stage 1)
     enabled: true,
@@ -168,7 +168,7 @@ const CHALLENGES = [
     affinity: 'wisdom',
     requirements: { stage: 0, strength: 5, agility: 5, wisdom: 10 },
     maxDailyAttempts: 5,
-    maxScore: 2000,
+    maxScore: 1000,
     xpReward: { base: 20, perPoint: 0.01 },
     essenceReward: 10,  // Tier 1 (display Stage 1)
     enabled: true,
