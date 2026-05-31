@@ -17,6 +17,7 @@ const {
   publishToGlobal,
   publishNotification,
   publishForceLogout,
+  publishUserAppReload,
   publishAppReload,
   publishGlobalForceLogout,
 } = require('../../common/iot-publisher');
@@ -230,10 +231,48 @@ async function userForceLogout(req, res) {
   }
 }
 
+/**
+ * POST /v1/admin/users/:id/app-reload
+ */
+async function userAppReload(req, res) {
+  try {
+    const { id } = req.params;
+
+    const v = validateReasonBody(req.body);
+    if (v.error) return errorResponse(res, 400, v.error);
+
+    const user = await getUser(id);
+    if (!user) {
+      return errorResponse(res, 404, { code: 'NOT_FOUND', message: 'User not found' });
+    }
+
+    const reason = req.body.reason.trim();
+    const delivered = await publishUserAppReload(id, reason);
+
+    const adminId = req.user.userId;
+    console.log(`[Admin] ${adminId} push app_reload → user:${id}: ${reason}`);
+
+    const response = {
+      delivered,
+      topic: `user:${id}`,
+      type: 'app_reload',
+      reason,
+    };
+    if (!delivered) response.undeliveredReason = 'user_not_registered';
+
+    return successResponse(res, response);
+  }
+  catch (error) {
+    console.error('[Admin] User app-reload error:', error);
+    return errorResponse(res, 500, { code: 'INTERNAL_ERROR', message: error.message });
+  }
+}
+
 module.exports = {
   broadcastNotification,
   broadcastAppReload,
   broadcastForceLogout,
   userNotification,
   userForceLogout,
+  userAppReload,
 };

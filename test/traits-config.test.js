@@ -47,6 +47,95 @@ describe('Traits config', () => {
       expect(t.icon.length).toBeGreaterThan(0);
     }
   });
+
+  describe('effects[] schema (Phase 2)', () => {
+    const KNOWN_TYPES = new Set([
+      'xpMultiplier',
+      'essenceRewardMultiplier',
+      'essenceCostMultiplier',
+      'durationMultiplier',
+      'happinessRewardMultiplier',
+      'seatEarnRateMultiplier',
+      'tenureBonusMultiplier',
+      'successChanceBonus',
+      'happinessFlat',
+      'hungerRestoreBonusPct',
+      'runeChanceBonus',
+      'lootChanceBonus',
+      'lootBoxChanceBonus',
+      'offenseBonus',
+      'defenseBonus',
+      'statBonus',
+      'flag',
+    ]);
+    const KNOWN_SCOPES = new Set([
+      'aura',
+      'aura:combat',
+      'challenge:any',
+      'challenge:strength',
+      'challenge:agility',
+      'challenge:wisdom',
+      'action:feed',
+      'action:train',
+      'action:treat',
+      'system:expedition',
+      'system:sanctum',
+      'sanctum:mission',
+      'loot:any',
+      'loot:rune',
+      'earn:any',
+    ]);
+    const KNOWN_CONDITIONS = new Set(['same_species_teammate']);
+
+    it('every trait declares at least one effect', () => {
+      for (const t of TRAITS) {
+        expect(Array.isArray(t.effects)).toBe(true);
+        expect(t.effects.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('every effect uses a known type / scope / condition', () => {
+      for (const t of TRAITS) {
+        for (const e of t.effects) {
+          expect(KNOWN_TYPES.has(e.type)).toBe(true);
+          const scopes = Array.isArray(e.scope) ? e.scope : [e.scope];
+          for (const s of scopes) {
+            expect(KNOWN_SCOPES.has(s)).toBe(true);
+          }
+          if (e.condition) expect(KNOWN_CONDITIONS.has(e.condition)).toBe(true);
+        }
+      }
+    });
+
+    it('statBonus values are an object of stat → integer', () => {
+      for (const t of TRAITS) {
+        for (const e of t.effects) {
+          if (e.type !== 'statBonus') continue;
+          expect(typeof e.value).toBe('object');
+          for (const [stat, n] of Object.entries(e.value)) {
+            expect(['strength', 'agility', 'wisdom']).toContain(stat);
+            expect(Number.isInteger(n)).toBe(true);
+          }
+        }
+      }
+    });
+
+    it('numeric effects use sensible value ranges', () => {
+      for (const t of TRAITS) {
+        for (const e of t.effects) {
+          if (e.type === 'statBonus' || e.type === 'flag') continue;
+          expect(typeof e.value).toBe('number');
+          if (e.type.endsWith('Multiplier')) {
+            expect(e.value).toBeGreaterThan(0);
+            expect(e.value).toBeLessThan(5);
+          } else {
+            expect(e.value).toBeGreaterThanOrEqual(-1);
+            expect(e.value).toBeLessThan(100);
+          }
+        }
+      }
+    });
+  });
 });
 
 describe('pickRandomInnate', () => {

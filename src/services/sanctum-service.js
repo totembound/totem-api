@@ -40,6 +40,7 @@ const {
 
 const { SPECIES_DISPLAY_NAMES } = require('./totem-creation');
 const { addTotemXp } = require('./totem-xp');
+const { resolveTraitBonuses } = require('../config/trait-effects');
 
 // =============================================================================
 // Constants
@@ -108,7 +109,7 @@ function getTenureMultiplier(tenureHours) {
  * @param {Date} [now] - Current time (for testing)
  * @returns {number} Integer Essence earned
  */
-function calculateSeatEarnings(seat, now) {
+function calculateSeatEarnings(seat, now, bonuses = null) {
   if (!seat || !seat.lastClaimedAt || !seat.seatedAt) return 0;
 
   const currentTime = now || new Date();
@@ -119,11 +120,13 @@ function calculateSeatEarnings(seat, now) {
   const hoursSinceLastClaim = (currentTime - lastClaimed) / (1000 * 60 * 60);
   const cappedHours = Math.min(hoursSinceLastClaim, MAX_ACCUMULATION_HOURS);
 
-  // Tenure = total time seated (for multiplier bracket)
+  // Tenure = total time seated (for multiplier bracket).
+  // Shy: seatEarnRateMultiplier ×1.05; Loyal: tenureBonusMultiplier ×1.05.
   const tenureHours = (currentTime - seatedAt) / (1000 * 60 * 60);
-  const multiplier = getTenureMultiplier(tenureHours);
+  const tenureMul = getTenureMultiplier(tenureHours) * (bonuses?.tenureBonusMultiplier ?? 1);
+  const ratePerHour = BASE_RATE_PER_HOUR * (bonuses?.seatEarnRateMultiplier ?? 1);
 
-  return Math.floor(BASE_RATE_PER_HOUR * multiplier * cappedHours);
+  return Math.floor(ratePerHour * tenureMul * cappedHours);
 }
 
 /**
@@ -164,9 +167,10 @@ async function getSanctum(userId) {
   const seatData = [];
   for (const seat of seats) {
     const totem = await getTotem(userId, seat.totemId);
+    const seatBonuses = totem ? resolveTraitBonuses(totem, { system: 'sanctum' }) : null;
     const tenureHours = (now - new Date(seat.seatedAt)) / 3_600_000;
-    const multiplier = getTenureMultiplier(tenureHours);
-    const accumulated = calculateSeatEarnings(seat, now);
+    const multiplier = getTenureMultiplier(tenureHours) * (seatBonuses?.tenureBonusMultiplier ?? 1);
+    const accumulated = calculateSeatEarnings(seat, now, seatBonuses);
 
     // Check for active mission
     const missionRecord = await getItem(TABLES.EXPEDITION_STATE, {
@@ -518,14 +522,18 @@ async function claimSanctum(userId) {
   let totalEarnings = 0;
 
   for (const seat of seats) {
-    const earnings = calculateSeatEarnings(seat, now);
+    // Pull traits per seated totem so Shy / Loyal fold into the claimed Essence.
+    const totem = await getTotem(userId, seat.totemId);
+    const seatBonuses = totem ? resolveTraitBonuses(totem, { system: 'sanctum' }) : null;
+    const earnings = calculateSeatEarnings(seat, now, seatBonuses);
     const tenureHours = (now - new Date(seat.seatedAt)) / (1000 * 60 * 60);
     breakdown.push({
       seatIndex: seat.seatIndex,
       totemId: seat.totemId,
       totemName: seat.totemName,
       earnings,
-      tenureMultiplier: getTenureMultiplier(tenureHours),
+      tenureMultiplier:
+        getTenureMultiplier(tenureHours) * (seatBonuses?.tenureBonusMultiplier ?? 1),
       hoursSinceLastClaim: (now - new Date(seat.lastClaimedAt)) / (1000 * 60 * 60),
     });
     totalEarnings += earnings;
@@ -577,7 +585,20 @@ async function claimSanctum(userId) {
   const user = await require('../common/db-client').getUser(userId);
   const newEssenceBalance = user?.currencies?.essence || 0;
 
-  // 6. Check sanctum claim achievements (non-blocking)
+  // 6. Log the Essence credit to the ledger so reconciliation queries chain
+  // through sanctum claims. transactWrite above bypasses logTransaction, so we
+  // post the credit explicitly here, mirroring the council-mission-claim path.
+  await logTransaction(userId, {
+    type: 'reward_sanctum',
+    currency: 'essence',
+    amount: totalEarnings,
+    balanceBefore: newEssenceBalance - totalEarnings,
+    balanceAfter: newEssenceBalance,
+    refType: 'sanctum',
+    refName: `Sanctum Claim (${seats.length} seat${seats.length === 1 ? '' : 's'})`,
+  });
+
+  // 7. Check sanctum claim achievements (non-blocking)
   let achievements = [];
   try {
     // Get current claim count from achievement progress (incremental)
@@ -757,10 +778,15 @@ async function startCouncilMission(userId, totemId, missionType) {
     'stats.happiness': newHappiness,
   });
 
-  // 9. Create mission record
+  // 9. Create mission record. Emissary: durationMultiplier ×0.80 on sanctum:mission.
+  const missionBonuses = resolveTraitBonuses(totem, {
+    system: 'sanctum',
+    sub: 'mission',
+  });
   const now = Date.now();
   const nowISO = new Date(now).toISOString();
-  const endsAt = now + mission.duration * 1000;
+  const effectiveDurationSec = Math.round(mission.duration * missionBonuses.durationMultiplier);
+  const endsAt = now + effectiveDurationSec * 1000;
   const endsAtISO = new Date(endsAt).toISOString();
   const seatIndex = totem.sanctum.seatIndex;
 
@@ -847,19 +873,28 @@ async function claimCouncilMission(userId, totemId) {
     };
   }
 
-  // 3. Award XP to totem (via chokepoint so prestige check fires)
+  // 3. Award XP to totem (via chokepoint so prestige check fires).
+  // Mentor aura on a totem buffs its own mission XP via the `aura` scope.
   const totem = await getTotem(userId, totemId);
   let prestigeAchievements = [];
+  const claimBonuses = totem
+    ? resolveTraitBonuses(totem, { system: 'sanctum', sub: 'mission' })
+    : null;
   if (totem) {
-    const xpResult = await addTotemXp(userId, totem, mission.rewards.xp || 0);
+    const baseXp = mission.rewards.xp || 0;
+    const xp = Math.round(baseXp * (claimBonuses?.xpMultiplier ?? 1));
+    const xpResult = await addTotemXp(userId, totem, xp);
     if (xpResult.achievements?.length) prestigeAchievements = xpResult.achievements;
   }
 
-  // 4. Roll for rune drops based on mission tier chances
+  // 4. Roll for rune drops based on mission tier chances.
+  // Sage: runeChanceBonus +0.15 on sanctum:mission. Bonus is additive to the base
+  // percentage chance (e.g., 60% → 75%).
   const runesEarned = { lesser: 0, greater: 0, ancient: 0 };
   if (mission.rewards.runes) {
+    const runeBonusPct = (claimBonuses?.runeChanceBonus ?? 0) * 100;
     for (const [runeType, chance] of Object.entries(mission.rewards.runes)) {
-      if (Math.random() * 100 < chance) {
+      if (Math.random() * 100 < chance + runeBonusPct) {
         runesEarned[runeType] = 1;
       }
     }

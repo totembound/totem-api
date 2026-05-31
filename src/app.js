@@ -975,7 +975,7 @@ app.post('/v1/rewards/daily/protection', authenticateJWT, async (req, res) => {
       }
       else {
         const statusCode = result.error?.code === 'INSUFFICIENT_ESSENCE' ? 402 :
-          result.error?.code === 'ALREADY_PROTECTED' ? 409 :
+          result.error?.code === 'CHARGES_FULL' || result.error?.code === 'EXCEEDS_CAP' ? 409 :
             result.error?.code === 'INSUFFICIENT_STREAK' ? 403 : 400;
         res.status(statusCode).json(result);
       }
@@ -998,7 +998,7 @@ app.post('/v1/rewards/weekly/protection', authenticateJWT, async (req, res) => {
       }
       else {
         const statusCode = result.error?.code === 'INSUFFICIENT_ESSENCE' ? 402 :
-          result.error?.code === 'ALREADY_PROTECTED' ? 409 :
+          result.error?.code === 'CHARGES_FULL' || result.error?.code === 'EXCEEDS_CAP' ? 409 :
             result.error?.code === 'INSUFFICIENT_STREAK' ? 403 : 400;
         res.status(statusCode).json(result);
       }
@@ -1138,21 +1138,6 @@ app.get('/v1/shop/listings', authenticateJWT, async (req, res) => {
   }
 });
 
-app.get('/v1/shop/my-listings', authenticateJWT, async (req, res) => {
-  try {
-    if (shopRoutes?.getMyListings) {
-      const result = await shopRoutes.getMyListings(req.user, req.query);
-      res.json(result);
-    }
-    else {
-      res.json({ success: true, data: { listings: [], summary: { total: 0, active: 0, sold: 0, cancelled: 0 } } });
-    }
-  }
-  catch (error) {
-    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
-  }
-});
-
 app.post('/v1/shop/list', authenticateJWT, async (req, res) => {
   try {
     if (shopRoutes?.listTotem) {
@@ -1176,21 +1161,6 @@ app.post('/v1/shop/purchase', authenticateJWT, async (req, res) => {
     }
     else {
       res.json({ success: true, data: { message: 'Purchase completed (stub)' } });
-    }
-  }
-  catch (error) {
-    res.status(500).json({ success: false, error: { code: 'INTERNAL_ERROR', message: error.message } });
-  }
-});
-
-app.post('/v1/shop/cancel', authenticateJWT, async (req, res) => {
-  try {
-    if (shopRoutes?.cancel) {
-      const result = await shopRoutes.cancel(req.user, req.body);
-      res.json(result);
-    }
-    else {
-      res.json({ success: true, data: { message: 'Cancel listing (stub)' } });
     }
   }
   catch (error) {
@@ -1520,10 +1490,12 @@ app.post('/v1/shop/exchange', authenticateJWT, async (req, res) => {
 // ============================================
 const adminUsers = require('./functions/admin/users');
 const adminStats = require('./functions/admin/stats');
+const adminStatsTrends = require('./functions/admin/stats-trends');
 const adminTransactions = require('./functions/admin/transactions');
 const adminMessaging = require('./functions/admin/messaging');
 
 app.get('/v1/admin/stats', authenticateJWT, requireRole('admin'), adminStats.get);
+app.get('/v1/admin/stats/trends', authenticateJWT, requireRole('admin'), adminStatsTrends.get);
 app.get('/v1/admin/users', authenticateJWT, requireRole('admin'), adminUsers.list);
 app.get('/v1/admin/users/:id', authenticateJWT, requireRole('admin'), adminUsers.getDetail);
 app.put('/v1/admin/users/:id/currencies', authenticateJWT, requireRole('admin'), adminUsers.adjustCurrencies);
@@ -1534,6 +1506,7 @@ app.post('/v1/admin/broadcast/app-reload',   authenticateJWT, requireRole('admin
 app.post('/v1/admin/broadcast/force-logout', authenticateJWT, requireRole('admin'), adminMessaging.broadcastForceLogout);
 app.post('/v1/admin/users/:id/notification', authenticateJWT, requireRole('admin'), adminMessaging.userNotification);
 app.post('/v1/admin/users/:id/force-logout', authenticateJWT, requireRole('admin'), adminMessaging.userForceLogout);
+app.post('/v1/admin/users/:id/app-reload', authenticateJWT, requireRole('admin'), adminMessaging.userAppReload);
 
 // ============================================
 // Finalize - adds error/404 handlers (must be called last)

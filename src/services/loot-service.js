@@ -3,6 +3,12 @@
  *
  * Handles granting, listing, and claiming loot box items.
  * Uses the RewardState table with LOOT# SK prefix.
+ *
+ * Trait effects (Phase 2): loot boxes are *granted* deterministically (achievements,
+ * purchases), never rolled per-action — so Lucky (`lootChanceBonus`) and Wanderer Lord
+ * (`lootBoxChanceBonus`) have no attach point here today and stay dormant. Expedition
+ * runes already pick up trait bonuses via `resolveTraitBonuses` over the team in
+ * `expeditions-service.claimExpeditionReward` (see Relic Bearer / Treasure Seeker).
  */
 
 const { generateId } = require('../common/id-utils');

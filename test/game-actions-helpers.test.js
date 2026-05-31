@@ -478,6 +478,44 @@ describe('Game Actions Helpers', () => {
       const result = calculateStatChanges('nonexistent', baseTotem);
       expect(result).toEqual({});
     });
+
+    describe('with trait bonuses', () => {
+      it('folds happinessFlat into train happinessChange (Gentle: −10 → −8)', () => {
+        const result = calculateStatChanges('train', baseTotem, { happinessFlat: 2 });
+        expect(result.happinessChange).toBe(-8);
+        expect(result.happiness).toBe(42); // 50 + (−10 + 2)
+      });
+
+      it('folds happinessFlat into feed happinessChange (Hardy: +10 → +12)', () => {
+        const result = calculateStatChanges('feed', baseTotem, { happinessFlat: 2 });
+        expect(result.happinessChange).toBe(12);
+        expect(result.happiness).toBe(62);
+      });
+
+      it('folds happinessFlat into treat happinessChange (Playful: +10 → +12)', () => {
+        const result = calculateStatChanges('treat', baseTotem, { happinessFlat: 2 });
+        expect(result.happinessChange).toBe(12);
+        expect(result.happiness).toBe(62);
+      });
+
+      it('caps happiness at 100 even with positive happinessFlat', () => {
+        const nearMax = { stats: { happiness: 95, hunger: 80 } };
+        const result = calculateStatChanges('treat', nearMax, { happinessFlat: 10 });
+        expect(result.happiness).toBe(100);
+      });
+
+      it('still clamps hunger at 100 even with Diligent Forager bonus', () => {
+        const result = calculateStatChanges('feed', baseTotem, {
+          hungerRestoreBonusPct: 0.10,
+        });
+        expect(result.hunger).toBe(100);
+      });
+
+      it('treats null bonuses as identity (no-op)', () => {
+        const result = calculateStatChanges('train', baseTotem, null);
+        expect(result.happinessChange).toBe(-10);
+      });
+    });
   });
 
   // =============================================================================

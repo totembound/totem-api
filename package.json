@@ -65,6 +65,7 @@
         "uuid": "^9.0.0"
     },
     "devDependencies": {
+        "node-cron": "^4.2.1",
         "@aws-sdk/client-api-gateway": "^3.995.0",
         "@aws-sdk/client-cloudformation": "^3.995.0",
         "@aws-sdk/client-lambda": "^3.995.0",

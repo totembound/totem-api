@@ -1,7 +1,7 @@
 /**
  * Shop Handler Tests
  *
- * Tests for shop listing, purchase, cancel, marketplace, my-listings,
+ * Tests for shop listing, purchase, marketplace,
  * exchange-gems, and shop config handlers.
  */
 
@@ -23,12 +23,9 @@ jest.mock('../src/common/db-client', () => ({
 // Mock shop-service
 jest.mock('../src/services/shop-service', () => ({
   listTotemForSale: jest.fn(),
-  cancelListing: jest.fn(),
   getListing: jest.fn(),
   purchaseUnboundTotem: jest.fn(),
   getUnboundListings: jest.fn(),
-  getUserListings: jest.fn(),
-  countUserListings: jest.fn(),
   calculateSellPrice: jest.fn((stage, rarityId) => 300 + (stage * 30) + (rarityId * 20)),
 }));
 
@@ -36,10 +33,8 @@ const dbClient = require('../src/common/db-client');
 const shopService = require('../src/services/shop-service');
 
 const { listTotem } = require('../src/functions/shop/list-totem');
-const { cancel } = require('../src/functions/shop/cancel');
 const { purchase } = require('../src/functions/shop/purchase');
 const { getListings } = require('../src/functions/shop/listings');
-const { getMyListings } = require('../src/functions/shop/my-listings');
 
 // =============================================================================
 // TEST DATA
@@ -114,74 +109,6 @@ describe('Shop Handlers', () => {
       const result = await listTotem(testUser, { totemId: 'ttm_abc' });
       expect(result.success).toBe(false);
       expect(result.error.code).toBe('LISTING_FAILED');
-    });
-  });
-
-  // ===========================================================================
-  // CANCEL LISTING
-  // ===========================================================================
-
-  describe('cancel', () => {
-    beforeEach(() => {
-      shopService.getListing.mockResolvedValue({
-        success: true,
-        listing: makeListing(),
-      });
-      shopService.cancelListing.mockResolvedValue({});
-      dbClient.getTotem.mockResolvedValue({ id: 'ttm_abc', name: 'Wolfie' });
-    });
-
-    it('should cancel a listing successfully', async () => {
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(true);
-      expect(result.data.totemId).toBe('ttm_abc');
-      expect(result.data.note).toContain('non-refundable');
-    });
-
-    it('should require totemId', async () => {
-      const result = await cancel(testUser, {});
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('MISSING_FIELD');
-    });
-
-    it('should reject invalid totemId format', async () => {
-      const result = await cancel(testUser, { totemId: 'bad_id' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('INVALID_ID');
-    });
-
-    it('should return NOT_LISTED when listing not found', async () => {
-      shopService.getListing.mockResolvedValue({ success: false });
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('NOT_LISTED');
-    });
-
-    it('should return UNAUTHORIZED when not the seller', async () => {
-      shopService.getListing.mockResolvedValue({
-        success: true,
-        listing: makeListing({ originalOwnerId: 'usr_other' }),
-      });
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('UNAUTHORIZED');
-    });
-
-    it('should return INVALID_STATUS when listing is sold', async () => {
-      shopService.getListing.mockResolvedValue({
-        success: true,
-        listing: makeListing({ status: 'sold' }),
-      });
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('INVALID_STATUS');
-    });
-
-    it('should handle cancel service error', async () => {
-      shopService.cancelListing.mockRejectedValue(new Error('fail'));
-      const result = await cancel(testUser, { totemId: 'ttm_abc' });
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('CANCEL_FAILED');
     });
   });
 
@@ -357,80 +284,6 @@ describe('Shop Handlers', () => {
     it('should handle service error', async () => {
       shopService.getUnboundListings.mockResolvedValue({ success: false, error: 'DB error' });
       const result = await getListings(testUser, {});
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('FETCH_FAILED');
-    });
-  });
-
-  // ===========================================================================
-  // GET MY LISTINGS
-  // ===========================================================================
-
-  describe('getMyListings', () => {
-    beforeEach(() => {
-      shopService.getUserListings.mockResolvedValue({
-        listings: [makeListing()],
-        hasMore: false,
-        nextCursor: null,
-      });
-      shopService.countUserListings.mockResolvedValue(1);
-    });
-
-    it('should return user listings with default params', async () => {
-      const result = await getMyListings(testUser, {});
-      expect(result.success).toBe(true);
-      expect(result.data.listings).toHaveLength(1);
-      expect(result.data.summary).toBeDefined();
-    });
-
-    it('should filter by status', async () => {
-      await getMyListings(testUser, { status: 'sold' });
-      expect(shopService.getUserListings).toHaveBeenCalledWith(
-        testUser.userId,
-        expect.objectContaining({ status: 'sold' })
-      );
-    });
-
-    it('should pass null status for "all"', async () => {
-      await getMyListings(testUser, { status: 'all' });
-      expect(shopService.getUserListings).toHaveBeenCalledWith(
-        testUser.userId,
-        expect.objectContaining({ status: null })
-      );
-    });
-
-    it('should default invalid status to active', async () => {
-      await getMyListings(testUser, { status: 'bogus' });
-      expect(shopService.getUserListings).toHaveBeenCalledWith(
-        testUser.userId,
-        expect.objectContaining({ status: 'active' })
-      );
-    });
-
-    it('should cap limit at MAX_LIMIT (100)', async () => {
-      await getMyListings(testUser, { limit: '999' });
-      expect(shopService.getUserListings).toHaveBeenCalledWith(
-        testUser.userId,
-        expect.objectContaining({ limit: 100 })
-      );
-    });
-
-    it('should include sale info for sold listings', async () => {
-      shopService.getUserListings.mockResolvedValue({
-        listings: [makeListing({
-          status: 'sold',
-          sale: { buyerId: 'usr_buyer', price: 350, fee: 100, completedAt: '2024-01-02T00:00:00.000Z' },
-        })],
-        hasMore: false,
-      });
-      const result = await getMyListings(testUser, { status: 'sold' });
-      expect(result.data.listings[0].sale).toBeDefined();
-      expect(result.data.listings[0].sale.buyerId).toBe('usr_buyer');
-    });
-
-    it('should handle service error', async () => {
-      shopService.getUserListings.mockRejectedValue(new Error('fail'));
-      const result = await getMyListings(testUser, {});
       expect(result.success).toBe(false);
       expect(result.error.code).toBe('FETCH_FAILED');
     });

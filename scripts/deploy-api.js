@@ -205,22 +205,38 @@ async function deployStack() {
 async function updateLambdaCode() {
   console.log(chalk.bold(`\n🔄 Updating Lambda function code...\n`));
 
-  const lambdaName = `${config.prefix}-api`;
-  console.log(chalk.cyan(`  Updating ${lambdaName}...`));
+  const S3Key = `totem-api/${FUNCTION_NAME}-${VERSION}.zip`;
 
-  try {
-    await lambdaClient.send(new UpdateFunctionCodeCommand({
-      FunctionName: lambdaName,
-      S3Bucket: config.s3Bucket,
-      S3Key: `totem-api/${FUNCTION_NAME}-${VERSION}.zip`
-    }));
-    console.log(chalk.green(`  ✓ Updated ${lambdaName}`));
-    return true;
+  // The API Lambda and the stats-snapshot Lambda share the SAME artifact (only
+  // their Handler differs), so both are updated from the same zip. The snapshot
+  // function is created by the CloudFormation stack; update it best-effort so a
+  // first-ever deploy (before the stack created it) doesn't fail the run.
+  const targets = [
+    { name: `${config.prefix}-api`, required: true },
+    { name: `${config.prefix}-stats-snapshot`, required: false },
+  ];
+
+  let ok = true;
+  for (const target of targets) {
+    console.log(chalk.cyan(`  Updating ${target.name}...`));
+    try {
+      await lambdaClient.send(new UpdateFunctionCodeCommand({
+        FunctionName: target.name,
+        S3Bucket: config.s3Bucket,
+        S3Key,
+      }));
+      console.log(chalk.green(`  ✓ Updated ${target.name}`));
+    }
+    catch (error) {
+      if (!target.required && error.name === 'ResourceNotFoundException') {
+        console.log(chalk.yellow(`  · ${target.name} not found yet (created by the stack) — skipping`));
+        continue;
+      }
+      console.error(chalk.red(`  ✗ Failed: ${error.message}`));
+      if (target.required) ok = false;
+    }
   }
-  catch (error) {
-    console.error(chalk.red(`  ✗ Failed: ${error.message}`));
-    return false;
-  }
+  return ok;
 }
 
 /**

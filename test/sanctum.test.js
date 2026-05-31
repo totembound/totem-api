@@ -133,6 +133,44 @@ describe('Sanctum Service', () => {
       // floor(0.5 * 1.0 * 10) = floor(5.0) = 5
       expect(sanctumService.calculateSeatEarnings(seat, now)).toBe(5);
     });
+
+    // Phase 2 trait effects (Shy / Loyal)
+    it('Shy seatEarnRateMultiplier ×1.05 raises earnings', () => {
+      // 100 hours since claim, tenure 100 hrs → 1.2x
+      const now = new Date('2026-03-28T12:00:00Z');
+      const seatedAt = new Date('2026-03-24T08:00:00Z'); // ~100h ago
+      const lastClaimed = new Date('2026-03-24T08:00:00Z');
+      const seat = { seatedAt: seatedAt.toISOString(), lastClaimedAt: lastClaimed.toISOString() };
+      const baseline = sanctumService.calculateSeatEarnings(seat, now);
+      const boosted = sanctumService.calculateSeatEarnings(seat, now, {
+        seatEarnRateMultiplier: 1.05,
+        tenureBonusMultiplier: 1,
+      });
+      expect(boosted).toBeGreaterThan(baseline);
+    });
+
+    it('Loyal tenureBonusMultiplier ×1.05 raises earnings', () => {
+      const now = new Date('2026-03-28T12:00:00Z');
+      const seatedAt = new Date('2026-03-24T08:00:00Z'); // ~100h ago
+      const lastClaimed = new Date('2026-03-24T08:00:00Z');
+      const seat = { seatedAt: seatedAt.toISOString(), lastClaimedAt: lastClaimed.toISOString() };
+      const baseline = sanctumService.calculateSeatEarnings(seat, now);
+      const boosted = sanctumService.calculateSeatEarnings(seat, now, {
+        seatEarnRateMultiplier: 1,
+        tenureBonusMultiplier: 1.05,
+      });
+      expect(boosted).toBeGreaterThan(baseline);
+    });
+
+    it('null/undefined bonuses → behaves like baseline (identity)', () => {
+      const now = new Date('2026-03-28T12:00:00Z');
+      const seatedAt = new Date('2026-03-24T08:00:00Z');
+      const lastClaimed = new Date('2026-03-24T08:00:00Z');
+      const seat = { seatedAt: seatedAt.toISOString(), lastClaimedAt: lastClaimed.toISOString() };
+      expect(sanctumService.calculateSeatEarnings(seat, now, null)).toBe(
+        sanctumService.calculateSeatEarnings(seat, now),
+      );
+    });
   });
 
   // ===========================================================================
@@ -408,6 +446,39 @@ describe('Sanctum Service', () => {
       expect(transactItems).toHaveLength(2); // 1 user update + 1 seat update
       expect(transactItems[0].Update.TableName).toBe('TotemBound-Users');
       expect(transactItems[1].Update.TableName).toBe('TotemBound-ExpeditionState');
+    });
+
+    it('should log the Essence credit to the ledger (chain reconciliation)', async () => {
+      // Regression: claimSanctum used to credit Essence via transactWrite without
+      // calling logTransaction, leaving a hole in the per-user ledger chain.
+      const seatedAt = new Date('2026-03-20T00:00:00Z');
+      const lastClaimed = new Date('2026-03-27T00:00:00Z');
+
+      dbClient.queryItems.mockResolvedValue([{
+        seatIndex: 0,
+        totemId: testTotemId,
+        totemName: 'Foxy',
+        seatedAt: seatedAt.toISOString(),
+        lastClaimedAt: lastClaimed.toISOString(),
+      }]);
+      dbClient.transactWrite.mockResolvedValue({});
+      // Post-credit balance returned by getUser; the log row's balanceBefore
+      // should equal balanceAfter - amount so chain queries stitch through.
+      dbClient.getUser.mockResolvedValue({ currencies: { essence: 500 } });
+
+      const result = await sanctumService.claimSanctum(testUserId);
+      expect(result.success).toBe(true);
+      const totalClaimed = result.data.totalClaimed;
+
+      expect(dbClient.logTransaction).toHaveBeenCalledWith(testUserId, expect.objectContaining({
+        type: 'reward_sanctum',
+        currency: 'essence',
+        amount: totalClaimed,
+        balanceBefore: 500 - totalClaimed,
+        balanceAfter: 500,
+        refType: 'sanctum',
+        refName: expect.stringContaining('Sanctum Claim'),
+      }));
     });
 
     it('should update all lastClaimedAt for multiple seats', async () => {

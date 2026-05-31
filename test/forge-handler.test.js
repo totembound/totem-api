@@ -361,13 +361,20 @@ describe('forgeTotem - successful fusion', () => {
   });
 
   test('logs enriched transaction after successful forge', async () => {
+    // Default getUser mock returns essence: 1500 — the log row should carry
+    // that real balance so chain-validation queries stitch through (forge is
+    // essence-neutral so amount stays 0 and balanceBefore === balanceAfter).
     await forgeTotem(testUser, { totemIds: ['ttm_a', 'ttm_b', 'ttm_c'] });
 
-    // Step 1: logTransaction called with core fields
+    // Step 1: logTransaction called with core fields + chain-friendly balance
     expect(dbClient.logTransaction).toHaveBeenCalledWith(
       testUser.userId,
       expect.objectContaining({
         type: 'totem_forge',
+        currency: 'essence',
+        amount: 0,
+        balanceBefore: 1500,
+        balanceAfter: 1500,
         ref: 'ttm_forged',
         refType: 'forge',
         quantity: 3,

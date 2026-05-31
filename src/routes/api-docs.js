@@ -1682,25 +1682,24 @@
  * /v1/rewards/daily/protection:
  *   post:
  *     tags: [Rewards]
- *     summary: Buy daily streak protection
- *     description: "Purchase protection to prevent losing daily streak if you miss a day. Tier 0: 50 Essence, 1-day protection, requires 7-day streak. Tier 1: 250 Essence, 7-day protection, requires 14-day streak."
+ *     summary: Buy daily streak-saver charges
+ *     description: "Buy consumable streak-saver charges that top up toward a cap of 7. Charges are spent only when you miss a day. Pricing: 50 Essence per charge, or 250 for a full 7-pack (bulk discount). Requires a 7-day streak. Omit `quantity` to fill to the cap."
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               tier:
+ *               quantity:
  *                 type: number
- *                 enum: [0, 1]
- *                 default: 0
- *                 description: "Protection tier (0 = 1 day/50 Essence, 1 = 7 days/250 Essence)"
+ *                 minimum: 1
+ *                 description: "Charges to add (1..headroom). Omit to fill to the cap (7)."
  *     responses:
  *       200:
- *         description: Protection purchased
+ *         description: Charges purchased
  *         content:
  *           application/json:
  *             schema:
@@ -1711,17 +1710,17 @@
  *                   type: object
  *                   properties:
  *                     rewardType: { type: string, example: daily }
- *                     tier: { type: number }
+ *                     chargesAdded: { type: number }
  *                     cost: { type: number }
- *                     durationSeconds: { type: number }
- *                     protectionExpiry: { type: string }
+ *                     protectionCharges: { type: number, description: "New total banked charges" }
+ *                     maxCharges: { type: number, example: 7 }
  *                     newBalance: { type: number }
  *       402:
  *         description: Insufficient Essence
  *       403:
- *         description: Streak too low for selected tier
+ *         description: Streak too low
  *       409:
- *         description: Already has active protection
+ *         description: At cap (CHARGES_FULL) or requested quantity exceeds headroom (EXCEEDS_CAP)
  */
 
 /**
@@ -1729,30 +1728,30 @@
  * /v1/rewards/weekly/protection:
  *   post:
  *     tags: [Rewards]
- *     summary: Buy weekly streak protection
- *     description: "Purchase protection for weekly streak. Tier 0 only: 500 Essence, 14-day protection, requires 4-week streak."
+ *     summary: Buy weekly streak-saver charges
+ *     description: "Buy consumable streak-saver charges that top up toward a cap of 2. Charges are spent only when you miss a week. 250 Essence per charge. Requires a 4-week streak. Omit `quantity` to fill to the cap."
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: true
+ *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               tier:
+ *               quantity:
  *                 type: number
- *                 enum: [0]
- *                 default: 0
+ *                 minimum: 1
+ *                 description: "Charges to add (1..headroom). Omit to fill to the cap (2)."
  *     responses:
  *       200:
- *         description: Protection purchased
+ *         description: Charges purchased
  *       402:
  *         description: Insufficient Essence
  *       403:
  *         description: Streak too low
  *       409:
- *         description: Already has active protection
+ *         description: At cap (CHARGES_FULL) or requested quantity exceeds headroom (EXCEEDS_CAP)
  */
 
 /**
@@ -1937,37 +1936,6 @@
 
 /**
  * @swagger
- * /v1/shop/my-listings:
- *   get:
- *     tags: [Shop]
- *     summary: Get my marketplace listings
- *     description: Returns all listings created by the authenticated user with summary stats
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User's listings
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data:
- *                   type: object
- *                   properties:
- *                     listings: { type: array, items: { type: object } }
- *                     summary:
- *                       type: object
- *                       properties:
- *                         total: { type: number }
- *                         active: { type: number }
- *                         sold: { type: number }
- *                         cancelled: { type: number }
- */
-
-/**
- * @swagger
  * /v1/shop/list:
  *   post:
  *     tags: [Shop]
@@ -2017,32 +1985,6 @@
  *         description: Purchase successful
  *       400:
  *         description: Insufficient Essence or listing not found
- */
-
-/**
- * @swagger
- * /v1/shop/cancel:
- *   post:
- *     tags: [Shop]
- *     summary: Cancel a marketplace listing
- *     description: Cancel your active listing and get the totem back
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [listingId]
- *             properties:
- *               listingId:
- *                 type: string
- *     responses:
- *       200:
- *         description: Listing cancelled, totem returned
- *       400:
- *         description: Listing not found or not owned by user
  */
 
 // ============================================
@@ -3091,6 +3033,59 @@
  *                         thisWeek: { type: object, properties: { count: { type: integer } } }
  *                         byType: { type: object }
  *                     generatedAt: { type: string, format: date-time }
+ *                     source: { type: string, enum: [snapshot, live], description: "Whether the data came from the latest precomputed snapshot or a live compute." }
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/stats/trends:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Stats time series for trend charts (admin only)
+ *     description: |
+ *       Time-bucketed snapshots from AdminStatsHistory for charting. Requires admin role.
+ *       Reads are a bounded query over the requested window — cheap and predictable.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: granularity
+ *         schema: { type: string, enum: [hourly, daily, weekly], default: daily }
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date-time }
+ *         description: ISO lower bound. Defaults to a granularity-dependent window (24h / 30d / 12w).
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date-time }
+ *         description: ISO upper bound. Defaults to now.
+ *       - in: query
+ *         name: metrics
+ *         schema: { type: string }
+ *         description: "Comma-separated dot paths (e.g. users.activeToday,transactions.essenceVolume). Omit to return the full snapshot maps."
+ *     responses:
+ *       200:
+ *         description: Time series
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     granularity: { type: string, example: DAILY }
+ *                     from: { type: string, format: date-time }
+ *                     to: { type: string, format: date-time }
+ *                     count: { type: integer, example: 30 }
+ *                     points:
+ *                       type: array
+ *                       items: { type: object, properties: { ts: { type: string, format: date-time } } }
+ *       400:
+ *         description: Invalid granularity
  *       403:
  *         description: Insufficient permissions
  */
@@ -3101,17 +3096,13 @@
  *   get:
  *     tags: [Admin]
  *     summary: List all users (admin only)
- *     description: Paginated user list with search. Requires admin role.
+ *     description: |
+ *       Cursor-paginated user list with optional search. Requires admin role.
+ *       Pass the `nextCursor` returned in `pagination` as the `cursor` query
+ *       param to fetch the next page. `hasMore` is true iff `nextCursor` is set.
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *           minimum: 1
- *         description: Page number (1-based)
  *       - in: query
  *         name: limit
  *         schema:
@@ -3119,7 +3110,12 @@
  *           default: 25
  *           minimum: 1
  *           maximum: 100
- *         description: Items per page
+ *         description: Page size
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *         description: Opaque cursor token from the previous response's `nextCursor`. Omit on the first page.
  *       - in: query
  *         name: search
  *         schema:
@@ -3127,7 +3123,7 @@
  *         description: Filter by email or display name (contains match)
  *     responses:
  *       200:
- *         description: Paginated user list
+ *         description: One page of users
  *         content:
  *           application/json:
  *             schema:
@@ -3155,10 +3151,10 @@
  *                 pagination:
  *                   type: object
  *                   properties:
- *                     page: { type: integer, example: 1 }
  *                     limit: { type: integer, example: 25 }
- *                     total: { type: integer, example: 150 }
- *                     totalPages: { type: integer, example: 6 }
+ *                     count: { type: integer, example: 25, description: "Items in this page" }
+ *                     nextCursor: { type: string, nullable: true, description: "Opaque token for the next page, or null when done" }
+ *                     hasMore: { type: boolean, example: true }
  *       403:
  *         description: Insufficient permissions (not admin)
  */
@@ -3364,48 +3360,45 @@
  *   get:
  *     tags: [Admin]
  *     summary: List transactions (admin only)
- *     description: Paginated transaction log with optional filters by user, type, and date range.
+ *     description: |
+ *       Cursor-paginated transaction log. Either `userId` or `type` is REQUIRED —
+ *       unbounded cross-slice queries are rejected (400 INVALID_QUERY) to keep
+ *       RCU cost predictable as the ledger grows. Pass the response's
+ *       `nextCursor` back in `cursor` to fetch the next page.
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: Page number (1-based)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 25
- *           maximum: 100
- *         description: Items per page
- *       - in: query
  *         name: userId
- *         schema:
- *           type: string
- *         description: Filter by user ID
+ *         schema: { type: string }
+ *         description: Filter by user ID (uses user-ts-index GSI). Required unless `type` is set.
  *       - in: query
  *         name: type
- *         schema:
- *           type: string
- *         description: "Filter by transaction type (e.g. admin_grant, action_feed, reward_signup)"
+ *         schema: { type: string }
+ *         description: "Filter by transaction type (uses type-ts-index GSI). Required unless `userId` is set. Examples: admin_grant, reward_daily, shop_sale, protection_purchase."
+ *       - in: query
+ *         name: currency
+ *         schema: { type: string, enum: [essence, gems, xp] }
+ *         description: Optional currency filter (FilterExpression after the GSI lookup). XP rows come from achievement and council-mission claims.
  *       - in: query
  *         name: startTime
- *         schema:
- *           type: string
- *           format: date-time
- *         description: Start of date range (inclusive)
+ *         schema: { type: string, format: date-time }
+ *         description: Inclusive lower bound on `ts`
  *       - in: query
  *         name: endTime
- *         schema:
- *           type: string
- *           format: date-time
- *         description: End of date range (inclusive)
+ *         schema: { type: string, format: date-time }
+ *         description: Inclusive upper bound on `ts`
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 25, maximum: 100 }
+ *         description: Page size
+ *       - in: query
+ *         name: cursor
+ *         schema: { type: string }
+ *         description: Opaque token from a prior response's `nextCursor`. Omit on the first page.
  *     responses:
  *       200:
- *         description: Paginated transaction list
+ *         description: One page of transactions
  *         content:
  *           application/json:
  *             schema:
@@ -3423,20 +3416,23 @@
  *                           id: { type: string }
  *                           userId: { type: string }
  *                           type: { type: string }
- *                           currency: { type: string }
+ *                           currency: { type: string, enum: [essence, gems, xp] }
  *                           amount: { type: number }
  *                           balanceBefore: { type: number }
  *                           balanceAfter: { type: number }
  *                           refType: { type: string, nullable: true }
+ *                           refId: { type: string, nullable: true }
  *                           refName: { type: string, nullable: true }
  *                           ts: { type: string, format: date-time }
  *                 pagination:
  *                   type: object
  *                   properties:
- *                     page: { type: integer }
  *                     limit: { type: integer }
- *                     total: { type: integer }
- *                     totalPages: { type: integer }
+ *                     count: { type: integer, description: "Items in this page" }
+ *                     nextCursor: { type: string, nullable: true }
+ *                     hasMore: { type: boolean }
+ *       400:
+ *         description: Neither userId nor type given (INVALID_QUERY), or unknown currency (INVALID_CURRENCY)
  *       403:
  *         description: Insufficient permissions
  */
@@ -3656,6 +3652,55 @@
  *                     delivered: { type: boolean }
  *                     topic:     { type: string, example: "user:usr_abc" }
  *                     type:      { type: string, example: force_logout }
+ *                     reason:    { type: string }
+ *                     undeliveredReason: { type: string, example: user_not_registered }
+ *       400:
+ *         description: Invalid reason
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/app-reload:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Force a single user's clients to reload (admin only)
+ *     description: Publishes an `app_reload` command to the target user's IoT topic so their open tabs hard-reload the app.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Target user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Shipping a client hotfix" }
+ *     responses:
+ *       200:
+ *         description: App reload published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: "user:usr_abc" }
+ *                     type:      { type: string, example: app_reload }
  *                     reason:    { type: string }
  *                     undeliveredReason: { type: string, example: user_not_registered }
  *       400:

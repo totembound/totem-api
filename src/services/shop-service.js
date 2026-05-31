@@ -428,103 +428,6 @@ async function purchaseUnboundTotem(buyerId, totemId) {
 }
 
 /**
- * Cancel an active listing
- *
- * Note: Listing fee is NOT refunded (as per contract rules)
- *
- * @param {string} userId - User cancelling the listing
- * @param {string} totemId - Totem listing to cancel
- * @returns {Promise<{ success: boolean, error?: string }>}
- */
-async function cancelListing(userId, totemId) {
-  try {
-    // Get the listing
-    const listing = await getItem(SHOP_TABLE, {
-      pk: shopUnboundPK(),
-      sk: shopTotemSK(totemId),
-    });
-
-    if (!listing) {
-      return { success: false, error: 'Listing not found' };
-    }
-
-    if (listing.status !== 'active') {
-      return { success: false, error: 'Listing is no longer active' };
-    }
-
-    // Verify ownership
-    if (listing.originalOwnerId !== userId) {
-      return { success: false, error: 'Not authorized to cancel this listing' };
-    }
-
-    const now = new Date().toISOString();
-
-    // Recreate totem for owner (restore to inventory)
-    const totemRecord = {
-      pk: userPK(userId),
-      sk: totemSK(totemId),
-      id: totemId,
-      userId,
-      speciesId: listing.totemData.speciesId,
-      colorId: listing.totemData.colorId,
-      rarityId: listing.totemData.rarityId,
-      name: listing.totemData.name,
-      stage: listing.totemData.stage,
-      experience: listing.totemData.experience,
-      prestigeLevel: listing.totemData.prestigeLevel,
-      stats: { ...listing.totemData.stats },
-      cooldowns: { feed: null, train: null, treat: null },
-      // Preserve traits across unlist (or backfill if pre-traits listing).
-      traits: listing.totemData.traits
-        ? { ...listing.totemData.traits }
-        : buildInitialTraits(),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    // Execute transaction
-    await transactWrite([
-      {
-        // Restore totem to user's inventory
-        Put: {
-          TableName: TABLES.TOTEMS,
-          Item: totemRecord,
-        },
-      },
-      {
-        // Mark listing as cancelled (with TTL for cleanup)
-        Update: {
-          TableName: SHOP_TABLE,
-          Key: { pk: shopUnboundPK(), sk: shopTotemSK(totemId) },
-          UpdateExpression: 'SET #status = :status, #cancelledAt = :now, #updatedAt = :now, #ttl = :ttl',
-          ExpressionAttributeNames: {
-            '#status': 'status',
-            '#cancelledAt': 'cancelledAt',
-            '#updatedAt': 'updatedAt',
-            '#ttl': 'ttl',
-          },
-          ExpressionAttributeValues: {
-            ':status': 'cancelled',
-            ':now': now,
-            ':ttl': Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60, // 7 days
-          },
-        },
-      },
-    ]);
-
-    return {
-      success: true,
-      totem: totemRecord,
-      message: 'Listing cancelled. Note: Listing fee is not refunded.',
-    };
-  }
-  catch (error) {
-    console.error('[Shop] Error cancelling listing:', error);
-    return { success: false, error: error.message || 'Failed to cancel listing' };
-  }
-}
-
-/**
  * Get all active unbound listings
  *
  * @param {object} filters - Filter options
@@ -662,43 +565,6 @@ async function getUnboundListings(filters = {}) {
 }
 
 /**
- * Get user's active listings
- *
- * @param {string} userId - User ID
- * @returns {Promise<{ success: boolean, listings?: array }>}
- */
-async function getMyListings(userId) {
-  try {
-    const command = new QueryCommand({
-      TableName: SHOP_TABLE,
-      IndexName: 'seller-index',
-      KeyConditionExpression: '#originalOwnerId = :userId',
-      FilterExpression: '#status = :active',
-      ExpressionAttributeNames: {
-        '#originalOwnerId': 'originalOwnerId',
-        '#status': 'status',
-      },
-      ExpressionAttributeValues: {
-        ':userId': userId,
-        ':active': 'active',
-      },
-      ScanIndexForward: false, // Most recent first
-    });
-
-    const response = await docClient.send(command);
-
-    return {
-      success: true,
-      listings: response.Items || [],
-    };
-  }
-  catch (error) {
-    console.error('[Shop] Error getting user listings:', error);
-    return { success: false, error: error.message || 'Failed to get listings' };
-  }
-}
-
-/**
  * Get a specific listing by totem ID
  *
  * @param {string} totemId - Totem ID
@@ -776,11 +642,9 @@ module.exports = {
   // Core operations
   listTotemForSale,
   purchaseUnboundTotem,
-  cancelListing,
 
   // Query operations
   getUnboundListings,
-  getMyListings,
   getListing,
   getShopStats,
 };

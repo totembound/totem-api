@@ -285,26 +285,40 @@ function checkEvolutionRequirements(totem) {
 // ============================================
 
 /**
- * Calculate stat changes from an action
- * Uses FIXED values from ACTION_CONFIGS - NO random values
+ * Calculate stat changes from an action.
+ *
+ * Uses FIXED values from ACTION_CONFIGS - NO random values. Optional `bonuses`
+ * (from the trait-effect resolver) nudges:
+ *  - `happinessFlat`           adds to the action's happinessChange
+ *                              (Gentle: train −10 → −8, Hardy: feed +10 → +12,
+ *                               Playful: treat +10 → +12)
+ *  - `hungerRestoreBonusPct`   adds to the fraction of hunger restored by feed.
+ *                              Clamped at 100 — visible once partial-restore
+ *                              feeds exist (Hunger system, Q3 2026).
  */
-function calculateStatChanges(actionType, totem) {
+function calculateStatChanges(actionType, totem, bonuses = null) {
   const config = ACTION_CONFIGS[actionType];
   const result = {};
 
   if (!config) return result;
 
-  // Fixed happiness change from contract
-  const happinessChange = config.happinessChange;
+  // Fixed happiness change from contract + trait happinessFlat overlay
+  const happinessFlat = bonuses?.happinessFlat || 0;
+  const happinessChange = config.happinessChange + happinessFlat;
   const currentHappiness = totem.stats?.happiness || 50;
   const newHappiness = Math.max(0, Math.min(100, currentHappiness + happinessChange));
 
   result.happiness = newHappiness;
   result.happinessChange = happinessChange;
 
-  // Feed also resets hunger
+  // Feed restores hunger (today: always to 100; once partial-restore lands the
+  // Diligent Forager bonus widens the recovered amount).
   if (actionType === 'feed') {
-    result.hunger = 100;
+    const currentHunger = totem.stats?.hunger ?? 0;
+    const baseRestore = 100 - currentHunger;
+    const bonusPct = bonuses?.hungerRestoreBonusPct || 0;
+    const boostedRestore = baseRestore * (1 + bonusPct);
+    result.hunger = Math.min(100, Math.floor(currentHunger + boostedRestore));
   }
 
   return result;

@@ -64,9 +64,7 @@ const {
   shopTotemSK,
   listTotemForSale,
   purchaseUnboundTotem,
-  cancelListing,
   getUnboundListings,
-  getMyListings,
   getListing,
 } = require('../src/services/shop-service');
 
@@ -390,67 +388,6 @@ describe('Shop Service', () => {
   });
 
   // =============================================================================
-  // CANCEL LISTING TESTS
-  // =============================================================================
-
-  describe('cancelListing', () => {
-    beforeEach(() => {
-      dbClient.getItem.mockResolvedValue(makeMockListing());
-    });
-
-    it('should successfully cancel an active listing', async () => {
-      const result = await cancelListing(testUserId, testTotemId);
-
-      expect(result.success).toBe(true);
-      expect(result.totem).toBeDefined();
-      expect(result.totem.userId).toBe(testUserId);
-      expect(dbClient.transactWrite).toHaveBeenCalled();
-    });
-
-    it('should restore totem to owner inventory', async () => {
-      const result = await cancelListing(testUserId, testTotemId);
-
-      expect(result.totem.pk).toBe(`USER#${testUserId}`);
-      expect(result.totem.sk).toBe(`TOTEM#${testTotemId}`);
-      expect(result.totem.speciesId).toBe(2);
-    });
-
-    it('should fail if listing not found', async () => {
-      dbClient.getItem.mockResolvedValue(null);
-
-      const result = await cancelListing(testUserId, testTotemId);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Listing not found');
-    });
-
-    it('should fail if listing is not active', async () => {
-      dbClient.getItem.mockResolvedValue(makeMockListing({ status: 'sold' }));
-
-      const result = await cancelListing(testUserId, testTotemId);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Listing is no longer active');
-    });
-
-    it('should fail if user is not the original owner', async () => {
-      const result = await cancelListing('usr_other', testTotemId);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Not authorized to cancel this listing');
-    });
-
-    it('should handle transaction errors', async () => {
-      dbClient.transactWrite.mockRejectedValue(new Error('TX failed'));
-
-      const result = await cancelListing(testUserId, testTotemId);
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('TX failed');
-    });
-  });
-
-  // =============================================================================
   // QUERY TESTS
   // =============================================================================
 
@@ -519,34 +456,6 @@ describe('Shop Service', () => {
       dbClient.docClient.send.mockRejectedValue(new Error('Query failed'));
 
       const result = await getUnboundListings();
-
-      expect(result.success).toBe(false);
-    });
-  });
-
-  describe('getMyListings', () => {
-    it('should query by seller index', async () => {
-      dbClient.docClient.send.mockResolvedValue({ Items: [makeMockListing()] });
-
-      const result = await getMyListings(testUserId);
-
-      expect(result.success).toBe(true);
-      expect(result.listings).toHaveLength(1);
-    });
-
-    it('should return empty for user with no listings', async () => {
-      dbClient.docClient.send.mockResolvedValue({ Items: [] });
-
-      const result = await getMyListings(testUserId);
-
-      expect(result.success).toBe(true);
-      expect(result.listings).toHaveLength(0);
-    });
-
-    it('should handle errors', async () => {
-      dbClient.docClient.send.mockRejectedValue(new Error('Query failed'));
-
-      const result = await getMyListings(testUserId);
 
       expect(result.success).toBe(false);
     });

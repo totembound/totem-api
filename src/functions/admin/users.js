@@ -20,27 +20,22 @@ const {
 } = require('../../common/db-client');
 
 /**
- * List users (paginated, searchable)
+ * List users (cursor-paginated, searchable)
  *
  * Query params:
- *   page   - page number, 1-based (default 1)
- *   limit  - items per page (default 25, max 100)
+ *   limit  - page size (default 25, max 100)
+ *   cursor - opaque token returned as `nextCursor` on the previous page
  *   search - filter by email or displayName (contains match)
  */
 async function list(req, res) {
   try {
-    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 25, 1), 100);
+    const cursor = req.query.cursor || null;
     const search = req.query.search || null;
 
-    const allUsers = await listUsers({ search });
+    const { items, nextCursor } = await listUsers({ limit, cursor, search });
 
-    const total = allUsers.length;
-    const totalPages = Math.ceil(total / limit) || 1;
-    const start = (page - 1) * limit;
-    const pageUsers = allUsers.slice(start, start + limit);
-
-    const users = pageUsers.map((u) => ({
+    const users = items.map((u) => ({
       id: u.id,
       email: u.email,
       displayName: u.displayName,
@@ -57,10 +52,10 @@ async function list(req, res) {
       success: true,
       data: { users },
       pagination: {
-        page,
         limit,
-        total,
-        totalPages,
+        count: users.length,
+        nextCursor,
+        hasMore: !!nextCursor,
       },
     });
   }

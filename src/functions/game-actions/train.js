@@ -24,6 +24,7 @@ const {
 const { onGameAction, checkBalancedCare } = require('../../services/achievements-service');
 const { emitQuestProgress } = require('../../services/daily-quests-service');
 const { addTotemXp } = require('../../services/totem-xp');
+const { resolveTraitBonuses } = require('../../config/trait-effects');
 
 /**
  * Train a totem
@@ -95,8 +96,10 @@ async function train(user, totemId) {
     };
   }
 
-  // 5. Deduct Essence cost
-  const cost = config.cost;
+  // 5. Resolve trait bonuses (self-scope) and deduct Essence cost.
+  // Thrifty: ×0.90 cost; Quick Learner: ×1.10 XP; Gentle: +2 to happinessChange.
+  const bonuses = resolveTraitBonuses(totem, { action: actionType });
+  const cost = Math.floor(config.cost * bonuses.essenceCostMultiplier);
   const balanceResult = await deductEssence(userId, cost, { type: 'action_train', ref: totemId, refType: 'totem' });
   if (!balanceResult.success) {
     return {
@@ -110,11 +113,11 @@ async function train(user, totemId) {
     };
   }
 
-  // 6. Calculate XP gain - FIXED value from contract (50 XP)
-  const xpGained = getXpGain(actionType);
+  // 6. Calculate XP gain — base 50 × trait xpMultiplier (Quick Learner).
+  const xpGained = Math.round(getXpGain(actionType) * bonuses.xpMultiplier);
 
-  // 6. Calculate stat changes - FIXED happiness change from contract (-10)
-  const statChanges = calculateStatChanges(actionType, totem);
+  // 6. Calculate stat changes — happinessFlat folds in here.
+  const statChanges = calculateStatChanges(actionType, totem, bonuses);
 
   // 7. Update totem in database (chokepoint applies XP + prestige check atomically)
   const now = new Date().toISOString();

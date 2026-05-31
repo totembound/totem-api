@@ -764,6 +764,179 @@ describe('completeChallenge', () => {
     expect(result.data.progress.highScore).toBe(800);
     expect(result.data.progress.isNewHighScore).toBe(false);
   });
+
+  // ===========================================================================
+  // Trait effects — Phase 2
+  // ===========================================================================
+  describe('with trait bonuses', () => {
+    const baseStats = { strength: 5, agility: 5, wisdom: 5, happiness: 50 };
+    const baseTotem = (overrides = {}) => ({
+      id: 'ttm_456',
+      userId: 'usr_123',
+      speciesId: 0,
+      stage: 0,
+      experience: 0,
+      stats: baseStats,
+      traits: { innate: null, learned: null, awakened: null },
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      mockDbClient.getItem.mockResolvedValue(null);
+      mockDbClient.putItem.mockResolvedValue({});
+      mockDbClient.updateTotem.mockResolvedValue({});
+      mockDbClient.queryItems.mockResolvedValue([]);
+    });
+
+    test('Clever (+5% XP on challenges) bumps a 10-XP win to 11', async () => {
+      // Garden Pest Patrol score=1000 → base 10 XP × 1.05 = 10.5 → round → 11
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({ traits: { innate: 'trt_clever', learned: null, awakened: null } }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', 1000);
+      expect(result.success).toBe(true);
+      expect(result.data.xpEarned).toBe(11);
+    });
+
+    test('Persistent (+20% happiness) raises challenge happiness reward 10 → 12', async () => {
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({ traits: { innate: null, learned: 'trt_persistent', awakened: null } }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', 500);
+      expect(result.success).toBe(true);
+      expect(result.data.happinessEarned).toBe(12);
+      expect(result.data.totem.newHappiness).toBe(62);
+    });
+
+    test("Merchant's Eye (+10% earn:any) raises Essence reward 5 → 6", async () => {
+      // Garden challenge essenceReward=5 × 1.10 = 5.5 → round → 6
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({ traits: { innate: null, learned: 'trt_merchant_eye', awakened: null } }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', 500);
+      expect(result.success).toBe(true);
+      expect(result.data.essenceEarned).toBe(6);
+    });
+
+    test('Mentor aura (+10% XP) folds on the acting totem too (self-scope via aura token)', async () => {
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({ traits: { innate: null, learned: null, awakened: 'trt_mentor' } }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', 1000);
+      expect(result.success).toBe(true);
+      // base 10 × 1.10 = 11
+      expect(result.data.xpEarned).toBe(11);
+    });
+
+    test('no traits → baseline rewards unchanged', async () => {
+      mockDbClient.getTotem.mockResolvedValue(baseTotem());
+      const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', 1000);
+      expect(result.success).toBe(true);
+      expect(result.data.xpEarned).toBe(10);
+      expect(result.data.happinessEarned).toBe(10);
+      expect(result.data.essenceEarned).toBe(5);
+    });
+
+    // successChanceBonus inflates the score server-side so every mini-game gets
+    // the boost without touching its container. XP comes from the boosted score.
+    test('Brave (+5% score → more XP) on a strength challenge: 1190 → +5% → 12 XP (baseline 11)', async () => {
+      // Boulder Breaker: maxScore=2000, maxXP=20. score 1190 baseline floor((1190*20)/2000)=11.
+      // boosted score 1190*1.05 = 1249.5 → 1250 → floor((1250*20)/2000) = 12.
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({
+          stats: { strength: 15, agility: 15, wisdom: 15, happiness: 50 },
+          traits: { innate: 'trt_brave', learned: null, awakened: null },
+        }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_boulder-breaker', 'ttm_456', 1190);
+      expect(result.success).toBe(true);
+      expect(result.data.xpEarned).toBe(12);
+    });
+
+    test('Skilled Fighter score boost is strength-only', async () => {
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({
+          stats: { strength: 15, agility: 15, wisdom: 15, happiness: 50 },
+          traits: { innate: null, learned: 'trt_skilled_fighter', awakened: null },
+        }),
+      );
+      // Wisdom challenge — Skilled Fighter doesn't fire, baseline XP.
+      const wisdom = await completeChallenge('usr_123', 'chl_ancient-runes', 'ttm_456', 1000);
+      expect(wisdom.data.xpEarned).toBe(10);
+      // Strength challenge — score 1000 × 1.10 = 1100 → 11 XP.
+      const strength = await completeChallenge('usr_123', 'chl_boulder-breaker', 'ttm_456', 1000);
+      expect(strength.data.xpEarned).toBe(11);
+    });
+
+    test('score boost caps at maxScore (no overflow XP)', async () => {
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({
+          stats: { strength: 15, agility: 15, wisdom: 15, happiness: 50 },
+          traits: { innate: null, learned: 'trt_skilled_fighter', awakened: null },
+        }),
+      );
+      // Already at maxScore — boost can't lift XP past maxXP.
+      const result = await completeChallenge('usr_123', 'chl_boulder-breaker', 'ttm_456', 2000);
+      expect(result.data.xpEarned).toBe(20);
+    });
+
+    test('Stubborn (+1 strength) gives +1% score on strength challenges', async () => {
+      // Boulder Breaker maxScore=2000, maxXP=20. Score 1190 → +1% → 1202 →
+      // floor((1202*20)/2000) = 12, vs baseline 11.
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({
+          stats: { strength: 15, agility: 15, wisdom: 15, happiness: 50 },
+          traits: { innate: 'trt_stubborn', learned: null, awakened: null },
+        }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_boulder-breaker', 'ttm_456', 1190);
+      expect(result.data.xpEarned).toBe(12);
+    });
+
+    test('Stubborn (+1 strength) lets a 12-strength totem clear a 13-strength gate', async () => {
+      // Boulder Breaker: requirements.strength = 10 (already met by base 12).
+      // Synthesize the gate effect by checking checkRequirements directly is cleaner;
+      // here we use a closer-to-real flow: a totem at exactly the boundary.
+      const { checkRequirements } = require('../src/services/challenges-service');
+      const challenge = {
+        affinity: 'strength',
+        requirements: { stage: 0, strength: 13, agility: 5, wisdom: 5 },
+      };
+      const baseTotem12 = {
+        stage: 2,
+        stats: { strength: 12, agility: 12, wisdom: 12 },
+        traits: { innate: null, learned: null, awakened: null },
+      };
+      const stubborn12 = {
+        ...baseTotem12,
+        traits: { innate: 'trt_stubborn', learned: null, awakened: null },
+      };
+      expect(checkRequirements(baseTotem12, challenge).qualified).toBe(false);
+      expect(checkRequirements(stubborn12, challenge).qualified).toBe(true);
+    });
+
+    test('Restless statBonus does NOT fire on wisdom challenges', async () => {
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({
+          stats: { strength: 15, agility: 15, wisdom: 15, happiness: 50 },
+          traits: { innate: 'trt_restless', learned: null, awakened: null },
+        }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_ancient-runes', 'ttm_456', 1000);
+      expect(result.data.xpEarned).toBe(10);
+    });
+
+    test('cumulative totalScore stays on the raw submission, not the boosted value', async () => {
+      mockDbClient.getTotem.mockResolvedValue(
+        baseTotem({
+          stats: { strength: 15, agility: 15, wisdom: 15, happiness: 50 },
+          traits: { innate: 'trt_brave', learned: null, awakened: null },
+        }),
+      );
+      const result = await completeChallenge('usr_123', 'chl_boulder-breaker', 'ttm_456', 1000);
+      expect(result.data.progress.totalScore).toBe(1000);
+    });
+  });
 });
 
 // =============================================================================

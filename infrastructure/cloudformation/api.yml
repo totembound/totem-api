@@ -7,6 +7,12 @@ Mappings:
       ResourcePrefix: totemboundci
       S3Bucket: totemboundci-releases
       CorsOrigin: https://totembound-test.net
+      # Allowlist (comma-separated) for the gateway-level CORS echo. The consumer
+      # app and the admin console are distinct origins; ACAO can only hold ONE
+      # value (and can't be '*' with credentials), so OPTIONS preflight echoes the
+      # request Origin only when it's in this set. Keep CorsOrigin as the primary
+      # app origin (used for APP_URL / OAUTH redirects below).
+      CorsAllowedOrigins: 'https://totembound-test.net,https://admin.totembound-test.net'
       CoreStackName: totemboundci-core-stack
       CognitoStackName: totemboundci-cognito-stack
       TablePrefix: TotemBound
@@ -15,6 +21,7 @@ Mappings:
       ResourcePrefix: totembound
       S3Bucket: totembound-releases
       CorsOrigin: https://totembound.com
+      CorsAllowedOrigins: 'https://totembound.com,https://admin.totembound.com'
       CoreStackName: totembound-core-stack
       CognitoStackName: totembound-cognito-stack
       TablePrefix: TotemBound
@@ -189,6 +196,118 @@ Resources:
         S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"
 
   # ============================================
+  # Stats Snapshot Lambda + EventBridge schedules (analytics pipeline)
+  #
+  # Reuses the SAME deployment artifact as the API Lambda — only the Handler
+  # differs (functions/admin/stats-snapshot.handler is in the bundle). Writes
+  # time-bucketed snapshots to AdminStatsHistory so GET /v1/admin/stats can read
+  # the latest instead of live-scanning. Shares the core LambdaExecutionRole,
+  # which already grants AdminStatsHistory + table read access.
+  # ============================================
+  StatsSnapshotFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub
+        - "${Prefix}-stats-snapshot"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      Handler: functions/admin/stats-snapshot.handler
+      Role:
+        Fn::ImportValue: !Sub
+          - "${StackName}-LambdaExecutionRoleArn"
+          - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CoreStackName]
+      Runtime: nodejs20.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+          NODE_ENV: !Ref Environment
+          TABLE_PREFIX: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"
+
+  StatsSnapshotHourlyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Hourly admin stats snapshot
+      ScheduleExpression: "cron(5 * * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-hourly
+          Input: '{"granularity":"HOURLY"}'
+
+  StatsSnapshotDailyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Daily admin stats snapshot (00:10 UTC)
+      ScheduleExpression: "cron(10 0 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-daily
+          Input: '{"granularity":"DAILY"}'
+
+  StatsSnapshotWeeklyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Weekly admin stats snapshot (Sunday 00:15 UTC)
+      ScheduleExpression: "cron(15 0 ? * SUN *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-weekly
+          Input: '{"granularity":"WEEKLY"}'
+
+  StatsSnapshotHourlyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotHourlyRule.Arn
+
+  StatsSnapshotDailyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotDailyRule.Arn
+
+  StatsSnapshotWeeklyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotWeeklyRule.Arn
+
+  # Observability: alarm when the snapshot Lambda errors across consecutive runs.
+  # If snapshots silently stop landing, /admin/stats quietly degrades to live
+  # full-table scans — this makes that visible. Wire AlarmActions to an ops SNS
+  # topic when one exists.
+  StatsSnapshotErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub
+        - "${Prefix}-stats-snapshot-errors"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      AlarmDescription: stats-snapshot Lambda errored on 2+ consecutive runs; /admin/stats may be falling back to live scans.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref StatsSnapshotFunction
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  # ============================================
   # REST API Gateway
   # ============================================
   TotemBoundApi:
@@ -228,9 +347,13 @@ Resources:
       RestApiId: !Ref TotemBoundApi
       ResponseType: DEFAULT_4XX
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub
-          - "'${Origin}'"
-          - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+        # Error responses (4XX/5XX) are generated by API Gateway itself and can't
+        # run conditional VTL (responseOverride only applies to integration
+        # responses), so we reflect the request Origin here. Successful data
+        # responses are still origin-validated by the Lambda cors allowlist, and
+        # OPTIONS preflight is allowlist-checked above — so this only governs who
+        # can READ generic error bodies, an accepted trade-off to stay Lambda-free.
+        gatewayresponse.header.Access-Control-Allow-Origin: method.request.header.Origin
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
 
@@ -240,9 +363,13 @@ Resources:
       RestApiId: !Ref TotemBoundApi
       ResponseType: DEFAULT_5XX
       ResponseParameters:
-        gatewayresponse.header.Access-Control-Allow-Origin: !Sub
-          - "'${Origin}'"
-          - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+        # Error responses (4XX/5XX) are generated by API Gateway itself and can't
+        # run conditional VTL (responseOverride only applies to integration
+        # responses), so we reflect the request Origin here. Successful data
+        # responses are still origin-validated by the Lambda cors allowlist, and
+        # OPTIONS preflight is allowlist-checked above — so this only governs who
+        # can READ generic error bodies, an accepted trade-off to stay Lambda-free.
+        gatewayresponse.header.Access-Control-Allow-Origin: method.request.header.Origin
         gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
         gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
 
@@ -302,11 +429,13 @@ Resources:
         IntegrationResponses:
           - StatusCode: 200
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
             ResponseTemplates:
-              application/json: '{"status":"healthy"}'
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  {"status":"healthy"}
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -331,12 +460,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -405,12 +538,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -458,12 +595,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -511,12 +652,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -564,12 +709,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -617,12 +766,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -670,12 +823,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -723,12 +880,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -776,12 +937,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -837,12 +1002,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -901,12 +1070,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -963,12 +1136,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
@@ -1026,12 +1203,16 @@ Resources:
             ResponseParameters:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
               method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
-              method.response.header.Access-Control-Allow-Origin: !Sub
-                - "'${Origin}'"
-                - Origin: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
               method.response.header.Access-Control-Max-Age: "'86400'"
             ResponseTemplates:
-              application/json: ''
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
           application/json: '{"statusCode": 200}'
