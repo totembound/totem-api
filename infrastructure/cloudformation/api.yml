@@ -432,7 +432,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                   {"status":"healthy"}
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
@@ -467,7 +468,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -545,7 +547,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -602,7 +605,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -659,7 +663,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -716,7 +721,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -773,7 +779,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -830,7 +837,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -887,7 +895,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -944,7 +953,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -1009,7 +1019,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -1077,7 +1088,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -1143,7 +1155,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -1210,7 +1223,8 @@ Resources:
               application/json: !Sub
                 - |
                   #set($origin = $input.params('Origin'))
-                  #if($origin != "" && ",${AllowedOrigins},".indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
                 - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
