@@ -125,12 +125,15 @@ Resources:
         - custom:displayName
         - custom:tier
         - custom:role
+      # custom:role is intentionally READ-only (not writable): it must appear in
+      # the ID token for the requireRole('admin') gate, but users must never be
+      # able to self-promote via UpdateUserAttributes. Admins are set server-side
+      # with AdminUpdateUserAttributes, which bypasses client WriteAttributes.
       WriteAttributes:
         - email
         - custom:userId
         - custom:displayName
         - custom:tier
-        - custom:role
 
 Outputs:
   UserPoolId:
