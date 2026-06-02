@@ -20,6 +20,7 @@ const {
   getMinHappiness,
   calculateStatChanges,
   buildActionResult,
+  HUNGER,
 } = require('./helpers');
 const { onGameAction, checkBalancedCare } = require('../../services/achievements-service');
 const { emitQuestProgress } = require('../../services/daily-quests-service');
@@ -96,6 +97,22 @@ async function train(user, totemId) {
     };
   }
 
+  // 4b. Hunger gate — too hungry to train. `totem.stats.hunger` is already the
+  // decayed value (the read boundary decayed it). Checked BEFORE deductEssence so
+  // a blocked train never charges the player.
+  const currentHunger = totem.stats?.hunger ?? HUNGER.max;
+  if (currentHunger < HUNGER.trainMin) {
+    return {
+      success: false,
+      error: {
+        code: 'TOO_HUNGRY',
+        message: `Your totem is too hungry to train (need ${HUNGER.trainMin}, have ${currentHunger}). Feed it first.`,
+        required: HUNGER.trainMin,
+        current: currentHunger,
+      },
+    };
+  }
+
   // 5. Resolve trait bonuses (self-scope) and deduct Essence cost.
   // Thrifty: ×0.90 cost; Quick Learner: ×1.10 XP; Gentle: +2 to happinessChange.
   const bonuses = resolveTraitBonuses(totem, { action: actionType });
@@ -116,8 +133,11 @@ async function train(user, totemId) {
   // 6. Calculate XP gain — base 50 × trait xpMultiplier (Quick Learner).
   const xpGained = Math.round(getXpGain(actionType) * bonuses.xpMultiplier);
 
-  // 6. Calculate stat changes — happinessFlat folds in here.
-  const statChanges = calculateStatChanges(actionType, totem, bonuses);
+  // 6. Calculate stat changes — happinessFlat folds in here. In the "cranky" band
+  // (trainMin ≤ hunger < happinessPenaltyBelow) training is allowed but costs 2×
+  // happiness. Below trainMin it's already blocked above, so this never stacks.
+  const hungerMultiplier = currentHunger < HUNGER.happinessPenaltyBelow ? 2 : 1;
+  const statChanges = calculateStatChanges(actionType, totem, bonuses, hungerMultiplier);
 
   // 7. Update totem in database (chokepoint applies XP + prestige check atomically)
   const now = new Date().toISOString();
@@ -125,6 +145,10 @@ async function train(user, totemId) {
   const newLastActionDates = { ...(totem.lastActionDates || {}), train: todayUTC };
   const extraUpdates = {
     'stats.happiness': statChanges.happiness,
+    // Persist the decayed hunger + advanced anchor together so the (value, clock)
+    // pair stays consistent (the read boundary decayed hunger in-memory only).
+    'stats.hunger': currentHunger,
+    hungerUpdatedAt: totem.hungerUpdatedAt,
     lastActionDates: newLastActionDates,
   };
   if (config.cooldown > 0) {

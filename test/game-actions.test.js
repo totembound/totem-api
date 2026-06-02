@@ -701,6 +701,25 @@ describe('Game Actions', () => {
         expect(result.data.essenceSpent).toBe(20);
         expect(result.data.statChanges.happinessChange).toBe(-10);
       });
+
+      it('blocks training when too hungry (TOO_HUNGRY) WITHOUT charging essence', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({
+          stats: { happiness: 50, hunger: 15, strength: 10, agility: 8, wisdom: 6 },
+        }));
+        const result = await train(testUser, testTotemId);
+        expect(result.success).toBe(false);
+        expect(result.error.code).toBe('TOO_HUNGRY');
+        expect(dbClient.deductEssence).not.toHaveBeenCalled();
+      });
+
+      it('cranky band (hunger 30): training allowed but 2× happiness loss (−20)', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({
+          stats: { happiness: 50, hunger: 30, strength: 10, agility: 8, wisdom: 6 },
+        }));
+        const result = await train(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.statChanges.happinessChange).toBe(-20);
+      });
     });
 
     describe('feed', () => {
@@ -718,14 +737,34 @@ describe('Game Actions', () => {
         expect(result.data.essenceSpent).toBe(9);
       });
 
-      it('Diligent Forager does not overshoot hunger cap of 100', async () => {
+      it('feed grants a fixed +30 partial restore (hunger 20 → 50)', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({
+          stats: { happiness: 50, hunger: 20, strength: 10, agility: 8, wisdom: 6 },
+        }));
+        const result = await feed(testUser, testTotemId);
+        expect(result.success).toBe(true);
+        expect(result.data.statChanges.hunger).toBe(50);
+        expect(result.data.statChanges.hungerGained).toBe(30);
+      });
+
+      it('Diligent Forager widens the restore to +36 (hunger 20 → 56)', async () => {
         dbClient.getTotem.mockResolvedValue(makeTotem({
           stats: { happiness: 50, hunger: 20, strength: 10, agility: 8, wisdom: 6 },
           traits: traits({ learned: 'trt_diligent_forager' }),
         }));
         const result = await feed(testUser, testTotemId);
         expect(result.success).toBe(true);
+        expect(result.data.statChanges.hunger).toBe(56); // 20 + round(30 × 1.20)=36
+      });
+
+      it('does not overshoot the hunger cap of 100', async () => {
+        dbClient.getTotem.mockResolvedValue(makeTotem({
+          stats: { happiness: 50, hunger: 90, strength: 10, agility: 8, wisdom: 6 },
+        }));
+        const result = await feed(testUser, testTotemId);
+        expect(result.success).toBe(true);
         expect(result.data.statChanges.hunger).toBe(100);
+        expect(result.data.statChanges.hungerGained).toBe(10);
       });
     });
 

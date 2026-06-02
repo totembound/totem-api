@@ -12,6 +12,7 @@ const {
   STAGE_THRESHOLDS,
   PRESTIGE_XP_REQUIREMENT,
   TIME_WINDOWS,
+  HUNGER,
   DEFAULT_STAGE_NAMES,
   getStageNameForSpecies,
 } = require('../../config/totem-config');
@@ -292,33 +293,44 @@ function checkEvolutionRequirements(totem) {
  *  - `happinessFlat`           adds to the action's happinessChange
  *                              (Gentle: train −10 → −8, Hardy: feed +10 → +12,
  *                               Playful: treat +10 → +12)
- *  - `hungerRestoreBonusPct`   adds to the fraction of hunger restored by feed.
- *                              Clamped at 100 — visible once partial-restore
- *                              feeds exist (Hunger system, Q3 2026).
+ *  - `hungerRestoreBonusPct`   adds to the fraction of HUNGER.feedRestore granted
+ *                              by feed (trt_diligent_forager: +0.20 → 30 → 36).
+ *
+ * `hungerMultiplier` (default 1) scales a NEGATIVE base happiness change — the
+ * "hungry totem gets sad faster" effect. Callers pass 2 when hunger < trainMin.
+ * It only multiplies losses (config.happinessChange < 0), so Feed/Treat gains
+ * (+10) are never buffed by being hungry; in practice only Train (−10) doubles.
+ * The trait `happinessFlat` overlay is applied AFTER the multiplier, so a Gentle
+ * totem still softens the harsher hungry penalty (−20 + 2 = −18).
  */
-function calculateStatChanges(actionType, totem, bonuses = null) {
+function calculateStatChanges(actionType, totem, bonuses = null, hungerMultiplier = 1) {
   const config = ACTION_CONFIGS[actionType];
   const result = {};
 
   if (!config) return result;
 
-  // Fixed happiness change from contract + trait happinessFlat overlay
+  // Hungry penalty multiplies the loss only (never a gain), then trait flat overlay.
+  const baseChange = config.happinessChange;
+  const hungerMult = baseChange < 0 ? hungerMultiplier : 1;
   const happinessFlat = bonuses?.happinessFlat || 0;
-  const happinessChange = config.happinessChange + happinessFlat;
+  const happinessChange = (baseChange * hungerMult) + happinessFlat;
   const currentHappiness = totem.stats?.happiness || 50;
   const newHappiness = Math.max(0, Math.min(100, currentHappiness + happinessChange));
 
   result.happiness = newHappiness;
   result.happinessChange = happinessChange;
 
-  // Feed restores hunger (today: always to 100; once partial-restore lands the
-  // Diligent Forager bonus widens the recovered amount).
+  // Feed grants a fixed partial restore (HUNGER.feedRestore, +trait bonus),
+  // clamped to HUNGER.max. `currentHunger` is the already-decayed value (the read
+  // boundary decayed it). `hungerGained` reports the ACTUAL amount so the client
+  // never shows "+30" when the totem was already near full.
   if (actionType === 'feed') {
     const currentHunger = totem.stats?.hunger ?? 0;
-    const baseRestore = 100 - currentHunger;
     const bonusPct = bonuses?.hungerRestoreBonusPct || 0;
-    const boostedRestore = baseRestore * (1 + bonusPct);
-    result.hunger = Math.min(100, Math.floor(currentHunger + boostedRestore));
+    const restore = Math.round(HUNGER.feedRestore * (1 + bonusPct));
+    const newHunger = Math.min(HUNGER.max, currentHunger + restore);
+    result.hunger = newHunger;
+    result.hungerGained = newHunger - currentHunger;
   }
 
   return result;
@@ -361,6 +373,7 @@ module.exports = {
   STAGE_THRESHOLDS,
   PRESTIGE_XP_REQUIREMENT,
   TIME_WINDOWS,
+  HUNGER,
 
   // Stage naming
   DEFAULT_STAGE_NAMES,

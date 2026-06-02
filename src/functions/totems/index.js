@@ -17,6 +17,7 @@ const {
   COLORS_BY_RARITY,
   SPECIES_DISPLAY_NAMES,
   DOMAIN_BY_SPECIES,
+  HUNGER,
   getStageNameForSpecies,
   getTotemImageUrl,
 } = require('../../config/totem-config');
@@ -98,7 +99,13 @@ function transformTotemForApi(totem) {
       color: totem.colorId,
       rarity: totem.rarityId,
       happiness: totem.stats?.happiness ?? 50,
+      // `hunger` is the value decayed at read time; `hungerAsOf` is the server
+      // "now" so the client can re-derive forward without refetching, and
+      // `hungerDecayPerHour` is the decay rate (constant 1 today; per-totem once a
+      // decay-modifying trait ships). See utils/hunger.ts deriveHunger().
       hunger: totem.stats?.hunger ?? 100,
+      hungerAsOf: new Date().toISOString(),
+      hungerDecayPerHour: HUNGER.decayPerHour,
       experience: totem.experience || 0,
       stage: totem.stage || 0,
       strength: totem.stats?.strength || 5,

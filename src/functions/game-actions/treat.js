@@ -20,6 +20,7 @@ const {
   getXpGain,
   calculateStatChanges,
   buildActionResult,
+  HUNGER,
 } = require('./helpers');
 const { onGameAction, checkBalancedCare } = require('../../services/achievements-service');
 const { emitQuestProgress } = require('../../services/daily-quests-service');
@@ -108,6 +109,10 @@ async function treat(user, totemId) {
   const xpResult = await addTotemXp(userId, totem, xpGained, {
     extraUpdates: {
       'stats.happiness': statChanges.happiness,
+      // Persist the decayed hunger + advanced anchor so the (value, clock) pair
+      // stays consistent (the read boundary decayed hunger in-memory only).
+      'stats.hunger': totem.stats?.hunger ?? HUNGER.max,
+      hungerUpdatedAt: totem.hungerUpdatedAt,
       'cooldowns.treat': now,
       lastActionDates: newLastActionDates,
     },
