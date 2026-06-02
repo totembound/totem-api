@@ -516,6 +516,50 @@ describe('Game Actions Helpers', () => {
         expect(result.happinessChange).toBe(-10);
       });
     });
+
+    describe('hunger restore + hungry penalty', () => {
+      it('feed grants a fixed +30 partial restore (not full)', () => {
+        const hungryTotem = { stats: { happiness: 50, hunger: 50 } };
+        const result = calculateStatChanges('feed', hungryTotem);
+        expect(result.hunger).toBe(80); // 50 + 30
+        expect(result.hungerGained).toBe(30);
+      });
+
+      it('reports the ACTUAL hungerGained when near full (not a flat 30)', () => {
+        const nearFull = { stats: { happiness: 50, hunger: 90 } };
+        const result = calculateStatChanges('feed', nearFull);
+        expect(result.hunger).toBe(100); // clamped
+        expect(result.hungerGained).toBe(10); // not 30
+      });
+
+      it('Diligent Forager widens the +30 base by 20% (→ 36)', () => {
+        const hungryTotem = { stats: { happiness: 50, hunger: 50 } };
+        const result = calculateStatChanges('feed', hungryTotem, { hungerRestoreBonusPct: 0.20 });
+        expect(result.hunger).toBe(86); // 50 + round(30 * 1.2)=36
+        expect(result.hungerGained).toBe(36);
+      });
+
+      it('doubles train happiness LOSS when hungry (−10 → −20)', () => {
+        const result = calculateStatChanges('train', baseTotem, null, 2);
+        expect(result.happinessChange).toBe(-20);
+        expect(result.happiness).toBe(30); // 50 − 20
+      });
+
+      it('hungry train penalty composes with Gentle flat overlay (−20 + 2 = −18)', () => {
+        const result = calculateStatChanges('train', baseTotem, { happinessFlat: 2 }, 2);
+        expect(result.happinessChange).toBe(-18);
+      });
+
+      it('never doubles a happiness GAIN — treat stays +10 when hungry', () => {
+        const result = calculateStatChanges('treat', baseTotem, null, 2);
+        expect(result.happinessChange).toBe(10);
+      });
+
+      it('never doubles feed happiness gain when hungry', () => {
+        const result = calculateStatChanges('feed', baseTotem, null, 2);
+        expect(result.happinessChange).toBe(10);
+      });
+    });
   });
 
   // =============================================================================

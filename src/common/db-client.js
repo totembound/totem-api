@@ -781,17 +781,27 @@ async function getBundlePurchasesToday(userId, bundleId) {
 // Totem Operations
 // ============================================
 
+// Decay-on-read: every totem read returns hunger decayed to "now". applyDecay is
+// shape-safe — it only adjusts `stats.hunger` and `hungerUpdatedAt` (both real
+// fields), never adds ephemeral keys, so callers that copy the record wholesale
+// (forge/shop/sanctum) stay clean. decay-service only depends on totem-config, so
+// there's no circular import back to db-client.
+const { applyDecay } = require('../services/decay-service');
+
 async function getUserTotems(userId) {
-  return queryItems(TABLES.TOTEMS, 'pk', userPK(userId), {
+  const items = await queryItems(TABLES.TOTEMS, 'pk', userPK(userId), {
     skPrefix: KEY_PREFIX.TOTEM,
   });
+  return items.map((t) => applyDecay(t).totem);
 }
 
 async function getTotem(userId, totemId) {
-  return getItem(TABLES.TOTEMS, {
+  const item = await getItem(TABLES.TOTEMS, {
     pk: userPK(userId),
     sk: totemSK(totemId),
   });
+  if (!item) return null;
+  return applyDecay(item).totem;
 }
 
 async function createTotem(totemData) {

@@ -106,6 +106,10 @@ async function evolve(user, totemId) {
     'stats.wisdom': Math.min(100, (totem.stats?.wisdom || 5) + evolutionStatBoost),
     // Happiness boost from evolving
     'stats.happiness': Math.min(100, (totem.stats?.happiness || 50) + 10),
+    // Persist the decayed hunger + advanced anchor (read boundary decayed it
+    // in-memory only) so evolving doesn't reset/erase pending hunger decay.
+    'stats.hunger': totem.stats?.hunger ?? 100,
+    hungerUpdatedAt: totem.hungerUpdatedAt,
   };
 
   await updateTotem(userId, totemId, updates);

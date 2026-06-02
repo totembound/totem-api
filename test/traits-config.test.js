@@ -189,3 +189,32 @@ describe('getRequiredStageForSlot', () => {
     expect(getRequiredStageForSlot('innate')).toBeNull();
   });
 });
+
+describe('trt_kindred_soul — same-species +25% XP aura (real resolver)', () => {
+  const { resolveTraitBonuses } = require('../src/config/trait-effects');
+  const lead = { id: 'a', speciesId: 2, traits: { innate: null, learned: null, awakened: 'trt_kindred_soul' } };
+
+  it('grants +25% XP when a same-species teammate is present', () => {
+    const sameSpecies = { id: 'b', speciesId: 2, traits: { innate: null, learned: null, awakened: null } };
+    const b = resolveTraitBonuses([lead, sameSpecies], { system: 'expedition' });
+    expect(b.xpMultiplier).toBeCloseTo(1.25);
+  });
+
+  it('does nothing without a same-species teammate (still better than nothing only when met)', () => {
+    const diffSpecies = { id: 'b', speciesId: 7, traits: { innate: null, learned: null, awakened: null } };
+    const b = resolveTraitBonuses([lead, diffSpecies], { system: 'expedition' });
+    expect(b.xpMultiplier).toBe(1);
+  });
+
+  it('beats Mentor (+10%) when its same-species condition is met', () => {
+    const mentorTeam = resolveTraitBonuses(
+      [{ id: 'm', speciesId: 2, traits: { innate: null, learned: null, awakened: 'trt_mentor' } }, { id: 'x', speciesId: 7, traits: {} }],
+      { system: 'expedition' },
+    ).xpMultiplier;
+    const kindredTeam = resolveTraitBonuses(
+      [lead, { id: 'b', speciesId: 2, traits: {} }],
+      { system: 'expedition' },
+    ).xpMultiplier;
+    expect(kindredTeam).toBeGreaterThan(mentorTeam);
+  });
+});

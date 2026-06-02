@@ -21,6 +21,7 @@ const {
   ACTION_CONFIGS,
   STAGE_THRESHOLDS,
   PRESTIGE_XP_REQUIREMENT,
+  HUNGER,
   getStageNameForSpecies,
 } = require('../config/totem-config');
 
@@ -191,7 +192,7 @@ function calculateInitialStats(baseStats, statBonus = 0) {
     agility: baseStats.agility + statBonus,
     wisdom: baseStats.wisdom + statBonus,
     happiness: 50, // Start at neutral
-    hunger: 100, // Start fully fed
+    hunger: HUNGER.startValue, // Start slightly hungry (70) — a day-1 reason to feed
   };
 }
 
@@ -310,6 +311,8 @@ function createTotem({
     // Metadata
     createdAt: now,
     updatedAt: now,
+    // Hunger decay clock — anchored at birth so decay starts from creation.
+    hungerUpdatedAt: now,
   };
 }
 
@@ -347,6 +350,7 @@ function createStarterTotem(userId) {
     lastActionDates: {},
     createdAt: now,
     updatedAt: now,
+    hungerUpdatedAt: now,
   };
 }
 

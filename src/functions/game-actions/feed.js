@@ -86,7 +86,7 @@ async function feed(user, totemId) {
   }
 
   // 4. Resolve trait bonuses (self-scope) and deduct Essence cost.
-  // Thrifty: ×0.90 cost; Hardy: +2 happinessFlat; Diligent Forager: +10% hunger restore.
+  // Thrifty: ×0.90 cost; Hardy: +2 happinessFlat; Diligent Forager: +20% hunger restore.
   const bonuses = resolveTraitBonuses(totem, { action: actionType });
   const cost = Math.floor(config.cost * bonuses.essenceCostMultiplier);
   const balanceResult = await deductEssence(userId, cost, { type: 'action_feed', ref: totemId, refType: 'totem' });
@@ -123,6 +123,8 @@ async function feed(user, totemId) {
     extraUpdates: {
       'stats.happiness': statChanges.happiness,
       'stats.hunger': statChanges.hunger ?? 100,
+      // Feeding IS a hunger event — reset the decay clock to now.
+      hungerUpdatedAt: now,
       feedHistory: prunedHistory,
       lastActionDates: newLastActionDates,
     },
@@ -173,7 +175,7 @@ async function feed(user, totemId) {
     success: true,
     data: {
       ...result,
-      message: `Fed your totem! +${statChanges.happinessChange} happiness`,
+      message: `Fed your totem! +${statChanges.happinessChange} happiness, +${statChanges.hungerGained ?? 0} hunger`,
       feedsToday: windowStatus.feedsToday + 1,
       maxDaily: windowStatus.maxDaily,
       essenceSpent: cost,

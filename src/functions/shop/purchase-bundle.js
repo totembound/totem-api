@@ -295,6 +295,8 @@ async function purchaseBundle(user, body = {}) {
       bundleId: bundle.id,
       createdAt: now,
       updatedAt: now,
+      // Hunger decay clock — anchored at birth (bundles bypass createTotem).
+      hungerUpdatedAt: now,
     };
 
     // 2. Atomic transaction: deduct gems + add essence + create totem + enforce daily limit

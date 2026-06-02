@@ -349,11 +349,11 @@ describe('Totem Creation Service', () => {
       expect(stats.wisdom).toBe(13);
     });
 
-    it('should start with happiness 50 and hunger 100', () => {
+    it('should start with happiness 50 and hunger 70', () => {
       const stats = calculateInitialStats({ strength: 5, agility: 5, wisdom: 5 });
 
       expect(stats.happiness).toBe(50);
-      expect(stats.hunger).toBe(100);
+      expect(stats.hunger).toBe(70);
     });
 
     it('should add Legendary bonus (+6) correctly', () => {
@@ -475,10 +475,16 @@ describe('Totem Creation Service', () => {
       expect(totem.stats.wisdom).toBe(14);
     });
 
-    it('should set happiness to 50 and hunger to 100', () => {
+    it('should set happiness to 50 and hunger to 70', () => {
       const totem = createTotem({ userId: 'usr_test123' });
       expect(totem.stats.happiness).toBe(50);
-      expect(totem.stats.hunger).toBe(100);
+      expect(totem.stats.hunger).toBe(70);
+    });
+
+    it('should anchor the hunger decay clock at creation', () => {
+      const totem = createTotem({ userId: 'usr_test123' });
+      expect(typeof totem.hungerUpdatedAt).toBe('string');
+      expect(totem.hungerUpdatedAt).toBe(totem.createdAt);
     });
   });
 
