@@ -184,6 +184,10 @@ function shouldSkipQuestProgress(user, todayUTC) {
 // --- Persistence layer ---------------------------------------------------
 
 const { TABLES, userPK, getItem, putItem, rawUpdate, updateUser, addEssence, addRunes, getUserTotems, getUser } = require('../common/db-client');
+const { getTierMultiplier } = require('./tier-bonuses');
+
+// Subscription tier (Free 1× / Premium 2× / VIP 3×) — mirrors rewards-service.
+const tierOf = (u) => (u && u.tier) || 'free';
 const { onQuestSetClaimed, onQuestThemedClaimed } = require('./achievements-service');
 
 // Bonus rune drop: 80% Lesser, 18% Greater, 2% Ancient.
@@ -388,9 +392,13 @@ async function batchClaim(userId, date, now = new Date()) {
     throw err;
   }
 
-  const claimedEntries = claimable.map(q => ({ questId: q.id, reward: q.reward }));
+  // Subscription tier scales quest ESSENCE (steps + bonus). The rune award below
+  // is deliberately NOT scaled. Stored record stays at base values.
+  const claimUser = await getUser(userId);
+  const mult = getTierMultiplier(tierOf(claimUser));
+  const claimedEntries = claimable.map(q => ({ questId: q.id, reward: { ...q.reward, essence: (q.reward.essence || 0) * mult } }));
   let total = claimedEntries.reduce((s, e) => s + (e.reward.essence || 0), 0);
-  if (bonusClaimed) total += record.bonus.reward.essence || 0;
+  if (bonusClaimed) total += (record.bonus.reward.essence || 0) * mult;
 
   let newBalance = null;
   if (total > 0) {

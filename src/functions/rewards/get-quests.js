@@ -4,6 +4,7 @@ const {
   getDailyTheme,
   getNextUTCMidnight,
 } = require('../../services/daily-quests-service');
+const { getTierMultiplier } = require('../../services/tier-bonuses');
 
 async function getDailyQuests(user) {
   if (!user || !user.userId) {
@@ -18,8 +19,14 @@ async function getDailyQuests(user) {
     const now = new Date();
     const record = await getOrCreateTodayQuests(user.userId, fullUser, now);
 
+    // Subscription tier scales the ESSENCE shown (steps + bonus) so the UI matches
+    // what batchClaim awards. Stored record stays at base; rune bonus is unscaled.
+    const tierMultiplier = getTierMultiplier(fullUser.tier || 'free');
+    const scaleEssence = (reward) => ({ ...reward, essence: (reward.essence || 0) * tierMultiplier });
+
     const enrichedQuests = record.quests.map(q => ({
       ...q,
+      reward: scaleEssence(q.reward),
       completed: q.progress >= q.goal,
     }));
 
@@ -31,9 +38,10 @@ async function getDailyQuests(user) {
         date: record.date,
         theme: record.theme || getDailyTheme(now),
         nextResetAt: getNextUTCMidnight(now),
+        tierMultiplier,
         quests: enrichedQuests,
         bonus: {
-          reward: record.bonus.reward,
+          reward: scaleEssence(record.bonus.reward),
           claimed: record.bonus.claimed,
           unlocked: bonusUnlocked,
         },
