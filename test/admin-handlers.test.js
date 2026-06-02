@@ -574,7 +574,8 @@ describe('GET /v1/admin/stats', () => {
   it('returns aggregated dashboard metrics (live compute when no snapshot)', async () => {
     const today = new Date().toISOString().split('T')[0];
     const users = [
-      { ...testUserRecord, stats: { ...testUserRecord.stats, lastLoginDate: today }, createdAt: `${today}T10:00:00.000Z` },
+      // activeToday is keyed off updatedAt (any activity today), not lastLoginDate.
+      { ...testUserRecord, updatedAt: `${today}T11:00:00.000Z`, createdAt: `${today}T10:00:00.000Z` },
       { ...testUserRecord2, status: 'banned' },
     ];
 
