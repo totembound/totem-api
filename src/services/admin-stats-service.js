@@ -48,8 +48,12 @@ async function computeSnapshot() {
 
     users = {
       total: allUsers.length,
-      activeToday: allUsers.filter((u) => u.stats?.lastLoginDate === todayStr).length,
-      activeThisWeek: allUsers.filter((u) => u.stats?.lastLoginDate >= weekAgoStr).length,
+      // Activity is keyed off updatedAt (bumped by every user mutation: game
+      // actions, daily claims, currency changes) rather than lastLoginDate, which
+      // is only written on a fresh login and goes stale for persisted/token
+      // sessions — undercounting active players to ~0.
+      activeToday: allUsers.filter((u) => u.updatedAt?.startsWith(todayStr)).length,
+      activeThisWeek: allUsers.filter((u) => u.updatedAt >= weekAgoStr).length,
       newToday: allUsers.filter((u) => u.createdAt && u.createdAt.startsWith(todayStr)).length,
       banned: allUsers.filter((u) => u.status === 'banned').length,
       byTier,
