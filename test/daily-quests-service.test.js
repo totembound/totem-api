@@ -352,6 +352,57 @@ describe('Daily Quests Service', () => {
       expect(totalRunes).toBe(1);
     });
 
+    it('Premium tier doubles quest essence (steps + bonus); rune is NOT multiplied', async () => {
+      db.getItem.mockResolvedValue({
+        date: TODAY,
+        quests: [
+          { slot: 1, id: 'dq_feed_2',         progress: 3, goal: 2, claimed: true,  reward: { essence: 15 } },
+          { slot: 2, id: 'dq_expedition_claim_1',          progress: 1, goal: 1, claimed: true,  reward: { essence: 15 } },
+          { slot: 3, id: 'dq_challenge_wisdom', progress: 1, goal: 1, claimed: true,  reward: { essence: 25 } },
+          { slot: 4, id: 'dq_expedition_start_water', progress: 1, goal: 1, claimed: true,  reward: { essence: 25 } },
+          { slot: 5, id: 'dq_challenge_3',        progress: 1, goal: 1, claimed: false, reward: { essence: 40 } },
+        ],
+        bonus: { reward: { essence: 75 }, claimed: false },
+      });
+      db.rawUpdate.mockResolvedValue(undefined);
+      db.addEssence.mockResolvedValue({ success: true, newBalance: 9999 });
+      db.addRunes.mockResolvedValue({ success: true });
+      db.getUser.mockResolvedValue({ tier: 'premium', stats: { totalQuestSetsCompleted: 0, totalThemedQuestClaims: 0 } });
+      db.updateUser.mockResolvedValue(undefined);
+
+      const r = await svc.batchClaim(USER_ID, TODAY, NOW);
+      expect(r.totalEssenceAwarded).toBe((40 + 75) * 2); // 230
+      expect(db.addEssence).toHaveBeenCalledWith(USER_ID, 230, expect.objectContaining({ type: 'reward_quest' }));
+      // Rune is NOT scaled by tier — still exactly one.
+      expect(db.addRunes).toHaveBeenCalledTimes(1);
+      const totalRunes = (r.runesAwarded.lesser || 0) + (r.runesAwarded.greater || 0) + (r.runesAwarded.ancient || 0);
+      expect(totalRunes).toBe(1);
+    });
+
+    it('VIP tier triples step essence (no bonus flip in this batch)', async () => {
+      db.getItem.mockResolvedValue({
+        date: TODAY,
+        quests: [
+          { slot: 1, id: 'dq_feed_2',       progress: 3, goal: 2, claimed: false, reward: { essence: 15 } },
+          { slot: 2, id: 'dq_train_diff_2', progress: 2, goal: 2, claimed: false, reward: { essence: 15 } },
+          { slot: 3, id: 'dq_challenge_wisdom', progress: 1, goal: 1, claimed: true,  reward: { essence: 25 } },
+          { slot: 4, id: 'dq_expedition_start_water', progress: 1, goal: 1, claimed: true,  reward: { essence: 25 } },
+          { slot: 5, id: 'dq_challenge_3',  progress: 0, goal: 1, claimed: false, reward: { essence: 40 } }, // incomplete → no bonus
+        ],
+        bonus: { reward: { essence: 75 }, claimed: false },
+      });
+      db.rawUpdate.mockResolvedValue(undefined);
+      db.addEssence.mockResolvedValue({ success: true, newBalance: 9999 });
+      db.getUser.mockResolvedValue({ tier: 'vip', stats: {} });
+      db.updateUser.mockResolvedValue(undefined);
+
+      const r = await svc.batchClaim(USER_ID, TODAY, NOW);
+      expect(r.bonusClaimed).toBe(false);
+      expect(r.totalEssenceAwarded).toBe((15 + 15) * 3); // 90
+      expect(db.addEssence).toHaveBeenCalledWith(USER_ID, 90, expect.objectContaining({ type: 'reward_quest' }));
+      expect(db.addRunes).not.toHaveBeenCalled();
+    });
+
     it('does not grant a rune when only individual quests are claimed (no bonus flip)', async () => {
       db.getItem.mockResolvedValue({
         date: TODAY,
