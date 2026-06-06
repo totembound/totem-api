@@ -1,0 +1,15 @@
+# Keep the image lean and avoid copying the host's node_modules over the
+# container's freshly-installed (linux) deps. package*.json + src + scripts are
+# all the server needs at runtime.
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.*
+docker
+test
+coverage
+docs
+*.md
+.DS_Store
