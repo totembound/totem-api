@@ -46,10 +46,6 @@ const TIME_WINDOWS = totemConfig.timeWindows;
 
 // --- Hunger (decay-on-read mechanic) ---
 const HUNGER = totemConfig.hunger;
-// Legacy-record guard: totems created before hunger shipped have no
-// `hungerUpdatedAt`, so decay anchors on `createdAt` clamped to this epoch —
-// no totem can show more decay than "hours since deploy" until first actioned.
-const HUNGER_DEPLOY_EPOCH_MS = Date.parse(HUNGER.deployEpoch);
 
 // --- Totem Images (IPFS CIDs) ---
 const SPECIES_NAMES = [
@@ -118,7 +114,6 @@ module.exports = {
   PRESTIGE_XP_REQUIREMENT,
   TIME_WINDOWS,
   HUNGER,
-  HUNGER_DEPLOY_EPOCH_MS,
   DEFAULT_STAGE_NAMES,
   getStageNameForSpecies,
   getTotemImageUrl,

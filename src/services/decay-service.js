@@ -19,12 +19,14 @@
  *     ~50 minutes still accumulates decay instead of resetting it to zero each
  *     time (the floor would otherwise round every gap down to 0 forever).
  *
- * Legacy records predate `hungerUpdatedAt`; they fall back to `createdAt`
- * clamped to `HUNGER_DEPLOY_EPOCH_MS` so they can't show more decay than
- * "hours since deploy" until their first action materializes the anchor.
+ * A totem with NO `hungerUpdatedAt` is self-healing: it's anchored at `now` and
+ * treated as "fed now", so it can never show retroactive decay (no fixed epoch
+ * to starve from). The materialized anchor is returned so the next read — or the
+ * next persisting write — decays forward from first observation. This makes a
+ * missing anchor harmless instead of a time bomb, in any environment.
  */
 
-const { HUNGER, HUNGER_DEPLOY_EPOCH_MS } = require('../config/totem-config');
+const { HUNGER } = require('../config/totem-config');
 
 const HOUR_MS = 3_600_000;
 
@@ -44,12 +46,12 @@ function applyDecay(totem, { now = Date.now(), bonuses = null } = {}) {
 
   const stored = totem.stats.hunger ?? HUNGER.max;
 
-  // Anchor: dedicated field if present, else createdAt clamped to deploy epoch.
+  // Anchor: the dedicated `hungerUpdatedAt` clock if present. No anchor → anchor
+  // at `now` (self-heal): the totem is treated as just-fed, decays 0 this read,
+  // and the materialized anchor lets subsequent reads decay forward from here.
   const hasAnchor = Boolean(totem.hungerUpdatedAt);
-  const anchorSource = totem.hungerUpdatedAt || totem.createdAt;
-  let anchorMs = anchorSource ? Date.parse(anchorSource) : now;
+  let anchorMs = hasAnchor ? Date.parse(totem.hungerUpdatedAt) : now;
   if (!Number.isFinite(anchorMs)) anchorMs = now;
-  if (!hasAnchor) anchorMs = Math.max(anchorMs, HUNGER_DEPLOY_EPOCH_MS);
 
   const rate = HUNGER.decayPerHour * (bonuses?.hungerDecayRateMultiplier ?? 1);
   const anchorIso = new Date(anchorMs).toISOString();

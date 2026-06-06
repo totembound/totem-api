@@ -385,7 +385,6 @@
     "feedRestore": 30,
     "trainMin": 20,
     "happinessPenaltyBelow": 40,
-    "startValue": 70,
-    "deployEpoch": "2026-06-01T00:00:00.000Z"
+    "startValue": 70
   }
 }
