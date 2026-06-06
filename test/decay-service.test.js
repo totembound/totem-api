@@ -4,12 +4,12 @@
  * applyDecay is pure (no I/O), so these run without DynamoDB. Covers the
  * properties that make the decay-on-read design correct: whole-hour flooring,
  * sub-hour no-op, remainder preservation across reads, anchor advancing by
- * consumed hours (not to `now`), clamping, the legacy DEPLOY_EPOCH fallback,
- * and the trait decay-rate hook.
+ * consumed hours (not to `now`), clamping, the self-healing missing-anchor
+ * fallback, and the trait decay-rate hook.
  */
 
 const { applyDecay } = require('../src/services/decay-service');
-const { HUNGER, HUNGER_DEPLOY_EPOCH_MS } = require('../src/config/totem-config');
+const { HUNGER } = require('../src/config/totem-config');
 
 const HOUR = 3_600_000;
 const T0 = Date.parse('2026-07-01T00:00:00.000Z'); // well after deploy epoch
@@ -70,20 +70,22 @@ describe('applyDecay', () => {
     expect(r.totem.stats.hunger).toBe(100);
   });
 
-  it('legacy record (no hungerUpdatedAt) anchors on createdAt clamped to deploy epoch', () => {
+  it('self-heals a record with no hungerUpdatedAt: anchors at now, zero decay, no retroactive starvation', () => {
     const ancient = {
       id: 'ttm_old',
-      createdAt: '2020-01-01T00:00:00.000Z', // long before hunger shipped
+      createdAt: '2020-01-01T00:00:00.000Z', // long before hunger shipped, ignored
       stats: { hunger: 100, happiness: 50 },
     };
-    const now = HUNGER_DEPLOY_EPOCH_MS + 10 * HOUR;
+    const now = T0 + 10 * HOUR;
     const r = applyDecay(ancient, { now });
-    // Only 10h of decay (since deploy epoch), NOT years from 2020.
-    expect(r.decayApplied).toBe(10);
-    expect(r.totem.stats.hunger).toBe(90);
+    // Treated as "fed now" — no decay regardless of how old createdAt is.
+    expect(r.decayApplied).toBe(0);
+    expect(r.totem.stats.hunger).toBe(100);
+    // The anchor is materialized at `now` so future reads decay forward from here.
+    expect(r.totem.hungerUpdatedAt).toBe(new Date(now).toISOString());
   });
 
-  it('a materialized anchor is trusted (not clamped to deploy epoch)', () => {
+  it('a materialized anchor is trusted and decays forward from it', () => {
     const fed = totem({ hungerUpdatedAt: new Date(T0).toISOString() });
     const r = applyDecay(fed, { now: T0 + 3 * HOUR });
     expect(r.decayApplied).toBe(3);
@@ -101,7 +103,10 @@ describe('applyDecay', () => {
   });
 
   it('defaults missing hunger to max before decaying', () => {
-    const r = applyDecay({ id: 'x', createdAt: new Date(T0).toISOString(), stats: {} }, { now: T0 + 5 * HOUR });
+    const r = applyDecay(
+      { id: 'x', hungerUpdatedAt: new Date(T0).toISOString(), stats: {} },
+      { now: T0 + 5 * HOUR }
+    );
     expect(r.totem.stats.hunger).toBe(HUNGER.max - 5);
   });
 });
