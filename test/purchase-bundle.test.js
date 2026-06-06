@@ -77,9 +77,27 @@ const {
   getCurrentMonthlySpecial,
 } = require('../src/functions/shop/purchase-bundle');
 
+// Same cached array reference that purchase-bundle's LIMITED_TOTEM_SERIES points at.
+const shopConfig = require('../src/data/shop-config.json');
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Every month now has a configured series, so to exercise the "unconfigured month"
+ * path we temporarily remove a month's series for the duration of fn (restored after).
+ */
+async function withoutSeriesForMonth(month, fn) {
+  const series = shopConfig.limitedTotemSeries.series;
+  const idx = series.findIndex((s) => s.month === month);
+  const [removed] = idx >= 0 ? series.splice(idx, 1) : [null];
+  try {
+    return await fn();
+  } finally {
+    if (removed) series.splice(idx, 0, removed);
+  }
+}
 
 const testUser = { userId: 'usr_test123' };
 
@@ -205,14 +223,16 @@ describe('Purchase Bundle', () => {
     });
 
     it('should return null for months with no series defined', () => {
-      // November has no series configured
-      const restore = mockUTCDate('2026-11-15T12:00:00.000Z');
-      try {
-        const special = getCurrentMonthlySpecial();
-        expect(special).toBeNull();
-      } finally {
-        restore();
-      }
+      // Simulate an unconfigured month by removing November's series for this test.
+      return withoutSeriesForMonth('November', () => {
+        const restore = mockUTCDate('2026-11-15T12:00:00.000Z');
+        try {
+          const special = getCurrentMonthlySpecial();
+          expect(special).toBeNull();
+        } finally {
+          restore();
+        }
+      });
     });
   });
 
@@ -318,19 +338,22 @@ describe('Purchase Bundle', () => {
     });
 
     it('should return MONTHLY_SPECIAL_NOT_AVAILABLE for unconfigured month', async () => {
-      const restore = mockUTCDate('2026-11-10T15:00:00.000Z');
-      try {
-        dbClient.getBundlePurchasesToday.mockResolvedValue(0);
-        dbClient.getUser.mockResolvedValue(makeUserRecord(10000));
+      // Simulate an unconfigured month by removing November's series for this test.
+      await withoutSeriesForMonth('November', async () => {
+        const restore = mockUTCDate('2026-11-10T15:00:00.000Z');
+        try {
+          dbClient.getBundlePurchasesToday.mockResolvedValue(0);
+          dbClient.getUser.mockResolvedValue(makeUserRecord(10000));
 
-        const result = await purchaseBundle(testUser, { bundleId: 3 });
+          const result = await purchaseBundle(testUser, { bundleId: 3 });
 
-        expect(result.success).toBe(false);
-        expect(result.error.code).toBe('MONTHLY_SPECIAL_NOT_AVAILABLE');
-        expect(dbClient.transactWrite).not.toHaveBeenCalled();
-      } finally {
-        restore();
-      }
+          expect(result.success).toBe(false);
+          expect(result.error.code).toBe('MONTHLY_SPECIAL_NOT_AVAILABLE');
+          expect(dbClient.transactWrite).not.toHaveBeenCalled();
+        } finally {
+          restore();
+        }
+      });
     });
 
     it('should deduct 5000 gems and add 2000 essence', async () => {

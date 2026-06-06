@@ -249,7 +249,7 @@
       "affinity": "Wisdom",
       "domain": "Earth",
       "locationId": 19,
-      "available": false,
+      "available": true,
       "image": "/totems/snakeplacecard.png",
       "baseStats": {
         "strength": 7,

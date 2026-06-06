@@ -287,6 +287,14 @@
         "rarity": 5
       },
       {
+        "id": "limited_series_11",
+        "month": "November",
+        "name": "Hearthcoil Snake",
+        "species": 10,
+        "color": 26,
+        "rarity": 5
+      },
+      {
         "id": "limited_series_12",
         "month": "December",
         "name": "Everfrost Owl",

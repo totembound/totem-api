@@ -39,6 +39,33 @@ const {
 // TESTS
 // =============================================================================
 
+// All 12 real species now ship (Snake was the last gated one), so there is no
+// real unavailable species to exercise the availability gate. Inject a synthetic
+// reserved species at the next index (id 12) for the negative-path tests, and
+// remove it afterwards. getSpecies() resolves by array index, and the load-time
+// AVAILABLE_SPECIES_IDS never includes 12, so it reads as unavailable.
+const RESERVED_SPECIES_ID = SPECIES.length; // 12
+const RESERVED_SPECIES = {
+  id: RESERVED_SPECIES_ID,
+  name: 'TestReserved',
+  available: false,
+  baseStats: { strength: 8, agility: 8, wisdom: 8 },
+};
+
+/**
+ * Run fn with the synthetic reserved (unavailable) species present in SPECIES,
+ * removing it afterwards. Scoped per-test so it never pollutes the structural
+ * tests that assert SPECIES.length / per-species invariants.
+ */
+function withReservedSpecies(fn) {
+  SPECIES[RESERVED_SPECIES_ID] = RESERVED_SPECIES;
+  try {
+    return fn();
+  } finally {
+    SPECIES.length = RESERVED_SPECIES_ID;
+  }
+}
+
 describe('Totem Creation Service', () => {
 
   // =============================================================================
@@ -152,9 +179,9 @@ describe('Totem Creation Service', () => {
       });
     });
 
-    it('should have 11 available species', () => {
-      // 0 Goose, 1 Otter, 2 Wolf, 3 Falcon, 4 Beaver, 5 Deer, 6 Woodpecker, 7 Turtle, 8 Bear, 9 Raven, 11 Owl
-      expect(AVAILABLE_SPECIES_IDS).toHaveLength(11);
+    it('should have 12 available species', () => {
+      // 0 Goose, 1 Otter, 2 Wolf, 3 Falcon, 4 Beaver, 5 Deer, 6 Woodpecker, 7 Turtle, 8 Bear, 9 Raven, 10 Snake, 11 Owl
+      expect(AVAILABLE_SPECIES_IDS).toHaveLength(12);
     });
 
     it('should exclude unavailable species', () => {
@@ -296,13 +323,17 @@ describe('Totem Creation Service', () => {
     });
 
     it('should return null for unavailable species with availability check', () => {
-      expect(getSpecies(10)).toBeNull(); // Snake - unavailable
+      withReservedSpecies(() => {
+        expect(getSpecies(RESERVED_SPECIES_ID)).toBeNull(); // synthetic reserved species
+      });
     });
 
     it('should return unavailable species when check is disabled', () => {
-      const species = getSpecies(10, false);
-      expect(species).not.toBeNull();
-      expect(species.speciesId).toBe(10);
+      withReservedSpecies(() => {
+        const species = getSpecies(RESERVED_SPECIES_ID, false);
+        expect(species).not.toBeNull();
+        expect(species.speciesId).toBe(RESERVED_SPECIES_ID);
+      });
     });
 
     it('should return null for invalid species ID', () => {
@@ -322,7 +353,7 @@ describe('Totem Creation Service', () => {
     });
 
     it('should return false for unavailable species', () => {
-      expect(isSpeciesAvailable(10)).toBe(false);  // Snake
+      expect(isSpeciesAvailable(RESERVED_SPECIES_ID)).toBe(false);  // synthetic reserved species
     });
   });
 
@@ -431,9 +462,11 @@ describe('Totem Creation Service', () => {
     });
 
     it('should throw for unavailable species', () => {
-      expect(() => {
-        createTotem({ userId: 'usr_test123', speciesId: 10 }); // Snake - unavailable
-      }).toThrow('Species 10 is not available');
+      withReservedSpecies(() => {
+        expect(() => {
+          createTotem({ userId: 'usr_test123', speciesId: RESERVED_SPECIES_ID }); // synthetic reserved species
+        }).toThrow(`Species ${RESERVED_SPECIES_ID} is not available`);
+      });
     });
 
     it('should set nickname when name provided', () => {
