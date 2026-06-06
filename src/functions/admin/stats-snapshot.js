@@ -84,6 +84,9 @@ async function runSnapshot({ granularity = 'HOURLY', now = new Date() } = {}) {
     transactions: snapshot.transactions,
     economy: snapshot.economy,
     generatedAt: snapshot.generatedAt,
+    // Only HOURLY buckets carry the per-hour transaction slice — it's the unit the
+    // today/thisWeek rollup sums, and the rollup reads HOURLY buckets exclusively.
+    ...(gran === 'HOURLY' && snapshot.txWindow ? { txWindow: snapshot.txWindow } : {}),
     ...(ttl != null ? { ttl } : {}),
   };
 

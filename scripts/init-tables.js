@@ -132,6 +132,7 @@ const tables = [
       { AttributeName: 'userId', AttributeType: 'S' },
       { AttributeName: 'ts', AttributeType: 'S' },
       { AttributeName: 'type', AttributeType: 'S' },
+      { AttributeName: 'dateBucket', AttributeType: 'S' },
     ],
     KeySchema: [
       { AttributeName: 'pk', KeyType: 'HASH' },
@@ -153,6 +154,15 @@ const tables = [
           { AttributeName: 'ts', KeyType: 'RANGE' },
         ],
         Projection: { ProjectionType: 'ALL' },
+      },
+      {
+        // Windowed time aggregates for admin stats (aggregateTransactions).
+        IndexName: 'date-ts-index',
+        KeySchema: [
+          { AttributeName: 'dateBucket', KeyType: 'HASH' },
+          { AttributeName: 'ts', KeyType: 'RANGE' },
+        ],
+        Projection: { ProjectionType: 'INCLUDE', NonKeyAttributes: ['type', 'currency', 'amount'] },
       },
     ],
     BillingMode: 'PAY_PER_REQUEST',
