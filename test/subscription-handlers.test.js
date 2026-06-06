@@ -860,6 +860,30 @@ describe('Subscription Handlers', () => {
       });
     });
 
+    it('should persist subscription.status (e.g. past_due) on subscription.updated', async () => {
+      const user = { id: 'usr_found', tier: 'premium' };
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(user);
+
+      const event = {
+        type: 'customer.subscription.updated',
+        data: {
+          object: {
+            customer: 'cus_found',
+            status: 'past_due',
+            cancel_at_period_end: false,
+            current_period_end: 1740000000,
+            items: { data: [{ price: { id: 'price_premium_test' } }] },
+          },
+        },
+      };
+
+      const result = await subscriptions.handleSubscriptionWebhook(event);
+      expect(result.success).toBe(true);
+      expect(dbClient.updateUser).toHaveBeenCalledWith('usr_found', expect.objectContaining({
+        'subscription.status': 'past_due',
+      }));
+    });
+
     it('should update tier on plan change in subscription.updated', async () => {
       process.env.STRIPE_PRICE_VIP = 'price_vip_test';
       const user = { id: 'usr_found', tier: 'premium' };
