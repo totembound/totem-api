@@ -79,6 +79,35 @@ services:
     depends_on:
       - dynamodb-local
 
+  # ============================================
+  # TotemBound API (local dev — baked image)
+  # Talks to the other services by hostname (DYNAMODB_ENDPOINT=http://dynamodb-local:8000).
+  # No source mount: rebuild (docker compose up -d --build totem-api) to pick up code changes.
+  # ============================================
+  totem-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: totembound-api
+    ports:
+      - "3001:3001"
+    environment:
+      - IS_LOCAL=true
+      - PORT=3001
+      - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+      - AWS_REGION=us-west-2
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   localstack-data:
 
