@@ -330,6 +330,9 @@ async function updateUser(userId, updates) {
  * GSIs:
  *   - user-ts-index: PK=userId, SK=ts (user history)
  *   - type-ts-index: PK=type, SK=ts (analytics)
+ *   - date-ts-index: PK=dateBucket (YYYY-MM-DD), SK=ts (windowed time aggregates
+ *     for admin stats — see aggregateTransactions; INCLUDE projection of
+ *     type/currency/amount so the aggregate is served entirely from the index)
  */
 async function logTransaction(userId, { type, currency, amount, balanceBefore, balanceAfter, ref, refType, refName, unitPrice, quantity }) {
   const now = new Date();
@@ -347,6 +350,7 @@ async function logTransaction(userId, { type, currency, amount, balanceBefore, b
     balanceBefore,
     balanceAfter,
     ts: now.toISOString(),
+    dateBucket: now.toISOString().slice(0, 10), // YYYY-MM-DD — PK of date-ts-index GSI
     // Optional fields for store transactions
     ...(refType && { refType }),
     ...(ref && { refId: ref }),
@@ -1105,46 +1109,90 @@ async function listAllTransactions({ limit = 50, cursor, userId, type, currency,
 }
 
 /**
- * Recent transactions across all users/types — only used by /v1/admin/stats.
- * Pure Scan with optional time window; expensive, slated for replacement by
- * counter rows / time-bucketed aggregates in a future PR (P2).
+ * UTC calendar dates (YYYY-MM-DD) the window [startIso, endIso] touches, inclusive
+ * — the set of `dateBucket` partitions aggregateTransactions must query.
  */
-async function scanRecentTransactions({ limit = 500, startTime, endTime } = {}) {
-  const allItems = [];
-  let lastKey;
-  let remaining = limit;
+function dateBucketsBetween(startIso, endIso) {
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  const out = [];
+  const day = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()));
+  const endDay = Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate());
+  while (day.getTime() <= endDay) {
+    out.push(day.toISOString().slice(0, 10));
+    day.setUTCDate(day.getUTCDate() + 1);
+  }
+  return out;
+}
 
-  do {
-    const params = {
-      TableName: TABLES.TRANSACTIONS,
-      Limit: Math.min(remaining, 100),
-    };
+/**
+ * Aggregate transactions in the window [startTime, endTime] via the date-ts-index
+ * GSI (PK=dateBucket=YYYY-MM-DD, SK=ts), reading ONLY the rows inside the window —
+ * never a full-table Scan. Queries each UTC day the window spans in parallel with
+ * an `ts BETWEEN` range, and folds matches into count / byType / essence+gem volume
+ * straight off the index's projected attributes (no base-table fetch).
+ *
+ * Admin stats calls this with tiny windows (a single clock hour for the snapshot
+ * delta + the current partial hour), so cost is flat regardless of table size.
+ * `maxItems` is a per-partition backstop against a pathologically wide window;
+ * hitting it sets `capped` and logs a warning (the totals are then a lower bound).
+ *
+ * @returns {Promise<{count, byType, essenceVolume, gemsVolume, fromTs, toTs, capped}>}
+ */
+async function aggregateTransactions({ startTime, endTime, maxItems = 5000 } = {}) {
+  if (!startTime) throw new Error('aggregateTransactions requires startTime');
+  const end = endTime || new Date().toISOString();
+  const agg = {
+    count: 0, byType: {}, essenceVolume: 0, gemsVolume: 0,
+    fromTs: startTime, toTs: end, capped: false,
+  };
+  if (startTime >= end) return agg; // empty window
 
-    if (startTime || endTime) {
-      const filters = [];
-      const exprValues = {};
-      if (startTime) {
-        filters.push('ts >= :start');
-        exprValues[':start'] = startTime;
+  const perBucket = await Promise.all(dateBucketsBetween(startTime, end).map(async (bucket) => {
+    const items = [];
+    let lastKey;
+    do {
+      const params = {
+        TableName: TABLES.TRANSACTIONS,
+        IndexName: 'date-ts-index',
+        KeyConditionExpression: 'dateBucket = :b AND ts BETWEEN :start AND :end',
+        ExpressionAttributeValues: { ':b': bucket, ':start': startTime, ':end': end },
+        Limit: 200,
+      };
+      if (lastKey) params.ExclusiveStartKey = lastKey;
+      const response = await docClient.send(new QueryCommand(params));
+      items.push(...(response.Items || []));
+      lastKey = response.LastEvaluatedKey;
+      if (items.length >= maxItems) {
+        agg.capped = true; break; 
       }
-      if (endTime) {
-        filters.push('ts <= :end');
-        exprValues[':end'] = endTime;
+    } while (lastKey);
+    return items;
+  }));
+
+  for (const items of perBucket) {
+    for (const t of items) {
+      agg.count++;
+      const type = t.type || 'unknown';
+      if (!agg.byType[type]) agg.byType[type] = { count: 0, essenceVolume: 0, gemsVolume: 0 };
+      agg.byType[type].count++;
+      const amt = Math.abs(t.amount || 0);
+      if (t.currency === 'essence') {
+        agg.byType[type].essenceVolume += amt; agg.essenceVolume += amt; 
       }
-      params.FilterExpression = filters.join(' AND ');
-      params.ExpressionAttributeValues = exprValues;
+      else if (t.currency === 'gems') {
+        agg.byType[type].gemsVolume += amt; agg.gemsVolume += amt; 
+      }
     }
+  }
 
-    if (lastKey) params.ExclusiveStartKey = lastKey;
-
-    const response = await docClient.send(new ScanCommand(params));
-    allItems.push(...(response.Items || []));
-    remaining -= (response.Items || []).length;
-    lastKey = response.LastEvaluatedKey;
-  } while (lastKey && remaining > 0);
-
-  allItems.sort((a, b) => (b.ts || '').localeCompare(a.ts || ''));
-  return allItems.slice(0, limit);
+  if (agg.capped) {
+    console.warn(
+      `[db-client] aggregateTransactions hit the ${maxItems}-item cap for window `
+      + `${startTime}..${end} — totals are a lower bound. Narrow the window or raise the cap.`,
+    );
+  }
+  return agg;
 }
 
 async function getUserByStripeCustomerId(stripeCustomerId) {
@@ -1290,7 +1338,7 @@ module.exports = {
   scanAllUsers,
   countTotems,
   listAllTransactions,
-  scanRecentTransactions,
+  aggregateTransactions,
   encodeCursor,
   decodeCursor,
 

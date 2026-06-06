@@ -229,6 +229,8 @@ Resources:
           AttributeType: S
         - AttributeName: type
           AttributeType: S
+        - AttributeName: dateBucket
+          AttributeType: S
       KeySchema:
         - AttributeName: pk
           KeyType: HASH
@@ -251,6 +253,22 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+        # Windowed time aggregates for admin stats (see aggregateTransactions).
+        # PK is the UTC calendar date so a window touches only the days it spans;
+        # INCLUDE projection lets the aggregate read type/currency/amount straight
+        # off the index without a base-table fetch, keeping write cost minimal.
+        - IndexName: date-ts-index
+          KeySchema:
+            - AttributeName: dateBucket
+              KeyType: HASH
+            - AttributeName: ts
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - type
+              - currency
+              - amount
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
       SSESpecification:

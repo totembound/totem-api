@@ -25,9 +25,12 @@ jest.mock('../src/common/db-client', () => ({
   deductGems: jest.fn(),
   countTotems: jest.fn(),
   listAllTransactions: jest.fn(),
-  scanRecentTransactions: jest.fn(),
+  aggregateTransactions: jest.fn(),
+  queryStatsTrends: jest.fn(),
   getLatestSnapshot: jest.fn(),
 }));
+
+const EMPTY_AGG = { count: 0, byType: {}, essenceVolume: 0, gemsVolume: 0, capped: false };
 
 const db = require('../src/common/db-client');
 const { list, getDetail, adjustCurrencies, setStatus } = require('../src/functions/admin/users');
@@ -569,6 +572,9 @@ describe('GET /v1/admin/stats', () => {
   beforeEach(() => {
     // Default: no precomputed snapshot → endpoint computes live.
     db.getLatestSnapshot.mockResolvedValue(null);
+    // Default transaction rollup inputs: empty boundary hours + no stored slices.
+    db.aggregateTransactions.mockResolvedValue({ ...EMPTY_AGG });
+    db.queryStatsTrends.mockResolvedValue([]);
   });
 
   it('returns aggregated dashboard metrics (live compute when no snapshot)', async () => {
@@ -581,9 +587,18 @@ describe('GET /v1/admin/stats', () => {
 
     db.scanAllUsers.mockResolvedValue(users);
     db.countTotems.mockResolvedValue(5);
-    db.scanRecentTransactions.mockResolvedValue([
-      { ...testTransaction, ts: `${today}T12:00:00.000Z` },
-    ]);
+    // computeTransactions reads two boundary hours via aggregateTransactions
+    // (prev completed hour, then current partial hour). Put today's activity in
+    // the current-hour read so it rolls into today + thisWeek.
+    db.aggregateTransactions
+      .mockResolvedValueOnce({ ...EMPTY_AGG })
+      .mockResolvedValueOnce({
+        count: 1,
+        byType: { action_feed: { count: 1, essenceVolume: 10, gemsVolume: 0 } },
+        essenceVolume: 10,
+        gemsVolume: 0,
+        capped: false,
+      });
 
     const req = { query: {} };
     const res = mockRes();
@@ -599,14 +614,44 @@ describe('GET /v1/admin/stats', () => {
     expect(data.users.banned).toBe(1);
     expect(data.totems.total).toBe(5);
     expect(data.transactions.today.count).toBe(1);
+    expect(data.transactions.thisWeek.count).toBe(1);
     expect(data.transactions.byType.action_feed).toBeDefined();
+    // The internal rollup unit must never leak into the API response.
+    expect(data.txWindow).toBeUndefined();
     expect(data.generatedAt).toBeDefined();
+  });
+
+  it('rolls up today/thisWeek from stored hourly slices', async () => {
+    const today = new Date().toISOString().split('T')[0];
+    db.scanAllUsers.mockResolvedValue([]);
+    db.countTotems.mockResolvedValue(0);
+    // A stored HOURLY slice earlier today + empty boundary hours → counted once.
+    db.queryStatsTrends.mockResolvedValue([
+      {
+        txWindow: {
+          count: 3,
+          byType: { action_train: { count: 3, essenceVolume: 30, gemsVolume: 0 } },
+          essenceVolume: 30,
+          gemsVolume: 0,
+          fromTs: `${today}T01:00:00.000Z`,
+          toTs: `${today}T02:00:00.000Z`,
+        },
+      },
+    ]);
+
+    const req = { query: {} };
+    const res = mockRes();
+    await getStats(req, res);
+
+    const data = res.json.mock.calls[0][0].data;
+    expect(data.transactions.today.count).toBe(3);
+    expect(data.transactions.thisWeek.count).toBe(3);
+    expect(data.transactions.byType.action_train.count).toBe(3);
   });
 
   it('handles empty database', async () => {
     db.scanAllUsers.mockResolvedValue([]);
     db.countTotems.mockResolvedValue(0);
-    db.scanRecentTransactions.mockResolvedValue([]);
 
     const req = { query: {} };
     const res = mockRes();
@@ -651,7 +696,6 @@ describe('GET /v1/admin/stats', () => {
     db.getLatestSnapshot.mockResolvedValue({ users: { total: 1 }, generatedAt: stale });
     db.scanAllUsers.mockResolvedValue([]);
     db.countTotems.mockResolvedValue(0);
-    db.scanRecentTransactions.mockResolvedValue([]);
 
     const req = { query: {} };
     const res = mockRes();
@@ -667,7 +711,6 @@ describe('GET /v1/admin/stats', () => {
     db.getLatestSnapshot.mockResolvedValue({ users: { total: 99 }, generatedAt: new Date().toISOString() });
     db.scanAllUsers.mockResolvedValue([]);
     db.countTotems.mockResolvedValue(0);
-    db.scanRecentTransactions.mockResolvedValue([]);
 
     const req = { query: { fresh: '1' } };
     const res = mockRes();

@@ -59,7 +59,8 @@ async function get(req, res) {
       }
     }
 
-    const snapshot = await computeSnapshot();
+    // `txWindow` is the writer's internal rollup unit — not part of the API shape.
+    const { txWindow: _txWindow, ...snapshot } = await computeSnapshot();
     return res.status(200).json({
       success: true,
       data: { ...snapshot, source: 'live' },
