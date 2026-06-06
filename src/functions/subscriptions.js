@@ -598,6 +598,11 @@ async function handleSubscriptionWebhook(event) {
       const updates = {
         'subscription.cancelAtPeriodEnd': subscription.cancel_at_period_end,
         'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000).toISOString(),
+        // Persist the Stripe status (active | past_due | unpaid | canceled | …) so a
+        // failed renewal isn't silently recorded as still-active. Access-gating /
+        // downgrade on past_due|unpaid is a separate product decision — this just
+        // records the truth. Conditional so test fixtures without a status are unaffected.
+        ...(subscription.status ? { 'subscription.status': subscription.status } : {}),
       };
 
       if (newTier && newTier !== user.tier) {
