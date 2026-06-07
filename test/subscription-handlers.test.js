@@ -22,6 +22,8 @@ jest.mock('../src/common/db-client', () => ({
   logTransaction: jest.fn(),
   getItem: jest.fn(),
   putItem: jest.fn(),
+  claimIdempotencyKey: jest.fn().mockResolvedValue({ firstTime: true }),
+  releaseIdempotencyKey: jest.fn().mockResolvedValue(undefined),
   TABLES: {
     REWARDS_CLAIMS: 'TotemBound-RewardsClaims',
   },
@@ -32,6 +34,9 @@ jest.mock('../src/common/email', () => ({
   sendSubscriptionCanceledEmail: jest.fn().mockResolvedValue({}),
   sendSubscriptionReactivatedEmail: jest.fn().mockResolvedValue({}),
   sendSubscriptionConfirmedEmail: jest.fn().mockResolvedValue({}),
+  sendSubscriptionExpiredEmail: jest.fn().mockResolvedValue({}),
+  sendPaymentFailedEmail: jest.fn().mockResolvedValue({}),
+  sendRenewalReceiptEmail: jest.fn().mockResolvedValue({}),
 }));
 
 // Mock iot-publisher
@@ -166,6 +171,8 @@ describe('Subscription Handlers', () => {
     dbClient.logTransaction.mockResolvedValue({});
     dbClient.getItem.mockResolvedValue(null);
     dbClient.putItem.mockResolvedValue({});
+    dbClient.claimIdempotencyKey.mockResolvedValue({ firstTime: true });
+    dbClient.releaseIdempotencyKey.mockResolvedValue(undefined);
     dbClient.addEssence.mockResolvedValue({ success: true, newBalance: 2500 });
     dbClient.addGems.mockResolvedValue({ success: true, newBalance: 600 });
     dbClient.getUserByStripeCustomerId.mockResolvedValue(null);
@@ -1016,9 +1023,142 @@ describe('Subscription Handlers', () => {
       expect(dbClient.updateUser).not.toHaveBeenCalled();
     });
 
+    it('should email the user when subscription.deleted and an email is on file', async () => {
+      const user = { id: 'usr_del2', tier: 'free', email: 'lapsed@test.local', subscription: { tier: 'vip' } };
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(user);
+
+      await subscriptions.handleSubscriptionWebhook({
+        type: 'customer.subscription.deleted',
+        data: { object: { customer: 'cus_del2' } },
+      });
+
+      // Uses the tier that was lost (from subscription.tier), not the already-downgraded user.tier.
+      expect(email.sendSubscriptionExpiredEmail).toHaveBeenCalledWith('lapsed@test.local', 'vip');
+    });
+
+    it('should send a dunning email on invoice.payment_failed', async () => {
+      const user = { id: 'usr_pf', tier: 'premium', email: 'pf@test.local', subscription: { tier: 'premium' } };
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(user);
+
+      const result = await subscriptions.handleSubscriptionWebhook({
+        type: 'invoice.payment_failed',
+        data: { object: { customer: 'cus_pf', subscription: 'sub_pf', next_payment_attempt: 1893456000 } },
+      });
+
+      expect(result.success).toBe(true);
+      expect(email.sendPaymentFailedEmail).toHaveBeenCalledWith('pf@test.local', 'premium', expect.any(Date));
+      expect(dbClient.logTransaction).toHaveBeenCalledWith('usr_pf', expect.objectContaining({
+        type: 'subscription_payment_failed',
+      }));
+    });
+
+    it('should skip invoice.payment_failed when user not found', async () => {
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(null);
+
+      const result = await subscriptions.handleSubscriptionWebhook({
+        type: 'invoice.payment_failed',
+        data: { object: { customer: 'cus_missing', subscription: 'sub_x' } },
+      });
+
+      expect(result.success).toBe(true);
+      expect(email.sendPaymentFailedEmail).not.toHaveBeenCalled();
+    });
+
+    it('should send a renewal receipt on invoice.payment_succeeded for a renewal cycle', async () => {
+      const user = { id: 'usr_rn', tier: 'vip', email: 'rn@test.local', subscription: { tier: 'vip' } };
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(user);
+
+      const result = await subscriptions.handleSubscriptionWebhook({
+        type: 'invoice.payment_succeeded',
+        data: {
+          object: {
+            id: 'in_rn1',
+            customer: 'cus_rn',
+            billing_reason: 'subscription_cycle',
+            amount_paid: 999,
+            currency: 'usd',
+            lines: { data: [{ period: { end: 1893456000 }, price: { id: 'price_vip' } }] },
+          },
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(dbClient.claimIdempotencyKey).toHaveBeenCalledWith('renewal-receipt', 'in_rn1');
+      expect(email.sendRenewalReceiptEmail).toHaveBeenCalledWith('rn@test.local', 'vip', 999, 'usd', expect.any(Date));
+      expect(dbClient.logTransaction).toHaveBeenCalledWith('usr_rn', expect.objectContaining({
+        type: 'subscription_renewed',
+      }));
+    });
+
+    it('should NOT send a duplicate renewal receipt on webhook redelivery', async () => {
+      dbClient.claimIdempotencyKey.mockResolvedValue({ firstTime: false }); // already processed
+      const user = { id: 'usr_dup', tier: 'vip', email: 'dup@test.local', subscription: { tier: 'vip' } };
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(user);
+
+      const result = await subscriptions.handleSubscriptionWebhook({
+        type: 'invoice.payment_succeeded',
+        data: {
+          object: {
+            id: 'in_dup1', customer: 'cus_dup', billing_reason: 'subscription_cycle',
+            amount_paid: 999, currency: 'usd',
+            lines: { data: [{ period: { end: 1893456000 }, price: { id: 'price_vip' } }] },
+          },
+        },
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/duplicate/i);
+      expect(email.sendRenewalReceiptEmail).not.toHaveBeenCalled();
+      expect(dbClient.logTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should skip a redelivered subscription.deleted when already downgraded', async () => {
+      dbClient.getUserByStripeCustomerId.mockResolvedValue({
+        id: 'usr_already', tier: 'free', email: 'a@test.local',
+        subscription: { status: 'canceled', tier: null },
+      });
+
+      const result = await subscriptions.handleSubscriptionWebhook({
+        type: 'customer.subscription.deleted',
+        data: { object: { customer: 'cus_already' } },
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/already downgraded/i);
+      expect(dbClient.updateUser).not.toHaveBeenCalled();
+      expect(dbClient.logTransaction).not.toHaveBeenCalled();
+      expect(email.sendSubscriptionExpiredEmail).not.toHaveBeenCalled();
+    });
+
+    it('should NOT send a receipt on the first invoice (subscription_create)', async () => {
+      const user = { id: 'usr_first', tier: 'premium', email: 'first@test.local', subscription: { tier: 'premium' } };
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(user);
+
+      const result = await subscriptions.handleSubscriptionWebhook({
+        type: 'invoice.payment_succeeded',
+        data: { object: { customer: 'cus_first', billing_reason: 'subscription_create', amount_paid: 999, currency: 'usd' } },
+      });
+
+      expect(result.success).toBe(true);
+      expect(email.sendRenewalReceiptEmail).not.toHaveBeenCalled();
+    });
+
+    it('should NOT send a receipt for a zero-amount renewal', async () => {
+      const user = { id: 'usr_zero', tier: 'premium', email: 'zero@test.local', subscription: { tier: 'premium' } };
+      dbClient.getUserByStripeCustomerId.mockResolvedValue(user);
+
+      const result = await subscriptions.handleSubscriptionWebhook({
+        type: 'invoice.payment_succeeded',
+        data: { object: { customer: 'cus_zero', billing_reason: 'subscription_cycle', amount_paid: 0, currency: 'usd' } },
+      });
+
+      expect(result.success).toBe(true);
+      expect(email.sendRenewalReceiptEmail).not.toHaveBeenCalled();
+    });
+
     it('should return null for unknown event type', async () => {
       const event = {
-        type: 'invoice.payment_succeeded',
+        type: 'payment_intent.created',
         data: { object: {} },
       };
 
