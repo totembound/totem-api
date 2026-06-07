@@ -28,7 +28,7 @@ const {
   updateUser,
 } = require('../common/db-client');
 
-const { sendNewUserWelcomeEmail } = require('../common/email');
+const { sendNewUserWelcomeEmail, sendPasswordChangedEmail } = require('../common/email');
 const { onLoginStreak, onPersistenceCheck } = require('../services/achievements-service');
 const { grantLootItem } = require('../services/loot-service');
 
@@ -711,6 +711,16 @@ async function handleResetPassword(req, res) {
     }
 
     const result = await confirmForgotPassword({ email, code, newPassword });
+
+    // Send a "your password was changed" security confirmation (non-blocking — the reset
+    // already succeeded; a failed email must not fail the request).
+    try {
+      const account = await getUserByEmail(email);
+      await sendPasswordChangedEmail(email, account?.displayName, new Date());
+    }
+    catch (err) {
+      console.error('Password changed confirmation email failed:', err.message);
+    }
 
     return res.status(200).json({
       success: true,

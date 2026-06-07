@@ -10,13 +10,24 @@
  *   - checkout.session.completed (mode: subscription)
  *   - customer.subscription.updated
  *   - customer.subscription.deleted
+ *   - invoice.payment_failed   (dunning email)
+ *   - invoice.payment_succeeded (renewal receipt — skips the first invoice)
  */
 
 const { getUser, updateUser, logTransaction, getUserByStripeCustomerId, addEssence, addGems } = require('../common/db-client');
-const { getItem, putItem, TABLES } = require('../common/db-client');
-const { sendSubscriptionCanceledEmail, sendSubscriptionReactivatedEmail, sendSubscriptionConfirmedEmail } = require('../common/email');
+const { getItem, putItem, TABLES, claimIdempotencyKey } = require('../common/db-client');
+const {
+  sendSubscriptionCanceledEmail,
+  sendSubscriptionReactivatedEmail,
+  sendSubscriptionConfirmedEmail,
+  sendSubscriptionExpiredEmail,
+  sendPaymentFailedEmail,
+  sendRenewalReceiptEmail,
+} = require('../common/email');
 const { publishBalanceUpdate, publishNotification } = require('../common/iot-publisher');
 const { getSecret } = require('../common/ssm-loader');
+const { SUBSCRIPTION_BONUS } = require('../config/subscription-tiers');
+const { STRIPE_API_VERSION } = require('../common/stripe');
 
 // Stripe instance (lazy loaded, resolves from SSM if needed)
 let stripe = null;
@@ -24,7 +35,7 @@ async function getStripeAsync() {
   if (stripe) return stripe;
   const key = await getSecret('STRIPE_SECRET_KEY');
   if (key) {
-    stripe = require('stripe')(key);
+    stripe = require('stripe')(key, { apiVersion: STRIPE_API_VERSION });
   }
   return stripe;
 }
@@ -40,6 +51,22 @@ function getPriceIdFromTier(tier) {
   if (tier === 'vip') return process.env.STRIPE_PRICE_VIP;
   if (tier === 'premium') return process.env.STRIPE_PRICE_PREMIUM;
   return null;
+}
+
+// Stripe billing_reason values that indicate a subscription invoice (vs. a one-off).
+const SUBSCRIPTION_BILLING_REASONS = new Set([
+  'subscription_create', 'subscription_cycle', 'subscription_update', 'subscription_threshold',
+]);
+
+// True if an invoice belongs to a subscription. Checks billing_reason plus the
+// subscription linkage in both the pre-'basil' (top-level `subscription`) and newer
+// (`parent.subscription_details.subscription`) payload shapes.
+function isSubscriptionInvoice(invoice) {
+  if (!invoice) return false;
+  if (SUBSCRIPTION_BILLING_REASONS.has(invoice.billing_reason)) return true;
+  if (invoice.subscription != null) return true;
+  if (invoice.parent?.subscription_details?.subscription != null) return true;
+  return false;
 }
 
 /**
@@ -629,6 +656,15 @@ async function handleSubscriptionWebhook(event) {
         return { success: true, message: 'User not found, skipped' };
       }
 
+      // Idempotency: a redelivered .deleted must not re-log or re-email. If the user is
+      // already downgraded+canceled, this event was already processed.
+      if (user.tier === 'free' && user.subscription?.status === 'canceled') {
+        return { success: true, message: 'Already downgraded (duplicate webhook)' };
+      }
+
+      // Capture the tier being lost before we overwrite it, for the notification email.
+      const endedTier = user.subscription?.tier || user.tier || 'premium';
+
       console.log(`[Subscription] Subscription ended for ${user.id}, downgrading to free`);
 
       await updateUser(user.id, {
@@ -651,6 +687,16 @@ async function handleSubscriptionWebhook(event) {
         refName: 'Subscription ended - downgraded to free',
       });
 
+      // Notify the user their subscription has fully lapsed (await so Lambda doesn't freeze).
+      if (user.email) {
+        try {
+          await sendSubscriptionExpiredEmail(user.email, endedTier);
+        }
+        catch (err) {
+          console.error('[Subscription] Expired email failed:', err.message);
+        }
+      }
+
       // Push real-time tier downgrade via IoT (non-blocking)
       publishBalanceUpdate(user.id, {
         currency: 'tier',
@@ -669,6 +715,123 @@ async function handleSubscriptionWebhook(event) {
       return { success: true, message: 'Subscription canceled, downgraded to free' };
     }
 
+    case 'invoice.payment_failed': {
+      const invoice = event.data.object;
+      const customerId = invoice.customer;
+
+      // Positively gate on subscription invoices — dunning copy says "your subscription
+      // payment failed", so never send it for a one-off invoice. Check both the billing
+      // reason and the subscription linkage (top-level pre-'basil', nested after).
+      if (!isSubscriptionInvoice(invoice)) {
+        return { success: true, message: 'Non-subscription invoice, skipped' };
+      }
+
+      const user = await getUserByStripeCustomerId(customerId);
+      if (!user) {
+        console.error('[Subscription] User not found for customer:', customerId);
+        return { success: true, message: 'User not found, skipped' };
+      }
+
+      const tier = user.subscription?.tier || user.tier || 'premium';
+      const nextRetryDate = invoice.next_payment_attempt
+        ? new Date(invoice.next_payment_attempt * 1000)
+        : null;
+
+      console.log(`[Subscription] Payment failed for ${user.id} (${tier}); next retry: ${nextRetryDate ? nextRetryDate.toISOString() : 'none'}`);
+
+      await logTransaction(user.id, {
+        type: 'subscription_payment_failed',
+        currency: 'tier',
+        amount: 0,
+        balanceBefore: 0,
+        balanceAfter: 0,
+        refType: 'subscription',
+        refName: `Payment failed for ${tier} subscription`,
+      });
+
+      // Dunning email (await so Lambda doesn't freeze before the send completes).
+      if (user.email) {
+        try {
+          await sendPaymentFailedEmail(user.email, tier, nextRetryDate);
+        }
+        catch (err) {
+          console.error('[Subscription] Payment failed email error:', err.message);
+        }
+      }
+
+      return { success: true, message: 'Payment failure processed' };
+    }
+
+    case 'invoice.payment_succeeded': {
+      const invoice = event.data.object;
+      const customerId = invoice.customer;
+
+      // Only send receipts for genuine renewals. The first invoice
+      // (billing_reason 'subscription_create') is already acknowledged by the
+      // subscription-confirmed email; proration/manual invoices are not clean renewals.
+      if (invoice.billing_reason !== 'subscription_cycle') {
+        return { success: true, message: `Invoice ${invoice.billing_reason || 'unknown'}, no receipt sent` };
+      }
+
+      // Skip zero-amount invoices (e.g. fully-discounted/trial cycles) — nothing was charged.
+      if (!invoice.amount_paid || invoice.amount_paid <= 0) {
+        return { success: true, message: 'Zero-amount renewal, no receipt sent' };
+      }
+
+      // Idempotency: don't send a duplicate receipt / re-log if Stripe redelivers.
+      if (invoice.id) {
+        const { firstTime } = await claimIdempotencyKey('renewal-receipt', invoice.id);
+        if (!firstTime) {
+          return { success: true, message: 'Renewal already processed (duplicate webhook)' };
+        }
+      }
+
+      const user = await getUserByStripeCustomerId(customerId);
+      if (!user) {
+        console.error('[Subscription] User not found for customer:', customerId);
+        return { success: true, message: 'User not found, skipped' };
+      }
+
+      const line = invoice.lines?.data?.[0];
+      // Read the price id defensively: pre-'basil' Stripe exposes line.price.id; newer
+      // versions move it to line.pricing.price_details.price. We pin the API version, but
+      // support both shapes so an SDK/version bump can't silently null the tier.
+      const linePriceId = line?.price?.id || line?.pricing?.price_details?.price || null;
+      const tier = getTierFromPriceId(linePriceId)
+        || user.subscription?.tier
+        || user.tier
+        || 'premium';
+
+      // The end of the period just paid for is the next billing date.
+      const nextBillingDate = line?.period?.end
+        ? new Date(line.period.end * 1000)
+        : (invoice.period_end ? new Date(invoice.period_end * 1000) : null);
+
+      console.log(`[Subscription] Renewal paid for ${user.id} (${tier}): ${invoice.amount_paid} ${invoice.currency}`);
+
+      await logTransaction(user.id, {
+        type: 'subscription_renewed',
+        currency: 'tier',
+        amount: 0,
+        balanceBefore: 0,
+        balanceAfter: 0,
+        refType: 'subscription',
+        refName: `${tier} subscription renewed`,
+      });
+
+      // Renewal receipt (await so Lambda doesn't freeze before the send completes).
+      if (user.email) {
+        try {
+          await sendRenewalReceiptEmail(user.email, tier, invoice.amount_paid, invoice.currency, nextBillingDate);
+        }
+        catch (err) {
+          console.error('[Subscription] Renewal receipt email error:', err.message);
+        }
+      }
+
+      return { success: true, message: 'Renewal receipt processed' };
+    }
+
     default:
       return null; // Not a subscription event
   }
@@ -679,11 +842,6 @@ async function handleSubscriptionWebhook(event) {
 // =============================================================================
 
 const REWARDS_CLAIMS_TABLE = TABLES.REWARDS_CLAIMS;
-
-const SUBSCRIPTION_BONUS = {
-  premium: { essence: 500, gems: 100 },
-  vip: { essence: 1500, gems: 500 },
-};
 
 /**
  * Get current billing month key (YYYY-MM)

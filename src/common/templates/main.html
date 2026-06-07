@@ -82,6 +82,13 @@
         }
         .content p {
             color: #d1d5db;
+            /* The global `* { margin:0 }` reset above strips paragraph spacing, leaving
+               <p> tags flush. Restore a consistent gap between paragraphs (~half a blank
+               line) so we don't need manual <br/> spacers. */
+            margin: 0 0 14px 0;
+        }
+        .content ul, .content ol {
+            margin: 0 0 14px 15px;
         }
         .content a {
             color: #a78bfa;
@@ -162,7 +169,7 @@
         <div class="header" style="padding: 20px; text-align: center; background-color: #111827;">
             <div class="logo-container" style="display: inline-block;">
                 <a href="{{appUrl}}" style="text-decoration: none;">
-                    <img src="{{appUrl}}/tb-logo-180.png" alt="TotemBound Logo" class="logo" style="width: 60px; height: 60px; vertical-align: middle; margin-right: 15px;">
+                    <img src="{{logoUrl}}" alt="TotemBound Logo" class="logo" style="width: 60px; height: 60px; vertical-align: middle; margin-right: 15px;">
                     <span class="brand-name" style="color: #ffffff; font-size: 28px; font-weight: bold; vertical-align: middle; text-shadow: 0 1px 3px rgba(0,0,0,0.3);">TotemBound</span>
                 </a>
             </div>

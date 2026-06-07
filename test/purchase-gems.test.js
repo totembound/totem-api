@@ -12,7 +12,12 @@
 
 jest.mock('../src/common/db-client', () => ({
   addGems: jest.fn(),
+  deductGems: jest.fn(),
   getUser: jest.fn(),
+  getItem: jest.fn(),
+  putItem: jest.fn(),
+  claimIdempotencyKey: jest.fn().mockResolvedValue({ firstTime: true }),
+  releaseIdempotencyKey: jest.fn().mockResolvedValue(undefined),
   logTransaction: jest.fn(),
   getBundlePurchasesToday: jest.fn(),
   TABLES: { REWARDS_CLAIMS: 'TotemBound-RewardsClaims' },
@@ -20,6 +25,7 @@ jest.mock('../src/common/db-client', () => ({
 
 jest.mock('../src/common/email', () => ({
   sendGemPurchaseReceiptEmail: jest.fn().mockResolvedValue({}),
+  sendRefundIssuedEmail: jest.fn().mockResolvedValue({}),
 }));
 
 jest.mock('../src/common/iot-publisher', () => ({
@@ -72,6 +78,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   dbClient.getUser.mockResolvedValue(makeUserRecord());
   dbClient.addGems.mockResolvedValue({ success: true, newBalance: 5500 });
+  dbClient.deductGems.mockResolvedValue({ success: true, newBalance: 4500 });
   dbClient.getBundlePurchasesToday.mockResolvedValue(0);
   dbClient.logTransaction.mockResolvedValue({});
   ssm.getSecret.mockResolvedValue(null);
@@ -477,6 +484,7 @@ describe('handleStripeWebhook', () => {
 
       jest.doMock('../src/common/db-client', () => ({
         addGems: jest.fn().mockResolvedValue({ success: true, newBalance: 5500 }),
+        deductGems: jest.fn().mockResolvedValue({ success: true, newBalance: 4500 }),
         getUser: jest.fn().mockResolvedValue({
           id: 'usr_test123',
           email: 'test@example.com',
@@ -486,6 +494,10 @@ describe('handleStripeWebhook', () => {
           settings: {},
           createdAt: '2024-01-01T00:00:00.000Z',
         }),
+        getItem: jest.fn().mockResolvedValue(null),
+        putItem: jest.fn().mockResolvedValue({}),
+        claimIdempotencyKey: jest.fn().mockResolvedValue({ firstTime: true }),
+        releaseIdempotencyKey: jest.fn().mockResolvedValue(undefined),
         logTransaction: jest.fn().mockResolvedValue({}),
         getBundlePurchasesToday: jest.fn().mockResolvedValue(0),
         TABLES: { REWARDS_CLAIMS: 'TotemBound-RewardsClaims' },
@@ -493,6 +505,7 @@ describe('handleStripeWebhook', () => {
 
       jest.doMock('../src/common/email', () => ({
         sendGemPurchaseReceiptEmail: jest.fn().mockResolvedValue({}),
+        sendRefundIssuedEmail: jest.fn().mockResolvedValue({}),
       }));
 
       jest.doMock('../src/common/iot-publisher', () => ({
@@ -644,18 +657,186 @@ describe('handleStripeWebhook', () => {
       expect(result.error).toBe('Missing user ID');
     });
 
-    it('should handle charge.refunded event', async () => {
+    it('should flag charge.refunded for manual review when metadata is missing', async () => {
       mockConstructEvent.mockReturnValue({
         type: 'charge.refunded',
         data: {
-          object: { id: 'ch_test_charge123' },
+          object: { id: 'ch_test_charge123', amount: 499, amount_refunded: 499, currency: 'usd' },
         },
       });
 
       const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
       expect(result.success).toBe(true);
-      expect(result.message).toBe('Refund logged');
+      expect(result.message).toMatch(/manual review/i);
+      expect(freshDb.deductGems).not.toHaveBeenCalled();
+    });
+
+    it('should claw back gems and email the user on a full refund with metadata', async () => {
+      freshDb.deductGems.mockResolvedValue({ success: true, newBalance: 4500 });
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_test_charge456',
+            amount: 499,
+            amount_refunded: 499,
+            currency: 'usd',
+            metadata: { userId: 'usr_test123', packageId: 'pkg_starter' },
+          },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Refund processed');
+      expect(freshDb.deductGems).toHaveBeenCalledWith(
+        'usr_test123',
+        expect.any(Number),
+        expect.objectContaining({ type: 'refund_reversal', ref: 'ch_test_charge456' })
+      );
+      expect(_freshEmail.sendRefundIssuedEmail).toHaveBeenCalled();
+    });
+
+    it('should not force a negative balance when gems were already spent', async () => {
+      freshDb.deductGems.mockResolvedValue({ success: false, error: 'Insufficient balance' });
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_test_charge789',
+            amount: 499,
+            amount_refunded: 499,
+            currency: 'usd',
+            metadata: { userId: 'usr_test123', packageId: 'pkg_starter' },
+          },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Refund processed');
+      // Still emails the user, but with a note that the balance wasn't adjusted.
+      const noteArg = _freshEmail.sendRefundIssuedEmail.mock.calls[0]?.[4] || '';
+      expect(noteArg).toMatch(/already been used|not adjusted/i);
+    });
+
+    it('should log charge.dispute.created as an operator alert', async () => {
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.dispute.created',
+        data: {
+          object: { id: 'dp_test1', charge: 'ch_x', amount: 499, currency: 'usd', reason: 'fraudulent' },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/dispute/i);
+    });
+
+    it('should NOT double-credit gems on a redelivered checkout.session.completed', async () => {
+      freshDb.claimIdempotencyKey.mockResolvedValue({ firstTime: false }); // already fulfilled
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_dup_session',
+            mode: 'payment',
+            client_reference_id: 'usr_test123',
+            metadata: { packageId: 'pkg_starter' },
+          },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/duplicate/i);
       expect(freshDb.addGems).not.toHaveBeenCalled();
+    });
+
+    it('should release the idempotency claim on a TRANSIENT fulfillment failure (allow retry)', async () => {
+      freshDb.claimIdempotencyKey.mockResolvedValue({ firstTime: true });
+      freshDb.addGems.mockResolvedValue({ success: false }); // → GEM_ADD_FAILED (transient)
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_fail_session',
+            mode: 'payment',
+            client_reference_id: 'usr_test123',
+            metadata: { packageId: 'pkg_starter' },
+          },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      expect(result.success).toBe(false);
+      expect(freshDb.releaseIdempotencyKey).toHaveBeenCalledWith('gem-fulfillment', 'cs_fail_session');
+    });
+
+    it('should KEEP the claim and ack on a TERMINAL fulfillment failure (no retry loop)', async () => {
+      freshDb.claimIdempotencyKey.mockResolvedValue({ firstTime: true });
+      freshDb.getUser.mockResolvedValue(null); // → USER_NOT_FOUND (terminal)
+      mockConstructEvent.mockReturnValue({
+        type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_terminal_session',
+            mode: 'payment',
+            client_reference_id: 'usr_missing',
+            metadata: { packageId: 'pkg_starter' },
+          },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      // Acks 2xx so Stripe stops retrying, but the claim is NOT released (no infinite loop).
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/manual review/i);
+      expect(freshDb.releaseIdempotencyKey).not.toHaveBeenCalled();
+    });
+
+    it('should skip a redelivered charge.refunded (same refund state)', async () => {
+      freshDb.claimIdempotencyKey.mockResolvedValue({ firstTime: false }); // already processed
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_dup', amount: 499, amount_refunded: 499, currency: 'usd',
+            metadata: { userId: 'usr_test123', packageId: 'pkg_starter' },
+          },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/duplicate/i);
+      expect(freshDb.deductGems).not.toHaveBeenCalled();
+    });
+
+    it('should reverse only the INCREMENTAL gems on a partial-then-larger refund', async () => {
+      // pkg_starter = 500 gems. 250 already reversed; now cumulative refund is full (499/499)
+      // → target 500, so only 250 more should be clawed back (not the full 500 again).
+      freshDb.claimIdempotencyKey.mockResolvedValue({ firstTime: true });
+      freshDb.getItem.mockResolvedValue({ reversedGems: 250 });
+      freshDb.deductGems.mockResolvedValue({ success: true, newBalance: 4250 });
+      mockConstructEvent.mockReturnValue({
+        type: 'charge.refunded',
+        data: {
+          object: {
+            id: 'ch_partial', amount: 499, amount_refunded: 499, currency: 'usd',
+            metadata: { userId: 'usr_test123', packageId: 'pkg_starter' },
+          },
+        },
+      });
+
+      const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
+      expect(result.success).toBe(true);
+      expect(freshDb.deductGems).toHaveBeenCalledWith('usr_test123', 250, expect.objectContaining({ ref: 'ch_partial' }));
+      // Marker advanced to the new cumulative total (500).
+      expect(freshDb.putItem).toHaveBeenCalledWith(
+        'TotemBound-RewardsClaims',
+        expect.objectContaining({ reversedGems: 500, chargeId: 'ch_partial' })
+      );
     });
 
     it('should return unhandled event message for unknown event types', async () => {
@@ -680,7 +861,7 @@ describe('handleStripeWebhook', () => {
       expect(result.message).toBe('Unhandled event: payment_intent.succeeded');
     });
 
-    it('should pass through INVALID_PACKAGE error from fulfillment', async () => {
+    it('should ack a terminal INVALID_PACKAGE failure for manual review (no retry loop)', async () => {
       mockConstructEvent.mockReturnValue({
         type: 'checkout.session.completed',
         data: {
@@ -694,11 +875,13 @@ describe('handleStripeWebhook', () => {
       });
 
       const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('INVALID_PACKAGE');
+      // Terminal: ack 2xx so Stripe stops retrying; flagged for manual fulfillment.
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/manual review/i);
+      expect(freshDb.releaseIdempotencyKey).not.toHaveBeenCalled();
     });
 
-    it('should pass through USER_NOT_FOUND from webhook fulfillment', async () => {
+    it('should ack a terminal USER_NOT_FOUND failure for manual review (no retry loop)', async () => {
       freshDb.getUser.mockResolvedValue(null);
 
       mockConstructEvent.mockReturnValue({
@@ -714,8 +897,9 @@ describe('handleStripeWebhook', () => {
       });
 
       const result = await mod.handleStripeWebhook('raw-body', 'valid-sig');
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('USER_NOT_FOUND');
+      expect(result.success).toBe(true);
+      expect(result.message).toMatch(/manual review/i);
+      expect(freshDb.releaseIdempotencyKey).not.toHaveBeenCalled();
     });
 
     it('should pass sessionId from webhook session to fulfillGemPurchase', async () => {
@@ -816,6 +1000,7 @@ describe('handleStripeWebhook', () => {
 
       jest.doMock('../src/common/db-client', () => ({
         addGems: jest.fn().mockResolvedValue({ success: true, newBalance: 5500 }),
+        deductGems: jest.fn().mockResolvedValue({ success: true, newBalance: 4500 }),
         getUser: jest.fn().mockResolvedValue({
           id: 'usr_test123',
           email: 'test@example.com',
@@ -825,6 +1010,10 @@ describe('handleStripeWebhook', () => {
           settings: {},
           createdAt: '2024-01-01T00:00:00.000Z',
         }),
+        getItem: jest.fn().mockResolvedValue(null),
+        putItem: jest.fn().mockResolvedValue({}),
+        claimIdempotencyKey: jest.fn().mockResolvedValue({ firstTime: true }),
+        releaseIdempotencyKey: jest.fn().mockResolvedValue(undefined),
         logTransaction: jest.fn().mockResolvedValue({}),
         getBundlePurchasesToday: jest.fn().mockResolvedValue(0),
         TABLES: { REWARDS_CLAIMS: 'TotemBound-RewardsClaims' },
@@ -832,6 +1021,7 @@ describe('handleStripeWebhook', () => {
 
       jest.doMock('../src/common/email', () => ({
         sendGemPurchaseReceiptEmail: jest.fn().mockResolvedValue({}),
+        sendRefundIssuedEmail: jest.fn().mockResolvedValue({}),
       }));
 
       jest.doMock('../src/common/iot-publisher', () => ({

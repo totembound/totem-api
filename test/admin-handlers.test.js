@@ -569,12 +569,23 @@ describe('PUT /v1/admin/users/:id/status (setStatus)', () => {
 // GET /v1/admin/stats
 // =============================================================================
 describe('GET /v1/admin/stats', () => {
+  // Pin a fixed mid-day UTC clock for the whole stats suite. The today/thisWeek
+  // rollup keys boundary hours by the current/previous UTC hour and overwrites any
+  // slice at those keys with live aggregates (admin-stats-service computeTransactions).
+  // The fixtures below hardcode a stored slice at 01:00 UTC, so on a real clock these
+  // tests fail when run during the 01:00–02:59 UTC window (hour-key collision). Noon
+  // is safely clear of every hardcoded boundary, making the suite time-independent.
   beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-06-15T12:00:00.000Z'));
     // Default: no precomputed snapshot → endpoint computes live.
     db.getLatestSnapshot.mockResolvedValue(null);
     // Default transaction rollup inputs: empty boundary hours + no stored slices.
     db.aggregateTransactions.mockResolvedValue({ ...EMPTY_AGG });
     db.queryStatsTrends.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('returns aggregated dashboard metrics (live compute when no snapshot)', async () => {

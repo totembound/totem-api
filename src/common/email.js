@@ -1,6 +1,7 @@
 const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 const fs = require('fs');
 const path = require('path');
+const { getTierBonus } = require('../config/subscription-tiers');
 const defaultAppUrl = 'https://totembound.com';
 const defaultLogoUrl = 'https://totembound.com/tb-logo-180.png';
 const defaultEmailFrom = 'no-reply@totembound.com';
@@ -26,9 +27,12 @@ let localTransport = null;
 function getLocalTransport() {
   if (!localTransport) {
     const nodemailer = require('nodemailer');
+    // Honor SMTP_HOST/SMTP_PORT so this works both on the host (localhost:1025 → MailHog
+    // via the port map) and INSIDE the api container (SMTP_HOST=mailhog on the compose
+    // network). Defaults preserve the original host-based behavior.
     localTransport = nodemailer.createTransport({
-      host: 'localhost',
-      port: 1025,
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT, 10) || 1025,
       ignoreTLS: true,
     });
   }
@@ -253,6 +257,30 @@ function tierDisplayName(tier) {
   return tier.charAt(0).toUpperCase() + tier.slice(1);
 }
 
+// Format a Date as a long, human-readable date (e.g. "Monday, July 15, 2024").
+function formatLongDate(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return 'your next billing date';
+  return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// Format a Stripe money amount (minor units, e.g. cents) + currency code into a display
+// string like "$9.99". Falls back gracefully for zero-decimal currencies and unknowns.
+function formatStripeAmount(amountMinor, currency) {
+  if (typeof amountMinor !== 'number' || isNaN(amountMinor)) return 'your payment';
+  const code = (currency || 'usd').toUpperCase();
+  // Zero-decimal currencies (Stripe) — value is already in major units.
+  const ZERO_DECIMAL = new Set(['JPY', 'KRW', 'VND', 'CLP', 'BIF', 'DJF', 'GNF', 'KMF', 'MGA', 'PYG', 'RWF', 'UGX', 'VUV', 'XAF', 'XOF', 'XPF']);
+  const major = ZERO_DECIMAL.has(code) ? amountMinor : amountMinor / 100;
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(major);
+  }
+  catch {
+    // Unknown/invalid currency code — fall back to a plain number + code.
+    return `${major} ${code}`;
+  }
+}
+
 /**
  * Send subscription canceled notification email
  */
@@ -278,7 +306,7 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate, tier = 'pr
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending cancel email to ${email}:`, error);
+    console.error('Error sending cancel email to %s:', email, error);
     return null;
   }
 };
@@ -308,7 +336,7 @@ exports.sendSubscriptionReactivatedEmail = async (email, renewalDate, tier = 'pr
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending reactivation email to ${email}:`, error);
+    console.error('Error sending reactivation email to %s:', email, error);
     return null;
   }
 };
@@ -332,7 +360,7 @@ exports.sendGemPurchaseReceiptEmail = async (email, packageName, gemsAdded, newB
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending gem receipt email to ${email}:`, error);
+    console.error('Error sending gem receipt email to %s:', email, error);
     return null;
   }
 };
@@ -344,8 +372,7 @@ exports.sendSubscriptionConfirmedEmail = async (email, tier, nextBillingDate) =>
   const tierName = tierDisplayName(tier);
   const subject = `Welcome to TotemBound ${tierName}!`;
 
-  const BONUS = { premium: { essence: 500, gems: 100 }, vip: { essence: 1500, gems: 500 } };
-  const bonus = BONUS[tier] || BONUS.premium;
+  const bonus = getTierBonus(tier);
 
   const formattedDate = nextBillingDate
     ? new Date(nextBillingDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
@@ -365,7 +392,159 @@ exports.sendSubscriptionConfirmedEmail = async (email, tier, nextBillingDate) =>
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending subscription confirmed email to ${email}:`, error);
+    console.error('Error sending subscription confirmed email to %s:', email, error);
+    return null;
+  }
+};
+
+/**
+ * Send password-changed security confirmation email.
+ * Fired after a password reset/change completes — purely a takeover-detection signal.
+ */
+exports.sendPasswordChangedEmail = async (email, displayName, changedAt = new Date()) => {
+  const subject = 'TotemBound - Your Password Was Changed';
+  const name = displayName || 'there';
+
+  const when = (changedAt instanceof Date ? changedAt : new Date(changedAt));
+  const changedAtText = isNaN(when.getTime())
+    ? 'just now'
+    : when.toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short', timeZone: 'UTC' }) + ' UTC';
+
+  const htmlContent = loadTemplate('password-changed', {
+    subject,
+    displayName: name,
+    changedAt: changedAtText,
+  });
+
+  const textContent = `Hi ${name}, this confirms the password for your TotemBound account was changed on ${changedAtText}. If this wasn't you, reset your password immediately and contact us right away.`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    console.error('Error sending password changed email to %s:', email, error);
+    return null;
+  }
+};
+
+/**
+ * Send failed-recurring-payment (dunning) email.
+ * @param {string} email
+ * @param {string} tier - 'premium' | 'vip'
+ * @param {Date|string|null} nextRetryDate - when Stripe will retry, if known
+ */
+exports.sendPaymentFailedEmail = async (email, tier, nextRetryDate = null) => {
+  const tierName = tierDisplayName(tier || 'premium');
+  const subject = `TotemBound - Payment Failed for Your ${tierName} Subscription`;
+
+  const retryDate = nextRetryDate ? (nextRetryDate instanceof Date ? nextRetryDate : new Date(nextRetryDate)) : null;
+  const retryInfo = retryDate && !isNaN(retryDate.getTime())
+    ? `We'll automatically try again on ${formatLongDate(retryDate)}.`
+    : `We'll retry the payment over the next several days.`;
+
+  const htmlContent = loadTemplate('payment-failed', {
+    subject,
+    tierName,
+    retryInfo,
+  });
+
+  const textContent = `We couldn't process the payment for your TotemBound ${tierName} subscription. Your benefits are still active for now. ${retryInfo} Please update your payment method in your account settings to avoid losing access.`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    console.error('Error sending payment failed email to %s:', email, error);
+    return null;
+  }
+};
+
+/**
+ * Send subscription-ended (final lapse) email — fired when the subscription actually
+ * terminates and the account is downgraded to free (distinct from a scheduled cancel).
+ */
+exports.sendSubscriptionExpiredEmail = async (email, tier) => {
+  const tierName = tierDisplayName(tier || 'premium');
+  const subject = `Your TotemBound ${tierName} Subscription Has Ended`;
+
+  const htmlContent = loadTemplate('subscription-expired', {
+    subject,
+    tierName,
+  });
+
+  const textContent = `Your TotemBound ${tierName} subscription has ended and your account is now on the Free plan. Your totems, progress, and currency are safe — only your ${tierName} perks are paused. You can resubscribe anytime from the Plans page.`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    console.error('Error sending subscription expired email to %s:', email, error);
+    return null;
+  }
+};
+
+/**
+ * Send a recurring renewal receipt — fired on a successful renewal charge (not the first
+ * invoice; the initial purchase already sends the confirmation email).
+ * @param {number|null} amountMinor - charged amount in minor units (Stripe), e.g. cents
+ * @param {string} currency - ISO currency code (e.g. 'usd')
+ * @param {Date|string|null} nextBillingDate
+ */
+exports.sendRenewalReceiptEmail = async (email, tier, amountMinor, currency, nextBillingDate = null) => {
+  const tierName = tierDisplayName(tier || 'premium');
+  const subject = `TotemBound - Receipt for Your ${tierName} Subscription`;
+
+  const amount = formatStripeAmount(amountMinor, currency);
+  const nextBillingText = nextBillingDate ? formatLongDate(nextBillingDate) : 'your next billing date';
+  const bonus = getTierBonus(tier);
+
+  const htmlContent = loadTemplate('renewal-receipt', {
+    subject,
+    tierName,
+    amount,
+    nextBillingDate: nextBillingText,
+    essenceBonus: bonus.essence.toString(),
+    gemsBonus: bonus.gems.toString(),
+  });
+
+  const textContent = `Receipt for your TotemBound ${tierName} subscription. Amount charged: ${amount}. Next billing date: ${nextBillingText}. Don't forget to claim this month's bonus of ${bonus.essence} Essence and ${bonus.gems} Gems!`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    console.error('Error sending renewal receipt email to %s:', email, error);
+    return null;
+  }
+};
+
+/**
+ * Send a refund-issued confirmation — fired when a charge is refunded.
+ * @param {number|null} amountMinor - refunded amount in minor units (Stripe), e.g. cents
+ * @param {string} currency - ISO currency code
+ * @param {string} itemName - what was refunded (e.g. gem package name) or a generic label
+ * @param {string} gemNote - human-readable note about any gem adjustment
+ */
+exports.sendRefundIssuedEmail = async (email, amountMinor, currency, itemName, gemNote) => {
+  const subject = 'TotemBound - Your Refund Has Been Processed';
+  const amount = formatStripeAmount(amountMinor, currency);
+  const item = itemName || 'TotemBound purchase';
+  const note = gemNote || 'Your account balances have been updated to reflect this refund.';
+
+  const htmlContent = loadTemplate('refund-issued', {
+    subject,
+    amount,
+    itemName: item,
+    gemNote: note,
+  });
+
+  const textContent = `Your refund of ${amount} for "${item}" has been processed and will appear on your original payment method within 5-10 business days. ${note} Reply to this email if you have any questions.`;
+
+  try {
+    return await sendEmail(email, subject, htmlContent, textContent);
+  }
+  catch (error) {
+    console.error('Error sending refund issued email to %s:', email, error);
     return null;
   }
 };
