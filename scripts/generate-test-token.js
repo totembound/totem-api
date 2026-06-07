@@ -91,8 +91,8 @@ const LOCAL_SECRET = 'totembound-local-development-secret-key-not-for-production
 let payload;
 
 if (customEmail) {
-  const { v4: uuidv4 } = require('uuid');
-  const userId = `usr_${uuidv4()}`;
+  const { randomUUID } = require('crypto');
+  const userId = `usr_${randomUUID()}`;
   payload = {
     sub: userId,
     email: customEmail,

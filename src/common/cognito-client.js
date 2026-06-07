@@ -10,7 +10,7 @@
  */
 
 const jwt = require('jsonwebtoken');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const { generateId } = require('./id-utils');
 
 // ============================================
@@ -101,7 +101,7 @@ function localGenerateTokens(userId, email, role) {
   );
 
   const refreshToken = jwt.sign(
-    { sub: userId, email, token_use: 'refresh', jti: uuidv4(), iat: Math.floor(Date.now() / 1000) },
+    { sub: userId, email, token_use: 'refresh', jti: randomUUID(), iat: Math.floor(Date.now() / 1000) },
     JWT_SECRET,
     { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
   );
@@ -634,7 +634,7 @@ async function localCreateOAuthUser({ email, displayName, provider, providerId }
   const user = {
     id: userId,
     email: normalizedEmail,
-    passwordHash: hashPassword(uuidv4()), // Random password — user never needs it
+    passwordHash: hashPassword(randomUUID()), // Random password — user never needs it
     displayName: displayName || email.split('@')[0],
     emailVerified: true, // OAuth emails are pre-verified
     oauthProvider: provider,
@@ -659,7 +659,7 @@ async function awsCreateOAuthUser({ email, displayName, _provider, _providerId }
 
   const normalizedEmail = email.toLowerCase();
   const name = displayName || email.split('@')[0];
-  const tempPassword = `Temp${uuidv4().replace(/-/g, '').slice(0, 16)}!1`;
+  const tempPassword = `Temp${randomUUID().replace(/-/g, '').slice(0, 16)}!1`;
 
   // Create user with suppressed welcome message
   const createResult = await getCognitoClient().send(new AdminCreateUserCommand({
