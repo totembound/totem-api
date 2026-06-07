@@ -306,7 +306,7 @@ exports.sendSubscriptionCanceledEmail = async (email, expirationDate, tier = 'pr
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending cancel email to ${email}:`, error);
+    console.error('Error sending cancel email to %s:', email, error);
     return null;
   }
 };
@@ -336,7 +336,7 @@ exports.sendSubscriptionReactivatedEmail = async (email, renewalDate, tier = 'pr
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending reactivation email to ${email}:`, error);
+    console.error('Error sending reactivation email to %s:', email, error);
     return null;
   }
 };
@@ -360,7 +360,7 @@ exports.sendGemPurchaseReceiptEmail = async (email, packageName, gemsAdded, newB
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending gem receipt email to ${email}:`, error);
+    console.error('Error sending gem receipt email to %s:', email, error);
     return null;
   }
 };
@@ -392,7 +392,7 @@ exports.sendSubscriptionConfirmedEmail = async (email, tier, nextBillingDate) =>
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending subscription confirmed email to ${email}:`, error);
+    console.error('Error sending subscription confirmed email to %s:', email, error);
     return null;
   }
 };
@@ -422,7 +422,7 @@ exports.sendPasswordChangedEmail = async (email, displayName, changedAt = new Da
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending password changed email to ${email}:`, error);
+    console.error('Error sending password changed email to %s:', email, error);
     return null;
   }
 };
@@ -454,7 +454,7 @@ exports.sendPaymentFailedEmail = async (email, tier, nextRetryDate = null) => {
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending payment failed email to ${email}:`, error);
+    console.error('Error sending payment failed email to %s:', email, error);
     return null;
   }
 };
@@ -478,7 +478,7 @@ exports.sendSubscriptionExpiredEmail = async (email, tier) => {
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending subscription expired email to ${email}:`, error);
+    console.error('Error sending subscription expired email to %s:', email, error);
     return null;
   }
 };
@@ -513,7 +513,7 @@ exports.sendRenewalReceiptEmail = async (email, tier, amountMinor, currency, nex
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending renewal receipt email to ${email}:`, error);
+    console.error('Error sending renewal receipt email to %s:', email, error);
     return null;
   }
 };
@@ -544,7 +544,7 @@ exports.sendRefundIssuedEmail = async (email, amountMinor, currency, itemName, g
     return await sendEmail(email, subject, htmlContent, textContent);
   }
   catch (error) {
-    console.error(`Error sending refund issued email to ${email}:`, error);
+    console.error('Error sending refund issued email to %s:', email, error);
     return null;
   }
 };
