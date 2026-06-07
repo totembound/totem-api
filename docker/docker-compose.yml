@@ -91,13 +91,25 @@ services:
     container_name: totembound-api
     ports:
       - "3001:3001"
+    # Load the full local config from the existing .env.local — this brings in ALL 8
+    # Stripe vars (secret, webhook, premium/vip + the 4 gem-package prices), OAuth creds,
+    # table names and feature flags. The environment: block below WINS over this file and
+    # rewrites the host-localhost endpoints to their in-container service names.
+    env_file:
+      - ../.env.local
     environment:
       - IS_LOCAL=true
       - PORT=3001
+      # Container-network endpoints — override .env.local's localhost:* values.
       - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+      - COGNITO_ENDPOINT=http://cognito-local:9229
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
       - AWS_REGION=us-west-2
       - AWS_ACCESS_KEY_ID=local
       - AWS_SECRET_ACCESS_KEY=local
+      # App origin for email links + Stripe success/cancel/return URLs (not in .env.local).
+      - APP_URL=http://localhost:3000
     depends_on:
       dynamodb-local:
         condition: service_healthy
