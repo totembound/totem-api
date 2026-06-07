@@ -1,6 +1,6 @@
 {
     "name": "totem-api",
-    "version": "0.13.1",
+    "version": "0.14.0",
     "description": "TotemBound REST API - serverless backend for game actions and user management",
     "main": "index.js",
     "scripts": {
@@ -61,8 +61,7 @@
         "obscenity": "^0.4.6",
         "serverless-http": "^3.2.0",
         "stripe": "^13.3.0",
-        "ulid": "^3.0.2",
-        "uuid": "^14.0.0"
+        "ulid": "^3.0.2"
     },
     "devDependencies": {
         "@aws-sdk/client-api-gateway": "^3.995.0",

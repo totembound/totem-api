@@ -38,14 +38,15 @@ const cases = [
   ['Subscription confirmed', () => email.sendSubscriptionConfirmedEmail('sub@example.com', 'vip', new Date(Date.now() + 30 * 864e5).toISOString())],
   ['Subscription canceled', () => email.sendSubscriptionCanceledEmail('cancel@example.com', new Date(Date.now() + 20 * 864e5), 'premium')],
   ['Subscription reactivated', () => email.sendSubscriptionReactivatedEmail('reactivate@example.com', new Date(Date.now() + 30 * 864e5), 'vip')],
-  ['Gem purchase receipt', () => email.sendGemPurchaseReceiptEmail('gems@example.com', 'Best Value Pack', 3000, 8200)],
+  ['Gem purchase receipt', () => email.sendGemPurchaseReceiptEmail('gems@example.com', 'Best Value', 3000, 8200)],
   // ---- NEW v1.0 emails ----
   ['Password changed (NEW)', () => email.sendPasswordChangedEmail('changed@example.com', 'SecurePlayer', new Date())],
   ['Payment failed / dunning (NEW)', () => email.sendPaymentFailedEmail('dunning@example.com', 'premium', new Date(Date.now() + 3 * 864e5))],
   ['Payment failed, no retry date (NEW)', () => email.sendPaymentFailedEmail('dunning2@example.com', 'vip', null)],
   ['Subscription expired (NEW)', () => email.sendSubscriptionExpiredEmail('expired@example.com', 'vip')],
-  ['Renewal receipt (NEW)', () => email.sendRenewalReceiptEmail('renewal@example.com', 'premium', 999, 'usd', new Date(Date.now() + 30 * 864e5))],
-  ['Refund issued (NEW)', () => email.sendRefundIssuedEmail('refund@example.com', 2499, 'usd', 'Best Value Pack', "We've removed 3,000 Gems associated with this refund from your account.")],
+  ['Renewal receipt — Premium (NEW)', () => email.sendRenewalReceiptEmail('renewal@example.com', 'premium', 500, 'usd', new Date(Date.now() + 30 * 864e5))],
+  ['Renewal receipt — VIP (NEW)', () => email.sendRenewalReceiptEmail('renewal-vip@example.com', 'vip', 1500, 'usd', new Date(Date.now() + 30 * 864e5))],
+  ['Refund issued (NEW)', () => email.sendRefundIssuedEmail('refund@example.com', 2499, 'usd', 'Best Value', "We've removed 3,000 Gems associated with this refund from your account.")],
 ];
 
 (async () => {
