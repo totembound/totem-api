@@ -1352,8 +1352,9 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
       return res.json({ success: true, message: 'Webhook ignored (not configured)' });
     }
 
-    // Construct and verify event once
-    const stripeLib = require('stripe')(stripeKey);
+    // Construct and verify event once (pin API version for deterministic payload shapes)
+    const { STRIPE_API_VERSION } = require('./common/stripe');
+    const stripeLib = require('stripe')(stripeKey, { apiVersion: STRIPE_API_VERSION });
     let event;
     try {
       event = stripeLib.webhooks.constructEvent(req.body, signature, webhookSecret);
@@ -1369,6 +1370,8 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
     const subscriptionEvents = [
       'customer.subscription.updated',
       'customer.subscription.deleted',
+      'invoice.payment_failed',
+      'invoice.payment_succeeded',
     ];
     if (subscriptionEvents.includes(event.type)) {
       const result = await subscriptionRoutes.handleSubscriptionWebhook(event);
@@ -1385,8 +1388,9 @@ app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (r
       // payment mode (gem purchases) - fall through to gem handler
     }
 
-    // Gem purchase events (checkout.session.completed payment mode, charge.refunded)
-    const result = await gemRoutes.handleStripeWebhook(req.body, signature);
+    // Gem purchase events (checkout.session.completed payment mode, charge.refunded,
+    // charge.dispute.created). Pass the already-verified event — no second constructEvent.
+    const result = await gemRoutes.handleStripeEvent(event);
     return res.json(result);
   }
   catch (error) {

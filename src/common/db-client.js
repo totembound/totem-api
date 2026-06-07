@@ -1235,6 +1235,49 @@ async function putStatsSnapshot(item) {
   }
 }
 
+// ============================================
+// Webhook idempotency markers
+//
+// Stripe (and other providers) deliver webhooks at-least-once: the same event can
+// arrive multiple times (retries on non-2xx, manual resends, network dupes). These
+// helpers record a marker in the existing RewardsClaims table (no extra table) so a
+// handler can no-op on redelivery. Keyed pk=`IDEMPOTENCY#<scope>` sk=<id>.
+// ============================================
+
+/**
+ * Atomically claim an idempotency key. Returns { firstTime: true } the first time a
+ * given (scope, id) is seen, { firstTime: false } on any subsequent call. Use the
+ * conditional-put result as the gate; if processing then fails, call
+ * releaseIdempotencyKey so a provider retry can re-process.
+ */
+async function claimIdempotencyKey(scope, id) {
+  try {
+    await docClient.send(new PutCommand({
+      TableName: TABLES.REWARDS_CLAIMS,
+      Item: { pk: `IDEMPOTENCY#${scope}`, sk: String(id), createdAt: new Date().toISOString() },
+      ConditionExpression: 'attribute_not_exists(pk)',
+    }));
+    return { firstTime: true };
+  }
+  catch (err) {
+    if (err.name === 'ConditionalCheckFailedException') {
+      return { firstTime: false };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Release a previously-claimed idempotency key (used to roll back the marker when the
+ * work it guarded failed, so a provider retry is allowed to re-run it).
+ */
+async function releaseIdempotencyKey(scope, id) {
+  await docClient.send(new DeleteCommand({
+    TableName: TABLES.REWARDS_CLAIMS,
+    Key: { pk: `IDEMPOTENCY#${scope}`, sk: String(id) },
+  }));
+}
+
 /**
  * Most recent snapshot for a granularity (newest first, Limit 1), or null.
  */
@@ -1345,5 +1388,7 @@ module.exports = {
   // Admin stats history
   putStatsSnapshot,
   getLatestSnapshot,
+  claimIdempotencyKey,
+  releaseIdempotencyKey,
   queryStatsTrends,
 };

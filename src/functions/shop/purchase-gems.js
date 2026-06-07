@@ -10,10 +10,14 @@
  */
 
 const { GEM_TO_ESSENCE_RATIO, getPackageById, getPackagesForDisplay } = require('../../config/gem-packages');
-const { addGems, getUser, getBundlePurchasesToday } = require('../../common/db-client');
-const { sendGemPurchaseReceiptEmail } = require('../../common/email');
+const {
+  addGems, deductGems, getUser, getBundlePurchasesToday,
+  getItem, putItem, claimIdempotencyKey, releaseIdempotencyKey, TABLES,
+} = require('../../common/db-client');
+const { sendGemPurchaseReceiptEmail, sendRefundIssuedEmail } = require('../../common/email');
 const { publishBalanceUpdate, publishNotification } = require('../../common/iot-publisher');
 const { getSecret } = require('../../common/ssm-loader');
+const { STRIPE_API_VERSION } = require('../../common/stripe');
 
 // Stripe instance (lazy loaded, resolves from SSM if needed)
 let stripe = null;
@@ -21,7 +25,7 @@ async function getStripeAsync() {
   if (stripe) return stripe;
   const key = await getSecret('STRIPE_SECRET_KEY');
   if (key) {
-    stripe = require('stripe')(key);
+    stripe = require('stripe')(key, { apiVersion: STRIPE_API_VERSION });
   }
   return stripe;
 }
@@ -90,6 +94,15 @@ async function createCheckoutSession(user, body) {
         userId,
         packageId: pkg.id,
         gems: pkg.gems.toString(),
+      },
+      // Mirror the metadata onto the PaymentIntent → Charge so refund webhooks
+      // (charge.refunded) can resolve the user/package without an extra Stripe lookup.
+      payment_intent_data: {
+        metadata: {
+          userId,
+          packageId: pkg.id,
+          gems: pkg.gems.toString(),
+        },
       },
     });
 
@@ -252,6 +265,20 @@ async function handleStripeWebhook(rawBody, signature) {
     return { success: false, error: 'Invalid signature' };
   }
 
+  return handleStripeEvent(event);
+}
+
+// Error codes from fulfillGemPurchase that are TRANSIENT (worth a Stripe retry).
+// Everything else is a terminal business failure: keep the idempotency claim so Stripe
+// stops retrying, and alert for manual fulfillment (the customer has already paid).
+const TRANSIENT_FULFILLMENT_ERRORS = new Set(['GEM_ADD_FAILED', 'FULFILLMENT_FAILED']);
+
+/**
+ * Handle an already-verified Stripe event (gem fulfillment, refund, dispute).
+ * Split from handleStripeWebhook so the central dispatcher in app.js — which has already
+ * verified the signature once — can pass the parsed event without a second constructEvent.
+ */
+async function handleStripeEvent(event) {
   // Handle checkout completion
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
@@ -273,29 +300,154 @@ async function handleStripeWebhook(rawBody, signature) {
       return { success: false, error: 'Missing user ID' };
     }
 
-    // Fulfill the purchase
-    const result = await fulfillGemPurchase(
-      { userId },
-      { packageId, sessionId: session.id }
-    );
+    // Idempotency: Stripe delivers at-least-once. Claim the session before crediting so
+    // a redelivered checkout.session.completed can't double-credit gems. If fulfillment
+    // fails, release the claim so a genuine retry can re-run.
+    const { firstTime } = await claimIdempotencyKey('gem-fulfillment', session.id);
+    if (!firstTime) {
+      console.log(`[Gems] Duplicate checkout.session.completed for ${session.id}, skipping`);
+      return { success: true, message: 'Already fulfilled (duplicate webhook)' };
+    }
+
+    let result;
+    try {
+      result = await fulfillGemPurchase({ userId }, { packageId, sessionId: session.id });
+    }
+    catch (err) {
+      // Unexpected throw = transient — release so Stripe retries.
+      await releaseIdempotencyKey('gem-fulfillment', session.id);
+      throw err;
+    }
+
+    // fulfillGemPurchase swallows its own errors into { success: false }. Only release the
+    // claim (→ Stripe retry) for TRANSIENT failures. Terminal business failures (daily
+    // limit, invalid package, user not found) must NOT loop forever: keep the claim, alert
+    // for manual fulfillment, and ack 2xx so Stripe stops.
+    if (!result || result.success === false) {
+      const code = result?.error?.code;
+      if (TRANSIENT_FULFILLMENT_ERRORS.has(code)) {
+        await releaseIdempotencyKey('gem-fulfillment', session.id);
+        return result;
+      }
+      console.error(`[Gems][ALERT] Paid checkout could not be fulfilled (terminal): session=${session.id} code=${code || 'unknown'} — manual fulfillment needed`);
+      return { success: true, message: `Fulfillment skipped (${code || 'unknown'}); flagged for manual review` };
+    }
 
     return result;
   }
 
-  // Handle refunds
+  // Handle refunds — claw back gems where the balance allows and confirm to the user.
   if (event.type === 'charge.refunded') {
-    const charge = event.data.object;
-    console.log('[Gems] Refund received:', charge.id);
-    // TODO: Implement gem reversal if needed
-    return { success: true, message: 'Refund logged' };
+    return handleChargeRefunded(event.data.object);
+  }
+
+  // Chargebacks/disputes — operator-facing alert so the team can contest in Stripe.
+  // (No customer email; this is handled in the Stripe dashboard.)
+  if (event.type === 'charge.dispute.created') {
+    const dispute = event.data.object;
+    console.error(`[Gems][ALERT] Dispute opened: dispute=${dispute.id} charge=${dispute.charge} amount=${dispute.amount} ${dispute.currency} reason=${dispute.reason}. Respond in the Stripe dashboard before the evidence due date.`);
+    return { success: true, message: 'Dispute logged for operator review' };
   }
 
   return { success: true, message: `Unhandled event: ${event.type}` };
 }
 
+/**
+ * Process a refunded charge: reverse the purchased gems where the balance allows (never
+ * forces a negative balance), then send a refund confirmation email.
+ *
+ * Stripe's `charge.amount_refunded` is CUMULATIVE across every refund on the charge, and
+ * `charge.refunded` is delivered at-least-once. We handle both:
+ *  - Redelivery of the same refund state is a no-op (idempotency key on charge+cumulative).
+ *  - A later partial refund (higher cumulative) reverses only the INCREMENTAL gems, using a
+ *    per-charge marker of how many gems we've already reversed — so partial-then-full never
+ *    over-reverses.
+ */
+async function handleChargeRefunded(charge) {
+  console.log(`[Gems] Refund received: charge=${charge.id} refunded=${charge.amount_refunded}/${charge.amount} ${charge.currency}`);
+
+  const meta = charge.metadata || {};
+  const userId = meta.userId || null;
+  const packageId = meta.packageId || null;
+  const pkg = packageId ? getPackageById(packageId) : null;
+
+  // Without metadata we can't safely attribute the refund — flag for manual handling.
+  if (!userId || !pkg) {
+    console.error(`[Gems][ALERT] Refund needs manual review (cannot resolve user/package): charge=${charge.id} userId=${userId || 'n/a'} packageId=${packageId || 'n/a'}`);
+    return { success: true, message: 'Refund logged; manual review required (no metadata)' };
+  }
+
+  // Idempotency keyed on (charge, cumulative-refunded): a redelivery of the SAME refund
+  // state is skipped; a later partial refund is a new state and falls through to the
+  // incremental-delta math below.
+  const idemId = `${charge.id}:${charge.amount_refunded}`;
+  const { firstTime } = await claimIdempotencyKey('refund', idemId);
+  if (!firstTime) {
+    console.log(`[Gems] Duplicate charge.refunded for ${idemId}, skipping`);
+    return { success: true, message: 'Refund already processed (duplicate webhook)' };
+  }
+
+  try {
+    const stateKey = { pk: `REFUND_STATE#${charge.id}`, sk: 'STATE' };
+    const state = await getItem(TABLES.REWARDS_CLAIMS, stateKey);
+    const alreadyReversed = state?.reversedGems || 0;
+
+    // Target = total gems that should be reversed given cumulative refunds so far.
+    const refundFraction = charge.amount > 0 ? Math.min(1, charge.amount_refunded / charge.amount) : 1;
+    const targetReversed = Math.floor(pkg.gems * refundFraction);
+    const delta = targetReversed - alreadyReversed;
+
+    const currentUser = await getUser(userId);
+    const recipientEmail = currentUser?.email || charge.receipt_email || charge.billing_details?.email || null;
+
+    let gemNote;
+    if (delta > 0) {
+      const result = await deductGems(userId, delta, {
+        type: 'refund_reversal',
+        ref: charge.id,
+        refType: 'refund',
+        refName: `Refund reversal for ${pkg.name}`,
+      });
+      if (result.success) {
+        await putItem(TABLES.REWARDS_CLAIMS, { ...stateKey, chargeId: charge.id, reversedGems: alreadyReversed + delta });
+        gemNote = `We've removed ${delta.toLocaleString()} Gems associated with this refund from your account.`;
+        console.log(`[Gems] Reversed ${delta} gems for ${userId} (charge ${charge.id}); new balance ${result.newBalance}`);
+      }
+      else {
+        // Balance no longer covers the gems (already spent) — do NOT force negative; flag for ops.
+        // Intentional: we leave the reversedGems marker un-advanced and keep the idempotency
+        // claim. The shortfall is ops-handled, not auto-retried (a retry would keep failing).
+        // Don't "fix" this into a negative balance.
+        gemNote = 'The Gems from this purchase had already been used, so your Gem balance was not adjusted.';
+        console.error(`[Gems][ALERT] Could not reverse ${delta} gems for ${userId} (charge ${charge.id}) — insufficient balance. Manual review may be needed.`);
+      }
+    }
+    else {
+      gemNote = 'Your account balances were not affected by this refund.';
+    }
+
+    if (recipientEmail) {
+      try {
+        await sendRefundIssuedEmail(recipientEmail, charge.amount_refunded, charge.currency, pkg.name, gemNote);
+      }
+      catch (err) {
+        console.error('[Gems] Refund email failed:', err.message);
+      }
+    }
+
+    return { success: true, message: 'Refund processed' };
+  }
+  catch (err) {
+    // Roll back the idempotency claim so a Stripe retry can re-process this refund state.
+    await releaseIdempotencyKey('refund', idemId);
+    throw err;
+  }
+}
+
 module.exports = {
   getGemPackages,
   createCheckoutSession,
+  handleStripeEvent,
   fulfillGemPurchase,
   handleStripeWebhook,
 };
