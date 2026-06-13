@@ -704,7 +704,7 @@ describe('Game Actions', () => {
 
       it('blocks training when too hungry (TOO_HUNGRY) WITHOUT charging essence', async () => {
         dbClient.getTotem.mockResolvedValue(makeTotem({
-          stats: { happiness: 50, hunger: 15, strength: 10, agility: 8, wisdom: 6 },
+          stats: { happiness: 50, hunger: 5, strength: 10, agility: 8, wisdom: 6 },
         }));
         const result = await train(testUser, testTotemId);
         expect(result.success).toBe(false);
@@ -712,9 +712,9 @@ describe('Game Actions', () => {
         expect(dbClient.deductEssence).not.toHaveBeenCalled();
       });
 
-      it('cranky band (hunger 30): training allowed but 2× happiness loss (−20)', async () => {
+      it('cranky band (hunger 20): training allowed but 2× happiness loss (−20)', async () => {
         dbClient.getTotem.mockResolvedValue(makeTotem({
-          stats: { happiness: 50, hunger: 30, strength: 10, agility: 8, wisdom: 6 },
+          stats: { happiness: 50, hunger: 20, strength: 10, agility: 8, wisdom: 6 },
         }));
         const result = await train(testUser, testTotemId);
         expect(result.success).toBe(true);
