@@ -55,6 +55,7 @@ const {
   onGameAction,
   onLoginStreak,
   onChallengeCompleted,
+  onChallengeTierReached,
   onExpeditionCompleted,
 } = require('../src/services/achievements-service');
 
@@ -86,8 +87,8 @@ describe('Achievements Service', () => {
   // =============================================================================
 
   describe('Achievement Constants', () => {
-    it('should define 42 achievement IDs', () => {
-      expect(Object.keys(ACHIEVEMENT_IDS)).toHaveLength(42);
+    it('should define 45 achievement IDs', () => {
+      expect(Object.keys(ACHIEVEMENT_IDS)).toHaveLength(45);
     });
 
     it('should have all achievement IDs prefixed with ach_', () => {
@@ -96,8 +97,8 @@ describe('Achievements Service', () => {
       });
     });
 
-    it('should define 17 one-time achievements', () => {
-      expect(ONETIME_ACHIEVEMENTS).toHaveLength(17);
+    it('should define 19 one-time achievements', () => {
+      expect(ONETIME_ACHIEVEMENTS).toHaveLength(19);
       expect(ONETIME_ACHIEVEMENTS).toContain(ACHIEVEMENT_IDS.RARE_COLLECTOR);
       expect(ONETIME_ACHIEVEMENTS).toContain(ACHIEVEMENT_IDS.EPIC_COLLECTOR);
       expect(ONETIME_ACHIEVEMENTS).toContain(ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR);
@@ -105,8 +106,8 @@ describe('Achievements Service', () => {
       expect(ONETIME_ACHIEVEMENTS).toContain(ACHIEVEMENT_IDS.EXPEDITION_EXPLORER);
     });
 
-    it('should define milestone thresholds for 25 progression achievements', () => {
-      expect(Object.keys(ACHIEVEMENT_MILESTONES)).toHaveLength(25);
+    it('should define milestone thresholds for 26 progression achievements', () => {
+      expect(Object.keys(ACHIEVEMENT_MILESTONES)).toHaveLength(26);
     });
 
     it('should have ascending milestone thresholds (excluding anti-meta which is per-rarity)', () => {
@@ -773,6 +774,83 @@ describe('Achievements Service', () => {
       expect(progressResult.unlocked).toBe(true);
     });
 
+    describe('CHALLENGE_TIER_REACHED trigger (Challenge Mastery)', () => {
+      it('should NOT award First Gold for three Bronze tier-ups (3 total tiers, no Gold)', async () => {
+        // Three different challenges each reaching Bronze => newTier 1 each time
+        for (const totalTiersEarned of [1, 2, 3]) {
+          const results = await checkAchievement(testUserId, 'CHALLENGE_TIER_REACHED', {
+            newTier: 1,
+            totalTiersEarned,
+            totemId: testTotemId,
+          });
+          const goldResult = results.find(r => r.achievementId === ACHIEVEMENT_IDS.CHALLENGE_GOLD);
+          expect(goldResult).toBeUndefined();
+        }
+      });
+
+      it('should award First Gold when a single challenge reaches Gold (newTier 3)', async () => {
+        const results = await checkAchievement(testUserId, 'CHALLENGE_TIER_REACHED', {
+          newTier: 3,
+          totalTiersEarned: 3, // same total as three Bronzes — newTier is what gates it
+          totemId: testTotemId,
+        });
+
+        const goldResult = results.find(r => r.achievementId === ACHIEVEMENT_IDS.CHALLENGE_GOLD);
+        expect(goldResult).toBeDefined();
+        expect(goldResult.unlocked).toBe(true);
+        expect(goldResult.rewards.essence).toBe(100);
+      });
+
+      it('should award Grandmaster at totalTiersEarned 60 (all 12 at Diamond)', async () => {
+        const results = await checkAchievement(testUserId, 'CHALLENGE_TIER_REACHED', {
+          newTier: 5,
+          totalTiersEarned: 60,
+          totemId: testTotemId,
+        });
+
+        const gmResult = results.find(r => r.achievementId === ACHIEVEMENT_IDS.CHALLENGE_GRANDMASTER);
+        expect(gmResult).toBeDefined();
+        expect(gmResult.unlocked).toBe(true);
+      });
+
+      it('should NOT award Grandmaster below 60 total tiers', async () => {
+        const results = await checkAchievement(testUserId, 'CHALLENGE_TIER_REACHED', {
+          newTier: 5,
+          totalTiersEarned: 59,
+        });
+
+        const gmResult = results.find(r => r.achievementId === ACHIEVEMENT_IDS.CHALLENGE_GRANDMASTER);
+        expect(gmResult).toBeUndefined();
+      });
+
+      it('should move CHALLENGE_MASTERY progression with totalTiersEarned', async () => {
+        // Milestones are [1, 5, 15, 30, 60] — 5 total tiers unlocks indexes 0 and 1
+        const results = await checkAchievement(testUserId, 'CHALLENGE_TIER_REACHED', {
+          newTier: 2,
+          totalTiersEarned: 5,
+        });
+
+        const masteryResult = results.find(r => r.achievementId === ACHIEVEMENT_IDS.CHALLENGE_MASTERY);
+        expect(masteryResult).toBeDefined();
+        expect(masteryResult.unlocked).toBe(true);
+        expect(masteryResult.newMilestones).toEqual([0, 1]);
+      });
+
+      it('sub-Gold tier-up must not touch the one-time First Gold record (no regress/zero-out)', async () => {
+        const results = await checkAchievement(testUserId, 'CHALLENGE_TIER_REACHED', {
+          newTier: 2,
+          totalTiersEarned: 4,
+        });
+
+        expect(results.find(r => r.achievementId === ACHIEVEMENT_IDS.CHALLENGE_GOLD)).toBeUndefined();
+        // value=0 short-circuits before checkAndUnlockMilestone — no write for CHALLENGE_GOLD
+        const goldWrites = dbClient.updateItem.mock.calls.filter(
+          ([, key]) => key.sk === `ACH#${ACHIEVEMENT_IDS.CHALLENGE_GOLD}`
+        );
+        expect(goldWrites).toHaveLength(0);
+      });
+    });
+
     it('should handle EXPEDITION_COMPLETED trigger (first expedition)', async () => {
       const results = await checkAchievement(testUserId, 'EXPEDITION_COMPLETED', {
         totalExpeditionCount: 1,
@@ -878,6 +956,22 @@ describe('Achievements Service', () => {
       it('should pass totalChallengeCount and totemId', async () => {
         const results = await onChallengeCompleted(testUserId, 1, testTotemId);
         expect(Array.isArray(results)).toBe(true);
+      });
+    });
+
+    describe('onChallengeTierReached', () => {
+      it('should pass newTier, totalTiersEarned and totemId through to the trigger', async () => {
+        // A Gold crossing through the helper should unlock First Gold
+        const results = await onChallengeTierReached(testUserId, {
+          newTier: 3,
+          totalTiersEarned: 3,
+          totemId: testTotemId,
+        });
+
+        expect(Array.isArray(results)).toBe(true);
+        const goldResult = results.find(r => r.achievementId === ACHIEVEMENT_IDS.CHALLENGE_GOLD);
+        expect(goldResult).toBeDefined();
+        expect(goldResult.unlocked).toBe(true);
       });
     });
 
