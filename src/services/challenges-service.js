@@ -33,13 +33,125 @@ const {
   TABLES,
 } = require('../common/db-client');
 
-const { onChallengeCompleted } = require('./achievements-service');
+const { onChallengeCompleted, onChallengeTierReached } = require('./achievements-service');
 const { checkEvolutionRequirements } = require('../functions/game-actions/helpers');
 const { checkActionAvailability } = require('../common/totem-utils');
 const { resolveTraitBonuses } = require('../config/trait-effects');
 
 // =============================================================================
-// CHALLENGE DEFINITIONS (11 Challenges - synced from frontend challenges.json)
+// CHALLENGE MASTERY (mirror of totem-app/src/config/challenge-mastery.json)
+// =============================================================================
+//
+// Mastery is a property of the CHALLENGE, not the totem. Progress = the
+// per-(user, challenge) `masteryCount` (falls back to `completionCount` for
+// legacy records; identical at the default anti-farm floor of 0); the tier is
+// a pure step-function of that count. Reaching a tier (1) scales XP on every future
+// completion of that challenge by any totem and (2) grants a one-time Essence
+// loot box + XP lump to the triggering totem. Gold (raiseTier) unlocks raising
+// difficulty above the stage-derived auto level.
+
+const MASTERY = {
+  version: '1.0.0',
+  // index === tier
+  tiers: [
+    { tier: 0, name: 'Novice', minCompletions: 0, xpMult: 1.0 },
+    { tier: 1, name: 'Bronze', minCompletions: 10, xpMult: 1.25 },
+    { tier: 2, name: 'Silver', minCompletions: 30, xpMult: 1.5 },
+    { tier: 3, name: 'Gold', minCompletions: 75, xpMult: 2.0 },
+    { tier: 4, name: 'Platinum', minCompletions: 150, xpMult: 2.5 },
+    { tier: 5, name: 'Diamond', minCompletions: 300, xpMult: 3.0 },
+  ],
+  // one-time bonus granted on reaching the tier (keyed by tier number).
+  // Rebalanced (2026-06-09): Bronze pays XP only; boxes start at Silver and cap
+  // at large — the huge box is exclusive to the CHALLENGE_GRANDMASTER achievement
+  // so the final Diamond doesn't triple-dip (~10.7k Essence in one run).
+  tierUpBonus: {
+    1: { lootBoxId: null, xp: 100 },
+    2: { lootBoxId: 'essence_box_small', xp: 250 },
+    3: { lootBoxId: 'essence_box_small', xp: 500 },
+    4: { lootBoxId: 'essence_box_large', xp: 1000 },
+    5: { lootBoxId: 'essence_box_large', xp: 2000 },
+  },
+  raiseTier: 3, // Gold — raising difficulty above stage-lock unlocks here
+  maxDifficulty: 3, // game has 3 difficulty levels
+  essenceXpScalingEnabled: false,
+  minMasteryScorePct: 0, // optional anti-AFK floor (0 = any score>0 counts)
+};
+
+/**
+ * Tier is a pure function of the completion count (never stored as truth).
+ * @param {number} completions
+ * @returns {number} tier index 0..5
+ */
+function tierForCompletions(completions) {
+  const n = Number.isFinite(completions) ? completions : 0;
+  let tier = 0;
+  for (let i = MASTERY.tiers.length - 1; i >= 0; i--) {
+    if (n >= MASTERY.tiers[i].minCompletions) {
+      tier = MASTERY.tiers[i].tier;
+      break;
+    }
+  }
+  return tier;
+}
+
+/**
+ * Round to an integer, then clamp into [min, max]. Difficulty is declared as
+ * enum [1, 2, 3] in swagger — a fractional request (e.g. 2.7) rounds first.
+ */
+function clampDifficulty(value, min, max) {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+/**
+ * Stage-derived "auto" difficulty — mirrors totem-app getGameDifficulty
+ * (totems.tsx): clamp(displayStage − requirements.stage, 1, maxDifficulty),
+ * where displayStage = stored stage + 1 (stages are stored 0-4, displayed
+ * 1-5). This is the default and the ceiling below Gold; it must match the
+ * frontend exactly or the client-computed difficulty gets silently clamped.
+ * @param {object} totem
+ * @param {object} challenge
+ * @returns {number} 1..maxDifficulty
+ */
+function autoDifficulty(totem, challenge) {
+  const displayStage = (totem?.stage || 0) + 1;
+  const reqStage = challenge?.requirements?.stage || 0;
+  return clampDifficulty(displayStage - reqStage, 1, MASTERY.maxDifficulty);
+}
+
+/**
+ * Build the per-challenge mastery block surfaced on list/status/complete
+ * responses. Field names are a frontend contract — do not rename.
+ * @param {number} completions - The mastery-counted value (masteryCount,
+ *   falling back to completionCount for legacy records). The tier here is
+ *   derived from this count — the same derivation the reward path uses.
+ * @param {number|null} preferredDifficulty
+ * @returns {object}
+ */
+function buildMasteryBlock(completions, preferredDifficulty = null) {
+  const tier = tierForCompletions(completions);
+  const tierDef = MASTERY.tiers[tier];
+  const nextDef = MASTERY.tiers[tier + 1] || null;
+  const nextTierAt = nextDef ? nextDef.minCompletions : null;
+  const completionsToNext = nextDef
+    ? Math.max(0, nextDef.minCompletions - completions)
+    : null;
+
+  return {
+    tier,
+    tierName: tierDef.name,
+    completions,
+    nextTierAt,
+    completionsToNext,
+    xpMultiplier: tierDef.xpMult,
+    difficultyUnlocked: tier >= MASTERY.raiseTier,
+    maxDifficulty: MASTERY.maxDifficulty,
+    preferredDifficulty: preferredDifficulty ?? null,
+  };
+}
+
+// =============================================================================
+// CHALLENGE DEFINITIONS (12 Challenges - synced from frontend challenges.json)
 // =============================================================================
 
 const CHALLENGES = [
@@ -53,7 +165,7 @@ const CHALLENGES = [
     maxDailyAttempts: 5,
     maxScore: 1000,
     xpReward: { base: 10, perPoint: 0.01 },
-    essenceReward: 5,  // Trial (display Stage 1)
+    essenceReward: 10,  // Tier 1 (display Stage 1) — stage curve 10/15/20, matches the card display
     enabled: true,
   },
   {
@@ -378,9 +490,10 @@ const CHALLENGE_HAPPINESS_REWARD = 10;
  * @param {string} challengeId - The challenge ID
  * @param {string} totemId - The totem's ID
  * @param {number} score - The score achieved in the challenge
+ * @param {number} [difficulty] - Optional requested difficulty (clamped server-side)
  * @returns {Promise<object>} - Result of the challenge completion
  */
-async function completeChallenge(userId, challengeId, totemId, score) {
+async function completeChallenge(userId, challengeId, totemId, score, difficulty) {
   const now = new Date().toISOString();
   const today = getTodayUTC();
 
@@ -498,10 +611,48 @@ async function completeChallenge(userId, challengeId, totemId, score) {
     Math.round(score * (1 + scoreBoostPct)),
   );
 
-  // 7a. XP reward based on the boosted score, then × xpMultiplier
-  //     (Clever +5% on challenge:any; Mentor +10% via aura token).
+  // 7-mastery. Resolve mastery for this (user, challenge) BEFORE computing reward.
+  //   prevCount        — completionCount before this submission (always increments).
+  //   prevMasteryCount — mastery-counted completions (masteryCount, falling back
+  //                      to completionCount for legacy records written before the
+  //                      field existed — initialized on this write).
+  //   prevTier         — DERIVED from the mastery count (same derivation the
+  //                      list/status display uses, so reward and display agree).
+  //   storedTier       — the persisted masteryTier, used STRICTLY as the
+  //                      idempotency floor for tier-up bonuses. Absent => retro
+  //                      record: floor starts at the derived tier so veterans
+  //                      never get back-paid loot boxes or XP lumps.
+  //   tierMult         — the XP multiplier the totem earns at the CURRENT tier.
+  const prevCount = progress?.completionCount || 0;
+  const prevMasteryCount = progress?.masteryCount ?? prevCount;
+  const hadStoredTier = progress?.masteryTier !== undefined && progress?.masteryTier !== null;
+  const prevTier = tierForCompletions(prevMasteryCount);
+  const storedTier = hadStoredTier ? progress.masteryTier : prevTier;
+  const tierMult = MASTERY.tiers[prevTier].xpMult;
+
+  // Validate the requested difficulty. Lowering is always allowed (1..auto);
+  // raising above the stage-locked auto level needs Gold+ (full 1..3). The value
+  // is clamped silently — the mini-game uses it to scale intensity, but maxScore
+  // (the XP denominator) is UNCHANGED, so difficulty only affects XP via score.
+  const auto = autoDifficulty(totem, challenge);
+  const maxSel = prevTier >= MASTERY.raiseTier ? MASTERY.maxDifficulty : auto;
+  const difficultyProvided = Number.isFinite(difficulty);
+  const reqDiff = clampDifficulty(
+    difficultyProvided ? difficulty : auto,
+    1,
+    maxSel,
+  );
+  // Only an EXPLICIT difficulty updates the saved preference — an omitted
+  // difficulty must not overwrite it with the clamped auto value.
+  const newPreferredDifficulty = difficultyProvided
+    ? reqDiff
+    : (progress?.preferredDifficulty ?? null);
+
+  // 7a. XP reward based on the boosted score, then × tierMult × xpMultiplier
+  //     (mastery tier mult; Clever +5% on challenge:any; Mentor +10% via aura token).
+  //     score ≤ maxScore keeps this bounded with no artificial cap.
   const baseXp = calculateXpReward(challenge.maxScore, effectiveScore);
-  const xpEarned = Math.round(baseXp * bonuses.xpMultiplier);
+  let xpEarned = Math.round(baseXp * tierMult * bonuses.xpMultiplier);
 
   // 7b. Award Essence reward, folded by essenceRewardMultiplier (Merchant's Eye +10%).
   const baseEssence = challenge.essenceReward || 0;
@@ -513,6 +664,62 @@ async function completeChallenge(userId, challengeId, totemId, score) {
       ref: challengeId,
     });
     newEssenceBalance = essenceResult.newBalance;
+  }
+
+  // 7c. Mastery tier-up detection (idempotent via stored masteryTier).
+  // completionCount ALWAYS increments on a valid (score>0) submission — it
+  // feeds the global CHALLENGE_INITIATE/CHALLENGE_PROGRESSION achievements and
+  // the player-visible stat. The parallel masteryCount only advances when the
+  // RAW score (not the trait-boosted effectiveScore) clears the optional
+  // anti-AFK floor; default 0 => any score>0 counts and the two counters stay
+  // in lockstep. Tier derivation everywhere uses the mastery count.
+  const masteryFloor = MASTERY.minMasteryScorePct > 0
+    ? MASTERY.minMasteryScorePct * challenge.maxScore
+    : 0;
+  const countsForMastery = score >= masteryFloor;
+  const newCompletionCount = prevCount + 1;
+  const newMasteryCount = prevMasteryCount + (countsForMastery ? 1 : 0);
+  const newTier = tierForCompletions(newMasteryCount);
+
+  let tierUp = null;
+  // Grant the one-time bonus only on a real crossing: the DERIVED tier rose
+  // above the stored idempotency floor. On a retro-init (no stored tier yet)
+  // the floor starts at the derived tier, so veterans keep their tier but
+  // never get back-paid loot boxes or XP lumps.
+  if (newTier > storedTier) {
+    const bonus = MASTERY.tierUpBonus[newTier];
+    if (bonus) {
+      xpEarned += bonus.xp; // one-time XP lump folded into this totem
+      let lootBox = null;
+      if (bonus.lootBoxId) {
+        try {
+          // Lazy require — loot-service can trigger achievements on box claim.
+          const { grantLootItem } = require('./loot-service');
+          const granted = await grantLootItem(userId, bonus.lootBoxId, 'mastery');
+          lootBox = { id: granted.id, boxId: granted.boxId, source: 'mastery' };
+        }
+        catch (err) {
+          // Deliberate trade: idempotency over delivery. masteryTier is still
+          // persisted below, so this crossing will NEVER re-fire — the box is
+          // lost unless manually remediated. Log everything needed to re-grant
+          // by hand (grantLootItem(userId, boxId, 'mastery')).
+          console.error(
+            `[Challenges] Mastery loot grant failed — manual remediation needed: user=${userId} challenge=${challengeId} box=${bonus.lootBoxId} tier=${newTier}:`,
+            err.message,
+          );
+        }
+      }
+      tierUp = {
+        from: storedTier,
+        to: newTier,
+        name: MASTERY.tiers[newTier].name,
+        xp: bonus.xp,
+        lootBox,
+      };
+      if (newTier >= MASTERY.raiseTier) {
+        tierUp.unlocked = ['difficulty-raise'];
+      }
+    }
   }
 
   // 8. Update totem's experience AND happiness (NEVER auto-evolve stage)
@@ -542,9 +749,8 @@ async function completeChallenge(userId, challengeId, totemId, score) {
   };
   const evolutionCheck = checkEvolutionRequirements(updatedTotemForCheck);
 
-  // 9. Update progress record
+  // 9. Update progress record (newCompletionCount + tier-up resolved in 7c)
   const newTotalAttempts = (progress?.totalAttempts || 0) + 1;
-  const newCompletionCount = (progress?.completionCount || 0) + 1;
   const newTotalXpEarned = (progress?.totalXpEarned || 0) + xpEarned;
   const newTotalScore = (progress?.totalScore || 0) + score; // Track cumulative score (matches contract)
   const newHighScore = Math.max(progress?.highScore || 0, score);
@@ -570,6 +776,7 @@ async function completeChallenge(userId, challengeId, totemId, score) {
     userId,
     challengeId,
     completionCount: newCompletionCount,
+    masteryCount: newMasteryCount, // mastery-counted completions (anti-farm floor applies)
     totalAttempts: newTotalAttempts,
     totalXpEarned: newTotalXpEarned,
     totalScore: newTotalScore, // Cumulative score (matches contract tracking)
@@ -580,6 +787,10 @@ async function completeChallenge(userId, challengeId, totemId, score) {
     lastAttemptAt: now,
     lastCompletionAt: now,
     firstCompletedAt: progress?.firstCompletedAt || now,
+    // Mastery: cached tier is STRICTLY the idempotency floor for tier-up
+    // bonuses (never regressed) + the player's explicit difficulty choice.
+    masteryTier: Math.max(storedTier, newTier),
+    preferredDifficulty: newPreferredDifficulty,
     createdAt: progress?.createdAt || now,
     updatedAt: now,
   };
@@ -595,31 +806,45 @@ async function completeChallenge(userId, challengeId, totemId, score) {
   // IMPORTANT: Pass GLOBAL total challenges completed (across ALL challenge types)
   // not just this challenge's count - achievements track overall progress like [10, 100, 1000]
   let achievements = [];
+  let globalCompletionCount = newCompletionCount;
+  let totalTiersEarned = newTier;
   try {
-    // Get all challenge progress to calculate global total
+    // Get all challenge progress to calculate global totals.
+    // Sum up completions AND mastery tiers across all challenges.
+    // Note: allProgress might have stale data for current challenge, so we handle it specially.
     const allProgress = await getAllChallengeProgress(userId);
-
-    // Sum up completions across all challenges
-    // Note: allProgress might have stale data for current challenge, so we handle it specially
-    let globalCompletionCount = 0;
+    globalCompletionCount = 0;
+    totalTiersEarned = 0;
     let foundCurrentChallenge = false;
 
     for (const p of allProgress) {
       if (p.challengeId === challengeId) {
-        // Use the fresh count we just calculated (DB might have stale read)
+        // Use the fresh values we just calculated (DB might have stale read)
         globalCompletionCount += newCompletionCount;
+        totalTiersEarned += newTier;
         foundCurrentChallenge = true;
       }
       else {
+        // Tier derives from the mastery count (completionCount fallback covers
+        // legacy records); the stored masteryTier is only the bonus floor.
         globalCompletionCount += (p.completionCount || 0);
+        totalTiersEarned += tierForCompletions(p.masteryCount ?? p.completionCount ?? 0);
       }
     }
 
     // If this is the user's first ever challenge completion
     if (!foundCurrentChallenge) {
       globalCompletionCount += newCompletionCount;
+      totalTiersEarned += newTier;
     }
+  }
+  catch (err) {
+    console.error('[Challenges] Achievement aggregation failed:', err.message);
+  }
 
+  // Each trigger gets its own try/catch — a failure in one must never
+  // suppress the other.
+  try {
     const achResults = await onChallengeCompleted(userId, globalCompletionCount, totemId);
     achievements = (achResults || []).filter(a => a.unlocked).map(a => ({
       achievementId: a.achievementId,
@@ -629,6 +854,22 @@ async function completeChallenge(userId, challengeId, totemId, score) {
   }
   catch (err) {
     console.error('[Challenges] Achievement check failed:', err.message);
+  }
+
+  // Fire the global mastery achievement layer only on a real tier-up.
+  if (tierUp) {
+    try {
+      const tierResults = await onChallengeTierReached(userId, { newTier, totalTiersEarned, totemId });
+      const tierAch = (tierResults || []).filter(a => a.unlocked).map(a => ({
+        achievementId: a.achievementId,
+        milestone: a.milestone,
+        rewards: a.rewards,
+      }));
+      achievements = achievements.concat(tierAch);
+    }
+    catch (err) {
+      console.error('[Challenges] Mastery achievement check failed:', err.message);
+    }
   }
 
   console.log(`[Challenges] User ${userId} completed ${challengeId} with score ${score} (+${xpEarned} XP, +${CHALLENGE_HAPPINESS_REWARD} happiness to totem ${totemId})`);
@@ -667,6 +908,8 @@ async function completeChallenge(userId, challengeId, totemId, score) {
         attemptsRemaining: challenge.maxDailyAttempts - dailyAttempts[today],
       },
       achievements,
+      mastery: buildMasteryBlock(newMasteryCount, newPreferredDifficulty),
+      tierUp,
       message: evolutionCheck.canEvolve
         ? `Your totem earned ${xpEarned} XP${happinessMsg}${essenceMsg} from ${challenge.name}! Your totem is ready to evolve!`
         : `Your totem earned ${xpEarned} XP${happinessMsg}${essenceMsg} from ${challenge.name}!`,
@@ -735,6 +978,12 @@ async function getChallengeStatus(userId, totemId = null) {
       attemptsToday: attemptCheck.attemptsToday,
       attemptsRemaining: attemptCheck.attemptsRemaining,
       canAttempt: attemptCheck.canAttempt,
+      // Mastery block (tier derived from the mastery count, falling back to
+      // completionCount for legacy records; frontend contract)
+      mastery: buildMasteryBlock(
+        progress?.masteryCount ?? progress?.completionCount ?? 0,
+        progress?.preferredDifficulty ?? null,
+      ),
       // Requirement status (if totem provided)
       requirementStatus,
     };
@@ -818,6 +1067,7 @@ module.exports = {
   // Constants
   CHALLENGES,
   CHALLENGES_MAP,
+  MASTERY,
 
   // Core functions
   completeChallenge,
@@ -833,4 +1083,9 @@ module.exports = {
   checkDailyAttempts,
   checkRequirements,
   calculateXpReward,
+  // Mastery helpers
+  tierForCompletions,
+  autoDifficulty,
+  clampDifficulty,
+  buildMasteryBlock,
 };

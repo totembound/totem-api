@@ -7,7 +7,7 @@
  * Get user's overall challenge progress including daily attempts and completion stats.
  */
 
-const { getChallengeStatus: getChallengeStatusService, getAllChallenges } = require('../../services/challenges-service');
+const { getChallengeStatus: getChallengeStatusService, getAllChallenges, MASTERY } = require('../../services/challenges-service');
 const { getUser } = require('../../common/db-client');
 
 /**
@@ -59,6 +59,8 @@ async function getChallengeStatus(user, totemId = null) {
     attemptsToday: status.attemptsToday,
     attemptsRemaining: status.attemptsRemaining,
     canAttempt: status.canAttempt,
+    // Mastery block (tier, multiplier, difficulty unlock — frontend contract)
+    mastery: status.mastery,
     // Requirement status (if totem provided)
     requirementStatus: status.requirementStatus,
   }));
@@ -80,6 +82,21 @@ async function getChallengeStatus(user, totemId = null) {
     (s) => !s.canAttempt
   ).length;
   const challengesReady = challenges.length - challengesAtDailyLimit;
+
+  // Mastery summary: total tiers earned + challenges at each tier.
+  // Tier indices come from the MASTERY config (raiseTier = Gold, last tier =
+  // Diamond) — never hardcoded literals.
+  const topTier = MASTERY.tiers.length - 1;
+  const totalTiersEarned = challengeStatuses.reduce(
+    (sum, s) => sum + (s.mastery?.tier || 0),
+    0
+  );
+  const challengesAtGold = challengeStatuses.filter(
+    (s) => (s.mastery?.tier || 0) >= MASTERY.raiseTier
+  ).length;
+  const challengesAtDiamond = challengeStatuses.filter(
+    (s) => (s.mastery?.tier || 0) >= topTier
+  ).length;
 
   // 6. Group by type
   const byType = challengeStatuses.reduce((acc, status) => {
@@ -103,6 +120,10 @@ async function getChallengeStatus(user, totemId = null) {
         totalChallengeCount: userStats.totalChallengeCount || totalCompletions,
         challengesReady,
         challengesAtDailyLimit,
+        // Mastery summary
+        totalTiersEarned,
+        challengesAtGold,
+        challengesAtDiamond,
       },
     },
   };

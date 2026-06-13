@@ -35,6 +35,8 @@ async function listChallenges(user) {
     xpReward: status.xpReward,
     maxDailyAttempts: status.maxDailyAttempts,
     difficulty: getDifficultyFromStage(status.requirements.stage),
+    // Mastery block (tier, multiplier, difficulty unlock — frontend contract)
+    mastery: status.mastery,
     // User's progress
     progress: {
       completionCount: status.completionCount,

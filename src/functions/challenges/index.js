@@ -37,7 +37,7 @@ async function getStatus(user) {
  *
  * @param {object} user - Authenticated user
  * @param {string} challengeId - Challenge ID from URL params
- * @param {object} body - Request body { totemId, score }
+ * @param {object} body - Request body { totemId, score, difficulty? }
  */
 async function complete(user, challengeId, body = {}) {
   // Merge challengeId from URL params into body

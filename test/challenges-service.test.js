@@ -808,14 +808,14 @@ describe('completeChallenge', () => {
       expect(result.data.totem.newHappiness).toBe(62);
     });
 
-    test("Merchant's Eye (+10% earn:any) raises Essence reward 5 → 6", async () => {
-      // Garden challenge essenceReward=5 × 1.10 = 5.5 → round → 6
+    test("Merchant's Eye (+10% earn:any) raises Essence reward 10 → 11", async () => {
+      // Garden challenge essenceReward=10 × 1.10 = 11
       mockDbClient.getTotem.mockResolvedValue(
         baseTotem({ traits: { innate: null, learned: 'trt_merchant_eye', awakened: null } }),
       );
       const result = await completeChallenge('usr_123', 'chl_garden-pest-patrol', 'ttm_456', 500);
       expect(result.success).toBe(true);
-      expect(result.data.essenceEarned).toBe(6);
+      expect(result.data.essenceEarned).toBe(11);
     });
 
     test('Mentor aura (+10% XP) folds on the acting totem too (self-scope via aura token)', async () => {
@@ -834,7 +834,7 @@ describe('completeChallenge', () => {
       expect(result.success).toBe(true);
       expect(result.data.xpEarned).toBe(10);
       expect(result.data.happinessEarned).toBe(10);
-      expect(result.data.essenceEarned).toBe(5);
+      expect(result.data.essenceEarned).toBe(10);
     });
 
     // successChanceBonus inflates the score server-side so every mini-game gets

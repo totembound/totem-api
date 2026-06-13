@@ -30,6 +30,19 @@ jest.mock('../src/services/challenges-service', () => ({
   getAllChallenges: jest.fn(),
   getAvailableChallenges: jest.fn(),
   getUnavailableChallenges: jest.fn(),
+  // status.js reads tier indices from the MASTERY config (raiseTier / top tier)
+  MASTERY: {
+    tiers: [
+      { tier: 0, name: 'Novice' },
+      { tier: 1, name: 'Bronze' },
+      { tier: 2, name: 'Silver' },
+      { tier: 3, name: 'Gold' },
+      { tier: 4, name: 'Platinum' },
+      { tier: 5, name: 'Diamond' },
+    ],
+    raiseTier: 3,
+    maxDifficulty: 3,
+  },
 }));
 
 const dbClient = require('../src/common/db-client');
@@ -378,8 +391,22 @@ describe('Challenge Handlers', () => {
       dbClient.getTotem.mockResolvedValue({ id: 'ttm_abc', stats: {} });
 
       await complete(testUser, 'c-0', { totemId: 'ttm_abc', score: 85 });
+      // 5th arg is the optional difficulty (undefined when omitted)
       expect(chalService.completeChallenge).toHaveBeenCalledWith(
-        testUser.userId, 'c-0', 'ttm_abc', 85
+        testUser.userId, 'c-0', 'ttm_abc', 85, undefined
+      );
+    });
+
+    it('complete should thread difficulty from body', async () => {
+      chalService.completeChallenge.mockResolvedValue({
+        success: true,
+        data: { challengeId: 'c-0', xpAwarded: 50 },
+      });
+      dbClient.getTotem.mockResolvedValue({ id: 'ttm_abc', stats: {} });
+
+      await complete(testUser, 'c-0', { totemId: 'ttm_abc', score: 85, difficulty: 3 });
+      expect(chalService.completeChallenge).toHaveBeenCalledWith(
+        testUser.userId, 'c-0', 'ttm_abc', 85, 3
       );
     });
   });
