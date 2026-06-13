@@ -588,7 +588,7 @@ describe('Sanctum Service', () => {
       expect(result.error.code).toBe('ALREADY_ON_MISSION');
     });
 
-    it('should reject when user has insufficient Essence', async () => {
+    it('should start even with zero Essence (missions cost happiness + time only)', async () => {
       dbClient.getTotem.mockResolvedValue({
         experience: 8000,
         stage: 4,
@@ -597,11 +597,13 @@ describe('Sanctum Service', () => {
         sanctum: { seated: true, seatIndex: 0, onMission: false },
       });
       dbClient.getItem.mockResolvedValue(null); // no active mission
-      dbClient.getUser.mockResolvedValue({ currencies: { essence: 5 } }); // only 5, need 15
+      dbClient.getUser.mockResolvedValue({ currencies: { essence: 0 } }); // broke, but missions are free
+      dbClient.updateTotem.mockResolvedValue({});
+      dbClient.putItem.mockResolvedValue({});
 
       const result = await sanctumService.startCouncilMission(testUserId, testTotemId, 'cm_decree-of-wisdom');
-      expect(result.success).toBe(false);
-      expect(result.error.code).toBe('INSUFFICIENT_ESSENCE');
+      expect(result.success).toBe(true);
+      expect(dbClient.deductEssence).not.toHaveBeenCalled();
     });
 
     it('should reject when totem has insufficient happiness', async () => {
@@ -626,7 +628,7 @@ describe('Sanctum Service', () => {
   // ===========================================================================
 
   describe('startCouncilMission - success', () => {
-    it('should create mission record and deduct costs', async () => {
+    it('should create mission record and deduct happiness only (no Essence)', async () => {
       dbClient.getTotem.mockResolvedValue({
         experience: 8000,
         stage: 4,
@@ -636,7 +638,6 @@ describe('Sanctum Service', () => {
       });
       dbClient.getItem.mockResolvedValue(null); // no active mission
       dbClient.getUser.mockResolvedValue({ currencies: { essence: 1000 } });
-      dbClient.deductEssence.mockResolvedValue({ success: true, newBalance: 985 });
       dbClient.updateTotem.mockResolvedValue({});
       dbClient.putItem.mockResolvedValue({});
 
@@ -649,14 +650,7 @@ describe('Sanctum Service', () => {
       expect(result.success).toBe(true);
       expect(result.data.mission.missionType).toBe('cm_decree-of-wisdom');
       expect(result.data.mission.name).toBe('Decree of Wisdom');
-      expect(result.data.newEssenceBalance).toBe(985);
-
-      // Verify Essence deduction
-      expect(dbClient.deductEssence).toHaveBeenCalledWith(
-        testUserId,
-        10,
-        { type: 'council_mission', ref: 'cm_decree-of-wisdom' },
-      );
+      expect(dbClient.deductEssence).not.toHaveBeenCalled();
 
       // Verify happiness deduction (50 - 5 = 45)
       expect(dbClient.updateTotem).toHaveBeenCalledWith(
@@ -1109,15 +1103,53 @@ describe('Sanctum Service', () => {
       expect(Object.keys(sanctumService.COUNCIL_MISSIONS)).toHaveLength(9);
     });
 
-    it('should have increasing costs by tier', () => {
+    it('should have increasing happiness costs by tier', () => {
       const missions = sanctumService.COUNCIL_MISSIONS;
       // Governance < Diplomacy < Legacy
-      expect(missions['cm_decree-of-wisdom'].cost.essence).toBeLessThan(
-        missions['cm_peace-summit'].cost.essence,
+      expect(missions['cm_decree-of-wisdom'].cost.happiness).toBeLessThan(
+        missions['cm_peace-summit'].cost.happiness,
       );
-      expect(missions['cm_peace-summit'].cost.essence).toBeLessThan(
-        missions['cm_rite-of-passage'].cost.essence,
+      expect(missions['cm_peace-summit'].cost.happiness).toBeLessThan(
+        missions['cm_rite-of-passage'].cost.happiness,
       );
+    });
+
+    it('should not charge Essence for any mission', () => {
+      const missions = sanctumService.COUNCIL_MISSIONS;
+      for (const mission of Object.values(missions)) {
+        expect(mission.cost.essence).toBeUndefined();
+      }
+    });
+
+    it('should progress monotonically by duration (no dominated missions)', () => {
+      // Ordered by duration, longer missions must never cost less happiness or grant
+      // less XP than a shorter one — otherwise the shorter one is strictly dominated.
+      const ordered = Object.values(sanctumService.COUNCIL_MISSIONS)
+        .sort((a, b) => a.duration - b.duration);
+
+      for (let i = 1; i < ordered.length; i++) {
+        const prev = ordered[i - 1];
+        const cur = ordered[i];
+        expect(cur.duration).toBeGreaterThan(prev.duration);
+        expect(cur.cost.happiness).toBeGreaterThanOrEqual(prev.cost.happiness);
+        expect(cur.rewards.xp).toBeGreaterThanOrEqual(prev.rewards.xp);
+      }
+    });
+
+    it('should ramp rune odds within each tier as duration grows', () => {
+      const byTier = (tier) => Object.values(sanctumService.COUNCIL_MISSIONS)
+        .filter((m) => m.tier === tier)
+        .sort((a, b) => a.duration - b.duration);
+
+      // Governance ramps Lesser, Diplomacy ramps Greater across their durations.
+      const govLesser = byTier('governance').map((m) => m.rewards.runes.lesser);
+      const dipGreater = byTier('diplomacy').map((m) => m.rewards.runes.greater);
+      for (let i = 1; i < govLesser.length; i++) {
+        expect(govLesser[i]).toBeGreaterThanOrEqual(govLesser[i - 1]);
+      }
+      for (let i = 1; i < dipGreater.length; i++) {
+        expect(dipGreater[i]).toBeGreaterThanOrEqual(dipGreater[i - 1]);
+      }
     });
   });
 });

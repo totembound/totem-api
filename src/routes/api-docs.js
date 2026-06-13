@@ -2871,15 +2871,15 @@
  *                   properties:
  *                     governance:
  *                       type: array
- *                       description: "Stage 4+ missions (2-4hr, low cost)"
+ *                       description: "Stage 4+ missions (2-4hr)"
  *                       items: { $ref: '#/components/schemas/CouncilMission' }
  *                     diplomacy:
  *                       type: array
- *                       description: "Stage 5 missions (6-8hr, medium cost)"
+ *                       description: "Stage 5 missions (6-10hr)"
  *                       items: { $ref: '#/components/schemas/CouncilMission' }
  *                     legacy:
  *                       type: array
- *                       description: "Stage 5 missions (12-24hr, high cost)"
+ *                       description: "Stage 5 missions (12-24hr)"
  *                       items: { $ref: '#/components/schemas/CouncilMission' }
  */
 
@@ -2889,7 +2889,7 @@
  *   post:
  *     tags: [Sanctum]
  *     summary: Start a council mission
- *     description: Send a seated totem on a council mission. Costs Essence and happiness. Totem earns XP and rune drops on completion.
+ *     description: Send a seated totem on a council mission. Costs happiness. Totem earns XP and rune drops on completion.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -2928,9 +2928,8 @@
  *                         duration: { type: number, description: "Duration in seconds" }
  *                         startedAt: { type: string }
  *                         endsAt: { type: string }
- *                     newEssenceBalance: { type: number }
  *       400:
- *         description: Invalid mission, totem not seated, already on mission, insufficient stage/Essence/happiness
+ *         description: Invalid mission, totem not seated, already on mission, insufficient stage/happiness
  */
 
 /**
