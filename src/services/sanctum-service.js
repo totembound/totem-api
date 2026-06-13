@@ -644,19 +644,20 @@ async function claimSanctum(userId) {
 // Council Mission Constants
 // =============================================================================
 
+// Council Missions: a seated totem spends happiness + time to earn XP and rune drops.
 const COUNCIL_MISSIONS = {
   // Governance: Stage 4+ (Adult) — short local leadership tasks. Rewards: XP + Lesser Rune chance
-  'cm_decree-of-wisdom': { id: 'cm_decree-of-wisdom', name: 'Decree of Wisdom', tier: 'governance', requiredStage: 3, duration: 7200, cost: { essence: 10, happiness: 5 }, rewards: { xp: 20, runes: { lesser: 50 } } },
-  'cm_territorial-survey': { id: 'cm_territorial-survey', name: 'Territorial Survey', tier: 'governance', requiredStage: 3, duration: 10800, cost: { essence: 12, happiness: 5 }, rewards: { xp: 30, runes: { lesser: 50 } } },
-  'cm_spirit-audience': { id: 'cm_spirit-audience', name: 'Spirit Audience', tier: 'governance', requiredStage: 3, duration: 14400, cost: { essence: 15, happiness: 8 }, rewards: { xp: 40, runes: { lesser: 50 } } },
+  'cm_decree-of-wisdom': { id: 'cm_decree-of-wisdom', name: 'Decree of Wisdom', tier: 'governance', requiredStage: 3, duration: 7200, cost: { happiness: 5 }, rewards: { xp: 20, runes: { lesser: 40 } } },
+  'cm_territorial-survey': { id: 'cm_territorial-survey', name: 'Territorial Survey', tier: 'governance', requiredStage: 3, duration: 10800, cost: { happiness: 6 }, rewards: { xp: 30, runes: { lesser: 50 } } },
+  'cm_spirit-audience': { id: 'cm_spirit-audience', name: 'Spirit Audience', tier: 'governance', requiredStage: 3, duration: 14400, cost: { happiness: 8 }, rewards: { xp: 40, runes: { lesser: 60 } } },
   // Diplomacy: Stage 5 (Ascended) only — longer, higher stakes. Rewards: XP + Greater Rune chance
-  'cm_peace-summit': { id: 'cm_peace-summit', name: 'Peace Summit', tier: 'diplomacy', requiredStage: 4, duration: 21600, cost: { essence: 20, happiness: 10 }, rewards: { xp: 30, runes: { greater: 50 } } },
-  'cm_alliance-forging': { id: 'cm_alliance-forging', name: 'Alliance Forging', tier: 'diplomacy', requiredStage: 4, duration: 28800, cost: { essence: 25, happiness: 12 }, rewards: { xp: 45, runes: { greater: 50 } } },
-  'cm_elder-exchange': { id: 'cm_elder-exchange', name: 'Elder Exchange', tier: 'diplomacy', requiredStage: 4, duration: 28800, cost: { essence: 25, happiness: 12 }, rewards: { xp: 45, runes: { greater: 50 } } },
+  'cm_peace-summit': { id: 'cm_peace-summit', name: 'Peace Summit', tier: 'diplomacy', requiredStage: 4, duration: 21600, cost: { happiness: 10 }, rewards: { xp: 40, runes: { greater: 50 } } },
+  'cm_alliance-forging': { id: 'cm_alliance-forging', name: 'Alliance Forging', tier: 'diplomacy', requiredStage: 4, duration: 28800, cost: { happiness: 12 }, rewards: { xp: 45, runes: { greater: 60 } } },
+  'cm_elder-exchange': { id: 'cm_elder-exchange', name: 'Elder Exchange', tier: 'diplomacy', requiredStage: 4, duration: 36000, cost: { happiness: 14 }, rewards: { xp: 50, runes: { greater: 70 } } },
   // Legacy: Stage 5 (Ascended) only — epic endgame missions. Rewards: XP + Greater Rune + Ancient Rune chance
-  'cm_rite-of-passage': { id: 'cm_rite-of-passage', name: 'Rite of Passage', tier: 'legacy', requiredStage: 4, duration: 43200, cost: { essence: 30, happiness: 15 }, rewards: { xp: 60, runes: { greater: 75, ancient: 10 } } },
-  'cm_ancient-convocation': { id: 'cm_ancient-convocation', name: 'Ancient Convocation', tier: 'legacy', requiredStage: 4, duration: 64800, cost: { essence: 40, happiness: 18 }, rewards: { xp: 90, runes: { greater: 75, ancient: 15 } } },
-  'cm_founding-ritual': { id: 'cm_founding-ritual', name: 'Founding Ritual', tier: 'legacy', requiredStage: 4, duration: 86400, cost: { essence: 50, happiness: 20 }, rewards: { xp: 120, runes: { greater: 75, ancient: 20 } } },
+  'cm_rite-of-passage': { id: 'cm_rite-of-passage', name: 'Rite of Passage', tier: 'legacy', requiredStage: 4, duration: 43200, cost: { happiness: 15 }, rewards: { xp: 60, runes: { greater: 75, ancient: 10 } } },
+  'cm_ancient-convocation': { id: 'cm_ancient-convocation', name: 'Ancient Convocation', tier: 'legacy', requiredStage: 4, duration: 64800, cost: { happiness: 18 }, rewards: { xp: 90, runes: { greater: 75, ancient: 15 } } },
+  'cm_founding-ritual': { id: 'cm_founding-ritual', name: 'Founding Ritual', tier: 'legacy', requiredStage: 4, duration: 86400, cost: { happiness: 20 }, rewards: { xp: 120, runes: { greater: 75, ancient: 20 } } },
 };
 
 // =============================================================================
@@ -741,17 +742,7 @@ async function startCouncilMission(userId, totemId, missionType) {
     };
   }
 
-  // 5. User must have enough Essence
-  const user = await require('../common/db-client').getUser(userId);
-  const currentEssence = user?.currencies?.essence || 0;
-  if (currentEssence < mission.cost.essence) {
-    return {
-      success: false,
-      error: { code: 'INSUFFICIENT_ESSENCE', message: `Need ${mission.cost.essence} Essence, have ${currentEssence}` },
-    };
-  }
-
-  // 6. Totem must have enough happiness
+  // 5. Totem must have enough happiness
   const currentHappiness = totem.stats?.happiness ?? totem.happiness ?? 0;
   if (currentHappiness < mission.cost.happiness) {
     return {
@@ -760,25 +751,13 @@ async function startCouncilMission(userId, totemId, missionType) {
     };
   }
 
-  // 7. Deduct Essence from user
-  const deductResult = await require('../common/db-client').deductEssence(userId, mission.cost.essence, {
-    type: 'council_mission',
-    ref: missionType,
-  });
-  if (!deductResult.success) {
-    return {
-      success: false,
-      error: { code: 'INSUFFICIENT_ESSENCE', message: deductResult.error || 'Failed to deduct Essence' },
-    };
-  }
-
-  // 8. Deduct happiness from totem
+  // 6. Deduct happiness from totem
   const newHappiness = currentHappiness - mission.cost.happiness;
   await updateTotem(userId, totemId, {
     'stats.happiness': newHappiness,
   });
 
-  // 9. Create mission record. Emissary: durationMultiplier ×0.80 on sanctum:mission.
+  // 7. Create mission record. Emissary: durationMultiplier ×0.80 on sanctum:mission.
   const missionBonuses = resolveTraitBonuses(totem, {
     system: 'sanctum',
     sub: 'mission',
@@ -806,7 +785,7 @@ async function startCouncilMission(userId, totemId, missionType) {
 
   await putItem(TABLES.EXPEDITION_STATE, missionRecord);
 
-  // 10. Update totem sanctum field
+  // 8. Update totem sanctum field
   await updateTotem(userId, totemId, {
     sanctum: {
       ...totem.sanctum,
@@ -829,7 +808,6 @@ async function startCouncilMission(userId, totemId, missionType) {
         duration: mission.duration,
         rewards: mission.rewards,
       },
-      newEssenceBalance: deductResult.newBalance,
     },
   };
 }
