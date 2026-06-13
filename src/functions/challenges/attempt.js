@@ -16,12 +16,12 @@ const { emitQuestProgress } = require('../../services/daily-quests-service');
  * Complete a challenge with a totem
  *
  * @param {object} user - Authenticated user { userId }
- * @param {object} body - Request body { totemId, challengeId, score }
+ * @param {object} body - Request body { totemId, challengeId, score, difficulty? }
  * @returns {object} - Challenge completion result
  */
 async function attemptChallenge(user, body) {
   const userId = user.userId;
-  const { totemId, challengeId, score } = body || {};
+  const { totemId, challengeId, score, difficulty } = body || {};
 
   // 1. Validate required parameters
   if (!totemId) {
@@ -62,8 +62,19 @@ async function attemptChallenge(user, body) {
     };
   }
 
-  // 4. Delegate to service - completeChallenge awards XP to totem
-  const result = await completeChallenge(userId, challengeId, totemId, numericScore);
+  // 4. Delegate to service - completeChallenge awards XP to totem.
+  //    Difficulty is optional and clamped server-side (lower always ok; raise
+  //    above stage-lock needs Gold+ mastery). Omitted/invalid => stage-derived auto.
+  const numericDifficulty = difficulty === undefined || difficulty === null
+    ? undefined
+    : Number(difficulty);
+  const result = await completeChallenge(
+    userId,
+    challengeId,
+    totemId,
+    numericScore,
+    numericDifficulty,
+  );
 
   // 5. Transform response to include totem stats
   if (result.success && result.data) {

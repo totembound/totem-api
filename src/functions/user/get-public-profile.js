@@ -12,6 +12,10 @@
  * - profile.bio, profile.avatar, profile.banner
  * - stats.totalTotems, stats.totalChallengesCompleted, stats.bestDailyStreak,
  *   stats.highestStageReached, stats.highestPrestigeReached
+ * - mastery.tiersEarned / gold / platinum / diamond / grandmaster /
+ *   challenges[{id, tier}] — gameplay accomplishment (Challenge Mastery),
+ *   derived from the same ChallengeProgress records already fetched for
+ *   totalChallengesCompleted (zero extra reads, not PII)
  *
  * Explicitly excluded: email, currencies, settings, OAuth fields,
  * lastLoginDate (privacy — would reveal when they were online), role, status.
@@ -24,7 +28,7 @@
  */
 
 const { getUser, getUserTotems } = require('../../common/db-client');
-const { getAllChallengeProgress } = require('../../services/challenges-service');
+const { getAllChallengeProgress, tierForCompletions, CHALLENGES } = require('../../services/challenges-service');
 const { getStreakState } = require('../../services/rewards-service');
 
 async function getPublicProfile(userId) {
@@ -82,12 +86,32 @@ async function getPublicProfile(userId) {
   // source completeChallenge feeds to achievements, so it's the ground truth.
   // Falls back to the (currently never-written) stat field if the query fails.
   let totalChallengesCompleted = user.stats?.totalChallengesCompleted || 0;
+  // Challenge Mastery summary — derived from the same progress records, so it
+  // costs no extra reads. `challenges` lists only trials with a tier above
+  // Novice; the frontend renders the full medal strip from its own config.
+  const mastery = {
+    tiersEarned: 0,
+    gold: 0,
+    platinum: 0,
+    diamond: 0,
+    grandmaster: false,
+    challenges: [],
+  };
   try {
     const progress = await getAllChallengeProgress(userId);
     totalChallengesCompleted = progress.reduce(
       (sum, p) => sum + (p.completionCount || 0),
       0,
     );
+    for (const p of progress) {
+      const tier = tierForCompletions(p.masteryCount ?? p.completionCount ?? 0);
+      if (tier > 0) mastery.challenges.push({ id: p.challengeId, tier });
+      mastery.tiersEarned += tier;
+      if (tier === 3) mastery.gold += 1;
+      else if (tier === 4) mastery.platinum += 1;
+      else if (tier === 5) mastery.diamond += 1;
+    }
+    mastery.grandmaster = mastery.diamond >= CHALLENGES.length;
   }
   catch (err) {
     console.warn('[getPublicProfile] Failed to sum challenge progress:', err.message);
@@ -125,6 +149,7 @@ async function getPublicProfile(userId) {
         highestStageReached: highestStage,
         highestPrestigeReached: highestPrestige,
       },
+      mastery,
     },
   };
 }

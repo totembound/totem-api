@@ -50,6 +50,10 @@ const ACHIEVEMENT_IDS = {
   TREAT_PROGRESSION: 'ach_treat-progression',
   CHALLENGE_INITIATE: 'ach_challenge-initiate',
   CHALLENGE_PROGRESSION: 'ach_challenge-progression',
+  // Challenge Mastery — total tiers earned across all challenges (category 4)
+  CHALLENGE_MASTERY: 'ach_challenge-mastery',
+  CHALLENGE_GOLD: 'ach_challenge-gold',
+  CHALLENGE_GRANDMASTER: 'ach_challenge-grandmaster',
   EXPEDITION_EXPLORER: 'ach_expedition-explorer',
   EXPEDITION_PROGRESSION: 'ach_expedition-progression',
   FUSION_PROGRESSION: 'ach_fusion-progression',
@@ -127,6 +131,11 @@ const TRIGGER_TO_ACHIEVEMENTS = {
     ACHIEVEMENT_IDS.CHALLENGE_INITIATE,
     ACHIEVEMENT_IDS.CHALLENGE_PROGRESSION,
   ],
+  CHALLENGE_TIER_REACHED: [
+    ACHIEVEMENT_IDS.CHALLENGE_MASTERY,
+    ACHIEVEMENT_IDS.CHALLENGE_GOLD,
+    ACHIEVEMENT_IDS.CHALLENGE_GRANDMASTER,
+  ],
   EXPEDITION_COMPLETED: [
     ACHIEVEMENT_IDS.EXPEDITION_EXPLORER,
     ACHIEVEMENT_IDS.EXPEDITION_PROGRESSION,
@@ -164,6 +173,8 @@ const ACHIEVEMENT_MILESTONES = {
   [ACHIEVEMENT_IDS.TRAIN_PROGRESSION]: [100, 500, 1000, 5000, 10000],
   [ACHIEVEMENT_IDS.TREAT_PROGRESSION]: [100, 500, 1000, 5000, 10000],
   [ACHIEVEMENT_IDS.CHALLENGE_PROGRESSION]: [10, 100, 1000, 5000, 10000],
+  // Challenge Mastery — total tiers earned across all challenges (max 60 = 12×5)
+  [ACHIEVEMENT_IDS.CHALLENGE_MASTERY]: [1, 5, 15, 30, 60],
   [ACHIEVEMENT_IDS.EXPEDITION_PROGRESSION]: [10, 50, 250, 1000, 10000],
   [ACHIEVEMENT_IDS.FUSION_PROGRESSION]: [1, 5, 10, 25, 50, 100, 250],
   [ACHIEVEMENT_IDS.PURE_FUSION]: [1, 3, 5, 10, 25],
@@ -195,6 +206,9 @@ const ONETIME_ACHIEVEMENTS = [
   ACHIEVEMENT_IDS.EPIC_COLLECTOR,
   ACHIEVEMENT_IDS.LEGENDARY_COLLECTOR,
   ACHIEVEMENT_IDS.CHALLENGE_INITIATE,
+  // Challenge Mastery one-time achievements
+  ACHIEVEMENT_IDS.CHALLENGE_GOLD,
+  ACHIEVEMENT_IDS.CHALLENGE_GRANDMASTER,
   ACHIEVEMENT_IDS.EXPEDITION_EXPLORER,
   ACHIEVEMENT_IDS.RARE_FORGER,
   ACHIEVEMENT_IDS.EPIC_FORGER,
@@ -252,6 +266,19 @@ const ONE_TIME_REWARDS = {
     essence: 25,
     xp: 50,
     name: 'Challenge Initiate',
+  },
+  // Challenge Mastery — one-time: first challenge to Gold
+  [ACHIEVEMENT_IDS.CHALLENGE_GOLD]: {
+    essence: 100,
+    xp: 150,
+    name: 'First Gold',
+  },
+  // Challenge Mastery — one-time: all 12 challenges to Diamond (60 total tiers)
+  [ACHIEVEMENT_IDS.CHALLENGE_GRANDMASTER]: {
+    essence: 500,
+    xp: 1000,
+    lootBoxId: 'essence_box_huge',
+    name: 'Grandmaster',
   },
   [ACHIEVEMENT_IDS.EXPEDITION_EXPLORER]: {
     essence: 25,
@@ -379,6 +406,15 @@ const MILESTONE_REWARDS = {
     { essence: 150, xp: 150, name: 'Challenge Adept' },    // 1000 challenges
     { essence: 300, xp: 200, name: 'Challenge Expert' },   // 5000 challenges
     { essence: 500, xp: 400, name: 'Challenge Master' },   // 10000 challenges
+  ],
+  // Challenge Mastery — total tiers earned (mirrors challenge-progression curve)
+  [ACHIEVEMENT_IDS.CHALLENGE_MASTERY]: [
+    { essence: 25, xp: 50, name: 'Mastery Climber' },      // 1 tier
+    { essence: 75, xp: 75, name: 'Mastery Adept' },        // 5 tiers
+    { essence: 150, xp: 150, name: 'Mastery Veteran' },    // 15 tiers
+    { essence: 300, xp: 200, name: 'Mastery Champion' },   // 30 tiers
+    // No box here — the 60th tier co-fires CHALLENGE_GRANDMASTER, which carries the huge box.
+    { essence: 500, xp: 400, name: 'Mastery Grandmaster' }, // 60 tiers
   ],
   [ACHIEVEMENT_IDS.EXPEDITION_PROGRESSION]: [
     { essence: 25, xp: 50, name: 'Expedition Seeker' },    // 10 expeditions
@@ -963,6 +999,24 @@ async function checkAchievement(userId, trigger, data = {}) {
             value = data.totalChallengeCount || 0;
           }
           break;
+
+        case 'CHALLENGE_TIER_REACHED': {
+          const tiers = data.totalTiersEarned || 0;
+          if (achievementId === ACHIEVEMENT_IDS.CHALLENGE_MASTERY) {
+            value = tiers; // progression: total tiers earned across all challenges
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.CHALLENGE_GOLD) {
+            // one-time: a SINGLE challenge first reaches Gold (newTier >= 3).
+            // Not total tiers — three Bronzes must not award it. A value of 0
+            // on sub-Gold tier-ups is a no-op for one-time achievements.
+            value = (data.newTier || 0) >= 3 ? 1 : 0;
+          }
+          else if (achievementId === ACHIEVEMENT_IDS.CHALLENGE_GRANDMASTER) {
+            // one-time: all 12 challenges to Diamond (60 = 12 × 5)
+            value = tiers >= 60 ? 1 : 0;
+          }
+          break;
+        }
 
         case 'EXPEDITION_COMPLETED':
           if (achievementId === ACHIEVEMENT_IDS.EXPEDITION_EXPLORER) {
@@ -1745,6 +1799,18 @@ async function onChallengeCompleted(userId, totalChallengeCount, totemId = null)
 }
 
 /**
+ * Call when a challenge crosses a mastery tier (Challenge Mastery feature).
+ * @param {string} userId - User ID
+ * @param {object} options - Options
+ * @param {number} options.newTier - The tier the crossing challenge just reached (gates First Gold)
+ * @param {number} options.totalTiersEarned - Sum of mastery tiers across all the user's challenges
+ * @param {string} [options.totemId] - Triggering totem ID (for XP rewards)
+ */
+async function onChallengeTierReached(userId, { newTier, totalTiersEarned, totemId = null }) {
+  return checkAchievement(userId, 'CHALLENGE_TIER_REACHED', { newTier, totalTiersEarned, totemId });
+}
+
+/**
  * Call when an expedition is completed
  * @param {string} userId - User ID
  * @param {number} totalExpeditionCount - Total expeditions completed
@@ -1866,6 +1932,7 @@ module.exports = {
   onTotemPrestiged,
   onTenureCheck,
   onChallengeCompleted,
+  onChallengeTierReached,
   onExpeditionCompleted,
   onTotemFused,
   onElderSeated,

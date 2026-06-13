@@ -1161,7 +1161,10 @@
  *   get:
  *     tags: [Challenges]
  *     summary: Get available challenges
- *     description: Returns all challenges with completion status
+ *     description: >
+ *       Returns all challenges with completion status. Each challenge includes a
+ *       `mastery` block (tier, multiplier, difficulty-unlock) driven by the
+ *       Challenge Mastery system.
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -1178,7 +1181,12 @@
  *                   properties:
  *                     challenges:
  *                       type: array
- *                       items: { $ref: '#/components/schemas/Challenge' }
+ *                       items:
+ *                         allOf:
+ *                           - $ref: '#/components/schemas/Challenge'
+ *                           - type: object
+ *                             properties:
+ *                               mastery: { $ref: '#/components/schemas/ChallengeMastery' }
  */
 
 /**
@@ -1216,14 +1224,39 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [totemId]
+ *             required: [totemId, score]
  *             properties:
  *               totemId:
  *                 type: string
  *                 description: Totem to use for challenge
+ *               score:
+ *                 type: number
+ *                 description: Score achieved in the mini-game
+ *               difficulty:
+ *                 type: integer
+ *                 enum: [1, 2, 3]
+ *                 description: >
+ *                   Optional. Lowering (1..auto) is always allowed; raising above
+ *                   the stage-derived level needs Gold+ mastery. Clamped silently
+ *                   server-side. Defaults to the stage-derived difficulty.
  *     responses:
  *       200:
  *         description: Challenge completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     xpEarned: { type: number }
+ *                     mastery: { $ref: '#/components/schemas/ChallengeMastery' }
+ *                     tierUp:
+ *                       nullable: true
+ *                       description: Present only when this run crossed a mastery tier
+ *                       allOf: [{ $ref: '#/components/schemas/ChallengeTierUp' }]
  *       400:
  *         description: Totem doesn't meet requirements
  */

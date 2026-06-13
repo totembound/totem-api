@@ -11,9 +11,18 @@ jest.mock('../src/common/db-client', () => ({
 }));
 
 // Mock the challenges-service module so we can control the live progress
-// sum without standing up CHALLENGE_PROGRESS table fixtures.
+// sum without standing up CHALLENGE_PROGRESS table fixtures. tierForCompletions
+// mirrors the real thresholds; CHALLENGES only needs the right length (12) for
+// the grandmaster check.
 jest.mock('../src/services/challenges-service', () => ({
   getAllChallengeProgress: jest.fn(),
+  tierForCompletions: (completions) => {
+    const T = [0, 10, 30, 75, 150, 300];
+    const n = completions || 0;
+    for (let i = T.length - 1; i >= 0; i--) { if (n >= T[i]) return i; }
+    return 0;
+  },
+  CHALLENGES: Array.from({ length: 12 }, (_, i) => ({ id: `chl_${i}` })),
 }));
 
 // Mock rewards-service so we can drive bestDailyStreak directly from the
@@ -94,6 +103,8 @@ describe('getPublicProfile — happy path', () => {
         highestStageReached: 4, // max of [1,3,0,2,4]
         highestPrestigeReached: 0, // stage-4 totem has exactly BASE_ELDER_XP, no prestige yet
       },
+      // default progress records are all below 10 completions → all Novice
+      mastery: { tiersEarned: 0, gold: 0, platinum: 0, diamond: 0, grandmaster: false, challenges: [] },
     });
   });
 
@@ -122,6 +133,55 @@ describe('getPublicProfile — happy path', () => {
     const result = await getPublicProfile('usr_abc123');
     expect(result.success).toBe(true);
     expect(result.data.profile).toEqual({ bio: null, avatar: null, banner: null });
+  });
+
+  it('aggregates Challenge Mastery from progress records (masteryCount preferred)', async () => {
+    challengesService.getAllChallengeProgress.mockResolvedValue([
+      { challengeId: 'chl_a', completionCount: 12, masteryCount: 12 },   // Bronze (1)
+      { challengeId: 'chl_b', completionCount: 95, masteryCount: 95 },   // Gold (3)
+      { challengeId: 'chl_c', completionCount: 175 },                    // Platinum (4) via completionCount fallback
+      { challengeId: 'chl_d', completionCount: 330, masteryCount: 330 }, // Diamond (5)
+      { challengeId: 'chl_e', completionCount: 3, masteryCount: 3 },     // Novice — excluded from challenges[]
+    ]);
+
+    const result = await getPublicProfile('usr_abc123');
+    expect(result.success).toBe(true);
+    expect(result.data.mastery).toEqual({
+      tiersEarned: 13, // 1+3+4+5
+      gold: 1,
+      platinum: 1,
+      diamond: 1,
+      grandmaster: false,
+      challenges: [
+        { id: 'chl_a', tier: 1 },
+        { id: 'chl_b', tier: 3 },
+        { id: 'chl_c', tier: 4 },
+        { id: 'chl_d', tier: 5 },
+      ],
+    });
+  });
+
+  it('sets grandmaster when all 12 challenges are Diamond', async () => {
+    challengesService.getAllChallengeProgress.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => ({
+        challengeId: `chl_${i}`, completionCount: 300, masteryCount: 300,
+      })),
+    );
+
+    const result = await getPublicProfile('usr_abc123');
+    expect(result.data.mastery.diamond).toBe(12);
+    expect(result.data.mastery.grandmaster).toBe(true);
+    expect(result.data.mastery.tiersEarned).toBe(60);
+  });
+
+  it('returns zeroed mastery when the progress query fails', async () => {
+    challengesService.getAllChallengeProgress.mockRejectedValue(new Error('DDB down'));
+
+    const result = await getPublicProfile('usr_abc123');
+    expect(result.success).toBe(true);
+    expect(result.data.mastery).toEqual({
+      tiersEarned: 0, gold: 0, platinum: 0, diamond: 0, grandmaster: false, challenges: [],
+    });
   });
 
   it('falls back to stored stats.totalTotems if totem query fails', async () => {
