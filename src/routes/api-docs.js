@@ -154,14 +154,17 @@
  *   post:
  *     tags: [Auth]
  *     summary: Verify email address
- *     description: Confirm account with verification code sent to email. In local dev, code is always 123456.
+ *     description: >
+ *       Confirm account with the verification code sent to email, then auto sign-in.
+ *       The account **password** is required (the endpoint logs the user in and returns tokens on success).
+ *       In local dev, code is always 123456.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, code]
+ *             required: [email, code, password]
  *             properties:
  *               email:
  *                 type: string
@@ -170,6 +173,11 @@
  *               code:
  *                 type: string
  *                 example: "123456"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: Account password — verify also auto-signs-in, so it is required.
+ *                 example: "Passw0rd!"
  *     responses:
  *       200:
  *         description: Email verified successfully

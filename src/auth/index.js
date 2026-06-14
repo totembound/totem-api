@@ -548,12 +548,15 @@ function optionalAuthMiddleware(req, res, next) {
  */
 async function handleVerify(req, res) {
   try {
-    const { email, code } = req.body;
+    const { email, code, password } = req.body;
 
-    if (!email || !code) {
+    // Require password up-front: verify both confirms AND auto-signs-in, so a
+    // missing password must 400 BEFORE confirmSignUp — otherwise the account is
+    // left CONFIRMED but the call still errors on the login half.
+    if (!email || !code || !password) {
       return res.status(400).json({
         success: false,
-        error: 'Email and verification code are required',
+        error: 'Email, verification code, and password are required',
       });
     }
 
@@ -561,7 +564,7 @@ async function handleVerify(req, res) {
     await confirmSignUp({ email, code });
 
     // Auto sign-in after verification
-    const loginResult = await signIn({ email, password: req.body.password });
+    const loginResult = await signIn({ email, password });
 
     // Get the user from DB for full profile
     const user = await getUser(loginResult.userId);
