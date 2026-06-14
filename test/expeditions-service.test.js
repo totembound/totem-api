@@ -96,20 +96,20 @@ describe('Expeditions Service', () => {
     it('should have correct base rewards for each tier', () => {
       const expeditions = expeditionsService.getAllExpeditions();
 
-      // Quick: 5 baseExp, 3 baseEssence, 2 essenceCost
+      // Quick: 5 baseExp, 3 baseEssence (no Essence cost — happiness-gated only)
       const quick = expeditions.filter(e => e.durationMinutes === 30);
       quick.forEach(exp => {
         expect(exp.baseExp).toBe(5);
         expect(exp.baseEssence).toBe(3);
-        expect(exp.essenceCost).toBe(2);
+        expect(exp.essenceCost).toBeUndefined();
       });
 
-      // Epic: 120 baseExp, 60 baseEssence, 50 essenceCost
+      // Epic: 120 baseExp, 60 baseEssence (no Essence cost)
       const epic = expeditions.filter(e => e.durationMinutes === 1440);
       epic.forEach(exp => {
         expect(exp.baseExp).toBe(120);
         expect(exp.baseEssence).toBe(60);
-        expect(exp.essenceCost).toBe(50);
+        expect(exp.essenceCost).toBeUndefined();
       });
     });
   });
@@ -251,15 +251,8 @@ describe('Expeditions Service', () => {
         })
       );
 
-      // Verify Essence was deducted (cost: 2)
-      expect(dbClient.deductEssence).toHaveBeenCalledWith(
-        testUserId,
-        2,
-        expect.objectContaining({
-          type: 'expedition_start',
-          ref: 'exp_lunch-delivery-mission',
-        })
-      );
+      // Expeditions no longer charge an Essence deposit on start — happiness-gated only
+      expect(dbClient.deductEssence).not.toHaveBeenCalled();
 
       // Verify totem was marked as busy
       expect(dbClient.updateTotem).toHaveBeenCalledWith(
