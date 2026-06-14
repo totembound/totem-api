@@ -18,7 +18,6 @@ const {
   getTotem,
   updateTotem,
   addEssence,
-  deductEssence,
   addRunes,
   getUserTotems,
   TABLES,
@@ -37,18 +36,18 @@ const { resolveTraitBonuses } = require('../config/trait-effects');
  * All available expeditions with their configurations
  * Synced with totem-app/public/config/expeditions.json
  *
- * Costs: Essence is DEDUCTED when starting (essenceCost)
- * Rewards: XP and Essence are GRANTED on completion (baseExp, baseEssence)
+ * Costs: Happiness only, deducted per-totem across the team when starting (happinessCost).
+ * Rewards: XP and Essence are GRANTED on completion (baseExp, baseEssence), scaled by
+ *   the team's success multiplier. Essence is a claim-only group reward — no start deposit.
  */
 const EXPEDITIONS = {
-  // Quick (30 min) - Cost: 2 Essence + 1 Happiness, Reward: 5 XP + Runes
+  // Quick (30 min) - Cost: 1 Happiness, Reward: 5 XP + Runes
   'exp_lunch-delivery-mission': {
     id: 'exp_lunch-delivery-mission',
     name: 'Lunch Delivery Mission',
     description: 'A quick errand delivering meals across the meadow',
     domain: 0, // Air
     durationMinutes: 30,
-    essenceCost: 2,
     happinessCost: 1,
     baseExp: 5,
     baseEssence: 3,
@@ -62,7 +61,6 @@ const EXPEDITIONS = {
     description: 'Help clear the garden of pesky weeds',
     domain: 1, // Earth
     durationMinutes: 30,
-    essenceCost: 2,
     happinessCost: 1,
     baseExp: 5,
     baseEssence: 3,
@@ -76,7 +74,6 @@ const EXPEDITIONS = {
     description: 'A relaxing trip to the nearby pond',
     domain: 2, // Water
     durationMinutes: 30,
-    essenceCost: 2,
     happinessCost: 1,
     baseExp: 5,
     baseEssence: 3,
@@ -85,14 +82,13 @@ const EXPEDITIONS = {
     requiredStage: 0,
   },
 
-  // Medium (3 hr / 180 min) - Cost: 10 Essence + 5 Happiness, Reward: 15 XP + Runes
+  // Medium (3 hr / 180 min) - Cost: 5 Happiness, Reward: 15 XP + Runes
   'exp_wind-scout-patrol': {
     id: 'exp_wind-scout-patrol',
     name: 'Wind Scout Patrol',
     description: 'Surveying the territory from high vantage points',
     domain: 0, // Air
     durationMinutes: 180,
-    essenceCost: 10,
     happinessCost: 5,
     baseExp: 15,
     baseEssence: 10,
@@ -106,7 +102,6 @@ const EXPEDITIONS = {
     description: 'Gathering resources from the fertile lands',
     domain: 1, // Earth
     durationMinutes: 180,
-    essenceCost: 10,
     happinessCost: 5,
     baseExp: 15,
     baseEssence: 10,
@@ -120,7 +115,6 @@ const EXPEDITIONS = {
     description: 'Learning ancient wisdom from the elder spirits',
     domain: 2, // Water
     durationMinutes: 180,
-    essenceCost: 10,
     happinessCost: 5,
     baseExp: 15,
     baseEssence: 10,
@@ -129,14 +123,13 @@ const EXPEDITIONS = {
     requiredStage: 1,
   },
 
-  // Long (6 hr / 360 min) - Cost: 20 Essence + 10 Happiness, Reward: 30 XP + Runes
+  // Long (6 hr / 360 min) - Cost: 10 Happiness, Reward: 30 XP + Runes
   'exp_diplomatic-envoy': {
     id: 'exp_diplomatic-envoy',
     name: 'Diplomatic Envoy',
     description: 'Representing the tribe in peaceful negotiations',
     domain: 0, // Air
     durationMinutes: 360,
-    essenceCost: 20,
     happinessCost: 10,
     baseExp: 30,
     baseEssence: 20,
@@ -150,7 +143,6 @@ const EXPEDITIONS = {
     description: 'Excavating artifacts from ancient sites',
     domain: 1, // Earth
     durationMinutes: 360,
-    essenceCost: 20,
     happinessCost: 10,
     baseExp: 30,
     baseEssence: 20,
@@ -164,7 +156,6 @@ const EXPEDITIONS = {
     description: 'Investigating natural phenomena',
     domain: 2, // Water
     durationMinutes: 360,
-    essenceCost: 20,
     happinessCost: 10,
     baseExp: 30,
     baseEssence: 20,
@@ -173,14 +164,13 @@ const EXPEDITIONS = {
     requiredStage: 1,
   },
 
-  // Extended (12 hr / 720 min) - Cost: 30 Essence + 15 Happiness, Reward: 60 XP + Runes
+  // Extended (12 hr / 720 min) - Cost: 15 Happiness, Reward: 60 XP + Runes
   'exp_festival-envoy': {
     id: 'exp_festival-envoy',
     name: 'Festival Envoy',
     description: 'Participating in grand celebrations across the land',
     domain: 0, // Air
     durationMinutes: 720,
-    essenceCost: 30,
     happinessCost: 15,
     baseExp: 60,
     baseEssence: 35,
@@ -194,7 +184,6 @@ const EXPEDITIONS = {
     description: 'Protecting the borders of the sacred lands',
     domain: 1, // Earth
     durationMinutes: 720,
-    essenceCost: 30,
     happinessCost: 15,
     baseExp: 60,
     baseEssence: 35,
@@ -208,7 +197,6 @@ const EXPEDITIONS = {
     description: 'Crafting mystical symbols of power',
     domain: 2, // Water
     durationMinutes: 720,
-    essenceCost: 30,
     happinessCost: 15,
     baseExp: 60,
     baseEssence: 35,
@@ -217,14 +205,13 @@ const EXPEDITIONS = {
     requiredStage: 1,
   },
 
-  // Epic (24 hr / 1440 min) - Cost: 50 Essence + 20 Happiness, Reward: 120 XP + Runes
+  // Epic (24 hr / 1440 min) - Cost: 20 Happiness, Reward: 120 XP + Runes
   'exp_celestial-mapping': {
     id: 'exp_celestial-mapping',
     name: 'Celestial Mapping',
     description: 'Charting the movements of the stars',
     domain: 0, // Air
     durationMinutes: 1440,
-    essenceCost: 50,
     happinessCost: 20,
     baseExp: 120,
     baseEssence: 60,
@@ -238,7 +225,6 @@ const EXPEDITIONS = {
     description: 'Venturing into uncharted territories',
     domain: 1, // Earth
     durationMinutes: 1440,
-    essenceCost: 50,
     happinessCost: 20,
     baseExp: 120,
     baseEssence: 60,
@@ -252,7 +238,6 @@ const EXPEDITIONS = {
     description: 'Communing with the ancient spirit council',
     domain: 2, // Water
     durationMinutes: 1440,
-    essenceCost: 50,
     happinessCost: 20,
     baseExp: 120,
     baseEssence: 60,
@@ -699,26 +684,8 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
     }
   }
 
-  // Deduct Essence cost
-  const essenceCost = expedition.essenceCost || 0;
-  if (essenceCost > 0) {
-    const costResult = await deductEssence(userId, essenceCost, {
-      type: 'expedition_start',
-      ref: expeditionId,
-      refType: 'expedition',
-      refName: expedition.name,
-    });
-
-    if (!costResult.success) {
-      return {
-        success: false,
-        error: 'Insufficient Essence',
-        message: `This expedition requires ${essenceCost} Essence to start. You have ${costResult.available || 0}.`,
-        required: essenceCost,
-        available: costResult.available,
-      };
-    }
-  }
+  // No Essence cost to start — expeditions are gated by happiness only (per-totem,
+  // ×3 team). Essence is a claim-only group reward (see calculateEssenceReward).
 
   // Deduct happiness cost from ALL team totems
   if (happinessCost > 0) {
@@ -772,7 +739,7 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
     }
   }
 
-  console.log(`[Expedition] Started "${expedition.name}" for totem ${totemId} by user ${userId} (cost: ${essenceCost} Essence, ${happinessCost} happiness)`);
+  console.log(`[Expedition] Started "${expedition.name}" for totem ${totemId} by user ${userId} (cost: ${happinessCost} happiness)`);
 
   return {
     success: true,
@@ -782,7 +749,6 @@ async function startExpedition(userId, totemId, expeditionId, totemIds) {
       name: expedition.name,
       description: expedition.description,
       durationMinutes: expedition.durationMinutes,
-      essenceCost,
       happinessCost,
       baseExp: expedition.baseExp,
       startedAt: now.toISOString(),
