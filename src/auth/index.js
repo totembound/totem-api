@@ -227,7 +227,7 @@ async function handleLogin(req, res) {
             totalTotems: 0,
             totalChallengesCompleted: 0,
             loginStreak: 1,
-            lastLoginDate: today,
+            lastLoginDate: new Date().toISOString(),
           },
           settings: { notifications: true, darkMode: 'system' },
         });
