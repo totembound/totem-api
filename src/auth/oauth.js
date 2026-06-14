@@ -149,7 +149,7 @@ async function handleOAuthCallback(req, res) {
             totalTotems: 0,
             totalChallengesCompleted: 0,
             loginStreak: 0,
-            lastLoginDate: new Date().toISOString().split('T')[0],
+            lastLoginDate: new Date().toISOString(),
           },
           settings: { notifications: true, darkMode: 'dark' },
           role: 'user',
@@ -202,22 +202,23 @@ async function handleOAuthCallback(req, res) {
     );
 
     // 6. Update login streak (fire-and-forget)
-    const today = new Date().toISOString().split('T')[0];
-    const lastLogin = userProfile.stats?.lastLoginDate;
+    const nowIso = new Date().toISOString();
+    const today = nowIso.slice(0, 10);
+    const lastLoginDay = (userProfile.stats?.lastLoginDate || '').slice(0, 10);
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayStr = yesterday.toISOString().split('T')[0];
 
     let newStreak = 1;
-    if (lastLogin === yesterdayStr) {
+    if (lastLoginDay === yesterdayStr) {
       newStreak = (userProfile.stats?.loginStreak || 0) + 1;
     }
-    else if (lastLogin === today) {
+    else if (lastLoginDay === today) {
       newStreak = userProfile.stats?.loginStreak || 1;
     }
 
     updateUser(userProfile.id, {
-      'stats.lastLoginDate': today,
+      'stats.lastLoginDate': nowIso,
       'stats.loginStreak': newStreak,
     }).catch(err => console.error('Failed to update login streak:', err));
 
