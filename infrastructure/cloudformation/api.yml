@@ -17,6 +17,7 @@ Mappings:
       CognitoStackName: totemboundci-cognito-stack
       TablePrefix: TotemBound
       DefaultFromEmail: no-reply@totembound-test.net
+      ApiReservedConcurrency: '50'
     production:
       ResourcePrefix: totembound
       S3Bucket: totembound-releases
@@ -26,6 +27,10 @@ Mappings:
       CognitoStackName: totembound-cognito-stack
       TablePrefix: TotemBound
       DefaultFromEmail: no-reply@totembound.com
+      # '-1' = omit ReservedConcurrentExecutions → API uses the shared account pool
+      # (no hard cap). Single-workload account, so capping the all-in-one API would
+      # only throttle players on spikes; runaway protection comes from the alarm.
+      ApiReservedConcurrency: '-1'
 
 Parameters:
   Environment:
@@ -131,8 +136,15 @@ Parameters:
     Description: SSM parameter name for Discord OAuth Client Secret
     Default: ''
 
+  AlarmTopicArn:
+    Type: String
+    Description: Optional SNS topic ARN for CloudWatch alarm actions. Empty = alarm has no notification action (still visible in console / dashboards).
+    Default: ''
+
 Conditions:
   UseDefaultFromEmail: !Equals [!Ref FromEmail, '']
+  HasApiReservedConcurrency: !Not [!Equals [!FindInMap [EnvironmentMap, !Ref Environment, ApiReservedConcurrency], '-1']]
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
 
 Resources:
   # ============================================
@@ -153,7 +165,14 @@ Resources:
       Runtime: nodejs22.x
       Timeout: 30
       MemorySize: 512
-      ReservedConcurrentExecutions: 50
+      # Per-env (EnvironmentMap.ApiReservedConcurrency): staging caps at 50;
+      # production omits the property → shares the account pool. Reserved concurrency
+      # is a hard ceiling, not just a floor, so capping the all-in-one API would 429
+      # players on spikes. See docs/lambda-concurrency-sizing.md.
+      ReservedConcurrentExecutions: !If
+        - HasApiReservedConcurrency
+        - !FindInMap [EnvironmentMap, !Ref Environment, ApiReservedConcurrency]
+        - !Ref AWS::NoValue
       Environment:
         Variables:
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
@@ -197,6 +216,31 @@ Resources:
       Code:
         S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
         S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"
+
+  # Throttles alarm: fires when the API Lambda hits a concurrency ceiling (account
+  # quota, or staging's reserved cap). On a single-workload account this is the
+  # runaway / over-cap signal — preferable to a low reserved cap that silently 429s
+  # players. Wire AlarmTopicArn to get notified; otherwise visible in CloudWatch.
+  ApiThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub
+        - "${Prefix}-api-throttles"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      AlarmDescription: "API Lambda throttled — concurrency ceiling hit. Raise account quota (Service Quotas L-B99A9384) or remove the reserved cap."
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ApiLambdaFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref "AWS::NoValue"]
+      OKActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref "AWS::NoValue"]
 
   # ============================================
   # Stats Snapshot Lambda + EventBridge schedules (analytics pipeline)
