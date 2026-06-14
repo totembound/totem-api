@@ -448,3 +448,69 @@ describe('handleLogin — OAuth guard', () => {
     expect(signIn).toHaveBeenCalled();
   });
 });
+
+// ============================================================================
+// Login Streak Tests (lastLoginDate is a full ISO timestamp; day comparison
+// must slice the date portion before comparing calendar days)
+// ============================================================================
+
+describe('handleLogin — login streak', () => {
+  const isoDaysAgo = (n) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - n);
+    return d.toISOString();
+  };
+
+  const loginAs = async (stats) => {
+    getUserByEmail.mockResolvedValue(null);
+    signIn.mockResolvedValue({
+      userId: 'usr_streak1',
+      email: 'streak@example.com',
+      displayName: 'Streak User',
+      accessToken: 'at', refreshToken: 'rt', idToken: 'it',
+      expiresIn: 86400, tokenType: 'Bearer',
+    });
+    getUser.mockResolvedValue({
+      id: 'usr_streak1',
+      email: 'streak@example.com',
+      displayName: 'Streak User',
+      tier: 'free',
+      currencies: { essence: 2000, gems: 0 },
+      stats,
+      settings: {},
+    });
+    updateUser.mockResolvedValue(null);
+    const res = mockRes();
+    await handleLogin(mockReq({ email: 'streak@example.com', password: 'pw' }), res);
+    return res;
+  };
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('extends the streak when the last login was yesterday', async () => {
+    await loginAs({ loginStreak: 4, lastLoginDate: isoDaysAgo(1) });
+    expect(updateUser).toHaveBeenCalledWith('usr_streak1', expect.objectContaining({
+      'stats.loginStreak': 5,
+    }));
+  });
+
+  it('keeps the streak when already logged in today', async () => {
+    await loginAs({ loginStreak: 4, lastLoginDate: isoDaysAgo(0) });
+    expect(updateUser).toHaveBeenCalledWith('usr_streak1', expect.objectContaining({
+      'stats.loginStreak': 4,
+    }));
+  });
+
+  it('resets the streak to 1 after a gap of several days', async () => {
+    await loginAs({ loginStreak: 9, lastLoginDate: isoDaysAgo(3) });
+    expect(updateUser).toHaveBeenCalledWith('usr_streak1', expect.objectContaining({
+      'stats.loginStreak': 1,
+    }));
+  });
+
+  it('writes lastLoginDate back as a full ISO timestamp, not a bare date', async () => {
+    await loginAs({ loginStreak: 1, lastLoginDate: isoDaysAgo(1) });
+    const written = updateUser.mock.calls[0][1]['stats.lastLoginDate'];
+    expect(written).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  });
+});

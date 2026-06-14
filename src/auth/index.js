@@ -113,7 +113,7 @@ async function handleSignup(req, res) {
         totalTotems: 0, // No totem yet - user opens loot box to choose species
         totalChallengesCompleted: 0,
         loginStreak: 0, // Starts at 0, increments when daily reward is claimed
-        lastLoginDate: new Date().toISOString().split('T')[0],
+        lastLoginDate: new Date().toISOString(),
       },
       settings: { notifications: true, darkMode: 'dark' },
       role: 'user',
@@ -227,7 +227,7 @@ async function handleLogin(req, res) {
             totalTotems: 0,
             totalChallengesCompleted: 0,
             loginStreak: 1,
-            lastLoginDate: today,
+            lastLoginDate: new Date().toISOString(),
           },
           settings: { notifications: true, darkMode: 'system' },
         });
@@ -243,23 +243,24 @@ async function handleLogin(req, res) {
       }
 
       if (userProfile) {
-        // Calculate login streak
-        const lastLogin = userProfile.stats?.lastLoginDate;
+        // Calculate login streak (compare UTC calendar days; lastLoginDate is a full ISO timestamp)
+        const nowIso = new Date().toISOString();
+        const lastLoginDay = (userProfile.stats?.lastLoginDate || '').slice(0, 10);
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split('T')[0];
 
         let newStreak = 1;
-        if (lastLogin === yesterdayStr) {
+        if (lastLoginDay === yesterdayStr) {
           newStreak = (userProfile.stats?.loginStreak || 0) + 1;
         }
-        else if (lastLogin === today) {
+        else if (lastLoginDay === today) {
           newStreak = userProfile.stats?.loginStreak || 1;
         }
 
         // Update login stats
         const updatedProfile = await updateUser(result.userId, {
-          'stats.lastLoginDate': today,
+          'stats.lastLoginDate': nowIso,
           'stats.loginStreak': newStreak,
         });
 
@@ -268,7 +269,7 @@ async function handleLogin(req, res) {
           userProfile = updatedProfile;
         }
         else {
-          userProfile.stats.lastLoginDate = today;
+          userProfile.stats.lastLoginDate = nowIso;
           userProfile.stats.loginStreak = newStreak;
         }
 

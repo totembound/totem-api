@@ -370,7 +370,6 @@ async function main() {
   const TEST_USER_EMAIL = 'testplayer1@example.com';
   const TEST_USER_NAME = 'TestPlayer1';
   const now = new Date().toISOString();
-  const today = now.slice(0, 10);
 
   // Check if test user already exists
   let userExists = false;
@@ -412,7 +411,7 @@ async function main() {
           totalTotems: { N: '0' },
           totalChallengesCompleted: { N: '0' },
           loginStreak: { N: '0' },
-          lastLoginDate: { S: today },
+          lastLoginDate: { S: now },
         }},
         settings: { M: {
           notifications: { BOOL: true },
@@ -512,7 +511,7 @@ async function main() {
           totalTotems: { N: '0' },
           totalChallengesCompleted: { N: '0' },
           loginStreak: { N: '0' },
-          lastLoginDate: { S: today },
+          lastLoginDate: { S: now },
         }},
         settings: { M: {
           notifications: { BOOL: true },
