@@ -1,0 +1,1379 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TotemBound API - Single Lambda + REST API Gateway + Cognito Auth'
+
+Mappings:
+  EnvironmentMap:
+    staging:
+      ResourcePrefix: totemboundci
+      S3Bucket: totemboundci-releases
+      CorsOrigin: https://totembound-test.net
+      # Allowlist (comma-separated) for the gateway-level CORS echo. The consumer
+      # app and the admin console are distinct origins; ACAO can only hold ONE
+      # value (and can't be '*' with credentials), so OPTIONS preflight echoes the
+      # request Origin only when it's in this set. Keep CorsOrigin as the primary
+      # app origin (used for APP_URL / OAUTH redirects below).
+      CorsAllowedOrigins: 'https://totembound-test.net,https://admin.totembound-test.net'
+      CoreStackName: totemboundci-core-stack
+      CognitoStackName: totemboundci-cognito-stack
+      TablePrefix: TotemBound
+      DefaultFromEmail: no-reply@totembound-test.net
+      ApiReservedConcurrency: '50'
+    production:
+      ResourcePrefix: totembound
+      S3Bucket: totembound-releases
+      CorsOrigin: https://totembound.com
+      CorsAllowedOrigins: 'https://totembound.com,https://admin.totembound.com'
+      CoreStackName: totembound-core-stack
+      CognitoStackName: totembound-cognito-stack
+      TablePrefix: TotemBound
+      DefaultFromEmail: no-reply@totembound.com
+      # '-1' = omit ReservedConcurrentExecutions → API uses the shared account pool
+      # (no hard cap). Single-workload account, so capping the all-in-one API would
+      # only throttle players on spikes; runaway protection comes from the alarm.
+      ApiReservedConcurrency: '-1'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues:
+      - staging
+      - production
+    Description: Deployment environment
+
+  AppVersion:
+    Type: String
+    Description: Version of the Lambda package to deploy
+    Default: latest
+
+  StripeSecretKeyParam:
+    Type: String
+    Description: SSM parameter name for Stripe secret key
+    Default: ''
+
+  StripeWebhookSecretParam:
+    Type: String
+    Description: SSM parameter name for Stripe webhook secret
+    Default: ''
+
+  StripePricePremium:
+    Type: String
+    Description: Stripe Price ID for Premium subscription tier
+    Default: ''
+
+  StripePriceVip:
+    Type: String
+    Description: Stripe Price ID for VIP subscription tier
+    Default: ''
+
+  StripePriceStarter:
+    Type: String
+    Description: Stripe Price ID for Starter gem package ($4.99)
+    Default: ''
+
+  StripePricePopular:
+    Type: String
+    Description: Stripe Price ID for Popular gem package ($9.99)
+    Default: ''
+
+  StripePriceBestValue:
+    Type: String
+    Description: Stripe Price ID for Best Value gem package ($24.99)
+    Default: ''
+
+  StripePriceUltimate:
+    Type: String
+    Description: Stripe Price ID for Ultimate gem package ($49.99)
+    Default: ''
+
+  IoTEndpoint:
+    Type: String
+    Description: AWS IoT Core data endpoint (e.g., xxxx-ats.iot.us-east-1.amazonaws.com). Leave empty to disable IoT push.
+    Default: ''
+
+  IoTIdentityPoolId:
+    Type: String
+    Description: Cognito Identity Pool ID (from IoT stack). Leave empty to disable IoT push.
+    Default: ''
+
+  IoTBrowserPolicyName:
+    Type: String
+    Description: IoT browser policy name (from IoT stack). Used by /v1/iot/register to attach policy to identities.
+    Default: ''
+
+  FromEmail:
+    Type: String
+    Description: Email address for notifications (must match a verified SES identity)
+    Default: ''
+
+  GoogleClientIdParam:
+    Type: String
+    Description: SSM parameter name for Google OAuth Client ID
+    Default: ''
+
+  GoogleClientSecretParam:
+    Type: String
+    Description: SSM parameter name for Google OAuth Client Secret
+    Default: ''
+
+  TwitchClientIdParam:
+    Type: String
+    Description: SSM parameter name for Twitch OAuth Client ID
+    Default: ''
+
+  TwitchClientSecretParam:
+    Type: String
+    Description: SSM parameter name for Twitch OAuth Client Secret
+    Default: ''
+
+  DiscordClientIdParam:
+    Type: String
+    Description: SSM parameter name for Discord OAuth Client ID
+    Default: ''
+
+  DiscordClientSecretParam:
+    Type: String
+    Description: SSM parameter name for Discord OAuth Client Secret
+    Default: ''
+
+  AlarmTopicArn:
+    Type: String
+    Description: Optional SNS topic ARN for CloudWatch alarm actions. Empty = alarm has no notification action (still visible in console / dashboards).
+    Default: ''
+
+Conditions:
+  UseDefaultFromEmail: !Equals [!Ref FromEmail, '']
+  HasApiReservedConcurrency: !Not [!Equals [!FindInMap [EnvironmentMap, !Ref Environment, ApiReservedConcurrency], '-1']]
+  HasAlarmTopic: !Not [!Equals [!Ref AlarmTopicArn, '']]
+
+Resources:
+  # ============================================
+  # Single Lambda Function (monolithic Express)
+  # Handler: lambda.handler → serverless-http(app)
+  # ============================================
+  ApiLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub
+        - "${Prefix}-api"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      Handler: lambda.handler
+      Role:
+        Fn::ImportValue: !Sub
+          - "${StackName}-LambdaExecutionRoleArn"
+          - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CoreStackName]
+      Runtime: nodejs22.x
+      Timeout: 30
+      MemorySize: 512
+      # Per-env (EnvironmentMap.ApiReservedConcurrency): staging caps at 50;
+      # production omits the property → shares the account pool. Reserved concurrency
+      # is a hard ceiling, not just a floor, so capping the all-in-one API would 429
+      # players on spikes. See docs/lambda-concurrency-sizing.md.
+      ReservedConcurrentExecutions: !If
+        - HasApiReservedConcurrency
+        - !FindInMap [EnvironmentMap, !Ref Environment, ApiReservedConcurrency]
+        - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+          NODE_ENV: !Ref Environment
+          TABLE_PREFIX: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+          # Multi-origin allowlist for the Lambda cors() middleware (app + admin),
+          # matching the gateway-level CorsAllowedOrigins. APP_URL/OAUTH stay on the
+          # single primary app origin below.
+          CORS_ORIGIN: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+          COGNITO_USER_POOL_ID:
+            Fn::ImportValue: !Sub
+              - "${StackName}-UserPoolId"
+              - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CognitoStackName]
+          COGNITO_CLIENT_ID:
+            Fn::ImportValue: !Sub
+              - "${StackName}-UserPoolClientId"
+              - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CognitoStackName]
+          STRIPE_SECRET_KEY_PARAM: !Ref StripeSecretKeyParam
+          STRIPE_WEBHOOK_SECRET_PARAM: !Ref StripeWebhookSecretParam
+          APP_URL: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+          EMAIL_FROM: !If
+            - UseDefaultFromEmail
+            - !FindInMap [EnvironmentMap, !Ref Environment, DefaultFromEmail]
+            - !Ref FromEmail
+          STRIPE_PRICE_PREMIUM: !Ref StripePricePremium
+          STRIPE_PRICE_VIP: !Ref StripePriceVip
+          STRIPE_PRICE_STARTER: !Ref StripePriceStarter
+          STRIPE_PRICE_POPULAR: !Ref StripePricePopular
+          STRIPE_PRICE_BEST_VALUE: !Ref StripePriceBestValue
+          STRIPE_PRICE_ULTIMATE: !Ref StripePriceUltimate
+          IOT_ENDPOINT: !Ref IoTEndpoint
+          IOT_IDENTITY_POOL_ID: !Ref IoTIdentityPoolId
+          IOT_BROWSER_POLICY_NAME: !Ref IoTBrowserPolicyName
+          GOOGLE_CLIENT_ID_PARAM: !Ref GoogleClientIdParam
+          GOOGLE_CLIENT_SECRET_PARAM: !Ref GoogleClientSecretParam
+          TWITCH_CLIENT_ID_PARAM: !Ref TwitchClientIdParam
+          TWITCH_CLIENT_SECRET_PARAM: !Ref TwitchClientSecretParam
+          DISCORD_CLIENT_ID_PARAM: !Ref DiscordClientIdParam
+          DISCORD_CLIENT_SECRET_PARAM: !Ref DiscordClientSecretParam
+          OAUTH_REDIRECT_BASE: !FindInMap [EnvironmentMap, !Ref Environment, CorsOrigin]
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"
+
+  # Throttles alarm: fires when the API Lambda hits a concurrency ceiling (account
+  # quota, or staging's reserved cap). On a single-workload account this is the
+  # runaway / over-cap signal — preferable to a low reserved cap that silently 429s
+  # players. Wire AlarmTopicArn to get notified; otherwise visible in CloudWatch.
+  ApiThrottlesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub
+        - "${Prefix}-api-throttles"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      AlarmDescription: "API Lambda throttled — concurrency ceiling hit. Raise account quota (Service Quotas L-B99A9384) or remove the reserved cap."
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ApiLambdaFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref "AWS::NoValue"]
+      OKActions: !If [HasAlarmTopic, [!Ref AlarmTopicArn], !Ref "AWS::NoValue"]
+
+  # ============================================
+  # Stats Snapshot Lambda + EventBridge schedules (analytics pipeline)
+  #
+  # Reuses the SAME deployment artifact as the API Lambda — only the Handler
+  # differs (functions/admin/stats-snapshot.handler is in the bundle). Writes
+  # time-bucketed snapshots to AdminStatsHistory so GET /v1/admin/stats can read
+  # the latest instead of live-scanning. Shares the core LambdaExecutionRole,
+  # which already grants AdminStatsHistory + table read access.
+  # ============================================
+  StatsSnapshotFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub
+        - "${Prefix}-stats-snapshot"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      Handler: functions/admin/stats-snapshot.handler
+      Role:
+        Fn::ImportValue: !Sub
+          - "${StackName}-LambdaExecutionRoleArn"
+          - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CoreStackName]
+      Runtime: nodejs22.x
+      Timeout: 60
+      MemorySize: 512
+      Environment:
+        Variables:
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1'
+          NODE_ENV: !Ref Environment
+          TABLE_PREFIX: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      Code:
+        S3Bucket: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+        S3Key: !Sub "totem-api/totembound-api-${AppVersion}.zip"
+
+  StatsSnapshotHourlyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Hourly admin stats snapshot
+      ScheduleExpression: "cron(5 * * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-hourly
+          Input: '{"granularity":"HOURLY"}'
+
+  StatsSnapshotDailyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Daily admin stats snapshot (00:10 UTC)
+      ScheduleExpression: "cron(10 0 * * ? *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-daily
+          Input: '{"granularity":"DAILY"}'
+
+  StatsSnapshotWeeklyRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: Weekly admin stats snapshot (Sunday 00:15 UTC)
+      ScheduleExpression: "cron(15 0 ? * SUN *)"
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt StatsSnapshotFunction.Arn
+          Id: stats-snapshot-weekly
+          Input: '{"granularity":"WEEKLY"}'
+
+  StatsSnapshotHourlyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotHourlyRule.Arn
+
+  StatsSnapshotDailyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotDailyRule.Arn
+
+  StatsSnapshotWeeklyPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref StatsSnapshotFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StatsSnapshotWeeklyRule.Arn
+
+  # Observability: alarm when the snapshot Lambda errors across consecutive runs.
+  # If snapshots silently stop landing, /admin/stats quietly degrades to live
+  # full-table scans — this makes that visible. Wire AlarmActions to an ops SNS
+  # topic when one exists.
+  StatsSnapshotErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub
+        - "${Prefix}-stats-snapshot-errors"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      AlarmDescription: stats-snapshot Lambda errored on 2+ consecutive runs; /admin/stats may be falling back to live scans.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref StatsSnapshotFunction
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 2
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  # ============================================
+  # REST API Gateway
+  # ============================================
+  TotemBoundApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub
+        - "${Prefix}-api"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      Description: TotemBound Game API
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  # ============================================
+  # Cognito Authorizer
+  # ============================================
+  CognitoAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: CognitoAuth
+      Type: COGNITO_USER_POOLS
+      RestApiId: !Ref TotemBoundApi
+      IdentitySource: method.request.header.Authorization
+      AuthorizerResultTtlInSeconds: 300
+      ProviderARNs:
+        - Fn::ImportValue: !Sub
+            - "${StackName}-UserPoolArn"
+            - StackName: !FindInMap [EnvironmentMap, !Ref Environment, CognitoStackName]
+
+  # ============================================
+  # Gateway Responses - CORS on error responses
+  # Without these, browser can't read 401/403 errors
+  # ============================================
+  GatewayResponse4XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        # Error responses (4XX/5XX) are generated by API Gateway itself and can't
+        # run conditional VTL (responseOverride only applies to integration
+        # responses), so we reflect the request Origin here. Successful data
+        # responses are still origin-validated by the Lambda cors allowlist, and
+        # OPTIONS preflight is allowlist-checked above — so this only governs who
+        # can READ generic error bodies, an accepted trade-off to stay Lambda-free.
+        gatewayresponse.header.Access-Control-Allow-Origin: method.request.header.Origin
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
+
+  GatewayResponse5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        # Error responses (4XX/5XX) are generated by API Gateway itself and can't
+        # run conditional VTL (responseOverride only applies to integration
+        # responses), so we reflect the request Origin here. Successful data
+        # responses are still origin-validated by the Lambda cors allowlist, and
+        # OPTIONS preflight is allowlist-checked above — so this only governs who
+        # can READ generic error bodies, an accepted trade-off to stay Lambda-free.
+        gatewayresponse.header.Access-Control-Allow-Origin: method.request.header.Origin
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
+
+  # ============================================
+  # Response Model (for OPTIONS MOCK methods)
+  # ============================================
+  EmptyModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ContentType: application/json
+      Name: EmptyResponse
+      Schema:
+        type: object
+
+  # ============================================
+  # API Resources
+  #
+  # Structure:
+  #   /health                        GET → MOCK (no auth, no Lambda)
+  #   /v1/auth/signup                POST → Lambda (no auth)
+  #   /v1/auth/login                 POST → Lambda (no auth)
+  #   /v1/auth/refresh               POST → Lambda (no auth)
+  #   /v1/auth/logout                POST → Lambda (no auth)
+  #   /v1/auth/verify                POST → Lambda (no auth)
+  #   /v1/auth/resend-verification   POST → Lambda (no auth)
+  #   /v1/auth/forgot-password       POST → Lambda (no auth)
+  #   /v1/auth/reset-password        POST → Lambda (no auth)
+  #   /v1/auth/oauth/callback       POST → Lambda (no auth)
+  #   /v1/auth/{proxy+}             ANY → Lambda (Cognito) - catches /auth/me
+  #   /v1/{proxy+}                  ANY → Lambda (Cognito) - catches everything else
+  #   /webhooks/stripe               POST → Lambda (no auth, Stripe signature)
+  #   All resources: OPTIONS → MOCK (no auth, no Lambda)
+  #
+  # Stage name is "api" (not "v1") so resource paths
+  # include /v1/ without URL duplication. With custom domain
+  # base path mapping, URL is: https://api.totembound.com/v1/...
+  # ============================================
+
+  # /health - API Gateway health check (no Lambda)
+  HealthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: health
+
+  HealthGet:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref HealthResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseTemplates:
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                  {"status":"healthy"}
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+
+  HealthOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref HealthResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+
+  # /v1
+  V1Resource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: v1
+
+  # /v1/auth
+  AuthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref V1Resource
+      PathPart: auth
+
+  # ============================================
+  # Public Auth Endpoints (no Cognito authorizer)
+  # ============================================
+
+  # /v1/auth/signup
+  AuthSignupResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: signup
+
+  AuthSignupPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthSignupResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthSignupOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthSignupResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/login
+  AuthLoginResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: login
+
+  AuthLoginPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthLoginResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthLoginOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthLoginResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/refresh
+  AuthRefreshResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: refresh
+
+  AuthRefreshPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthRefreshResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthRefreshOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthRefreshResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/logout
+  AuthLogoutResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: logout
+
+  AuthLogoutPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthLogoutResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthLogoutOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthLogoutResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/verify (email verification - public, user not yet authenticated)
+  AuthVerifyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: verify
+
+  AuthVerifyPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthVerifyResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthVerifyOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthVerifyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/resend-verification (public, user not yet authenticated)
+  AuthResendVerificationResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: resend-verification
+
+  AuthResendVerificationPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthResendVerificationResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthResendVerificationOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthResendVerificationResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/forgot-password (public, user not authenticated)
+  AuthForgotPasswordResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: forgot-password
+
+  AuthForgotPasswordPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthForgotPasswordResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthForgotPasswordOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthForgotPasswordResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/reset-password (public, user not authenticated)
+  AuthResetPasswordResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: reset-password
+
+  AuthResetPasswordPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthResetPasswordResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthResetPasswordOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthResetPasswordResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # /v1/auth/oauth (intermediate resource for nested path)
+  AuthOAuthResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: oauth
+
+  # /v1/auth/oauth/callback (public, user not authenticated - this is where OAuth creates the token)
+  AuthOAuthCallbackResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthOAuthResource
+      PathPart: callback
+
+  AuthOAuthCallbackPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthOAuthCallbackResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthOAuthCallbackOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthOAuthCallbackResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # ============================================
+  # Protected Auth Proxy - catches /v1/auth/me
+  # and any future auth sub-routes needing auth
+  #
+  # API Gateway won't backtrack from /v1/auth/ to
+  # /v1/{proxy+}, so we need {proxy+} here too.
+  # ============================================
+  AuthProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref AuthResource
+      PathPart: '{proxy+}'
+
+  AuthProxyAny:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthProxyResource
+      HttpMethod: ANY
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  AuthProxyOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref AuthProxyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # ============================================
+  # Protected Catch-All Proxy
+  # Catches all /v1/* routes not explicitly defined
+  # (totems, shop, rewards, challenges, expeditions, etc.)
+  # ============================================
+  V1ProxyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref V1Resource
+      PathPart: '{proxy+}'
+
+  V1ProxyAny:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref V1ProxyResource
+      HttpMethod: ANY
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref CognitoAuthorizer
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  V1ProxyOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref V1ProxyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,PATCH,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # ============================================
+  # Stripe Webhook (no auth - Stripe uses signature verification)
+  # Path: /webhooks/stripe (outside /v1/ prefix)
+  # ============================================
+  WebhooksResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !GetAtt TotemBoundApi.RootResourceId
+      PathPart: webhooks
+
+  WebhooksStripeResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ParentId: !Ref WebhooksResource
+      PathPart: stripe
+
+  WebhooksStripePost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref WebhooksStripeResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiLambdaFunction.Arn}/invocations"
+
+  WebhooksStripeOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      ResourceId: !Ref WebhooksStripeResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,Cache-Control'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Max-Age: "'86400'"
+            ResponseTemplates:
+              # Echo the request Origin into Access-Control-Allow-Origin only when
+              # it's in the env allowlist (app + admin). responseOverride runs at
+              # the gateway — no Lambda invocation for preflight.
+              application/json: !Sub
+                - |
+                  #set($origin = $input.params('Origin'))
+                  #set($allow = ",${AllowedOrigins},")
+                  #if($origin != "" && $allow.indexOf(",$origin,") >= 0)#set($context.responseOverride.header.Access-Control-Allow-Origin = $origin)#end
+                - AllowedOrigins: !FindInMap [EnvironmentMap, !Ref Environment, CorsAllowedOrigins]
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseModels:
+            application/json: !Ref EmptyModel
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Max-Age: true
+
+  # ============================================
+  # API Deployment & Stage
+  # Stage name: "api" (not "v1") because resource
+  # paths already include /v1/. With custom domain
+  # base path mapping, the stage name is hidden.
+  # ============================================
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - HealthGet
+      - HealthOptions
+      - AuthSignupPost
+      - AuthSignupOptions
+      - AuthLoginPost
+      - AuthLoginOptions
+      - AuthRefreshPost
+      - AuthRefreshOptions
+      - AuthLogoutPost
+      - AuthLogoutOptions
+      - AuthVerifyPost
+      - AuthVerifyOptions
+      - AuthResendVerificationPost
+      - AuthResendVerificationOptions
+      - AuthForgotPasswordPost
+      - AuthForgotPasswordOptions
+      - AuthResetPasswordPost
+      - AuthResetPasswordOptions
+      - AuthProxyAny
+      - AuthProxyOptions
+      - V1ProxyAny
+      - V1ProxyOptions
+      - WebhooksStripePost
+      - WebhooksStripeOptions
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      Description: !Sub "Deployment ${AppVersion} (${Environment})"
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId: !Ref TotemBoundApi
+      DeploymentId: !Ref ApiDeployment
+      StageName: api
+      Description: !Sub
+        - "${Prefix} API Stage"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      Variables:
+        lambdaVersion: !Ref AppVersion
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          MetricsEnabled: true
+          LoggingLevel: ERROR
+          ThrottlingBurstLimit: 500
+          ThrottlingRateLimit: 200
+
+  # ============================================
+  # Lambda Permission for API Gateway
+  # ============================================
+  ApiLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ApiLambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${TotemBoundApi}/*"
+
+Outputs:
+  ApiUrl:
+    Description: API Gateway base URL (use custom domain for clean URLs)
+    Value: !Sub "https://${TotemBoundApi}.execute-api.${AWS::Region}.amazonaws.com/api"
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiUrl"
+
+  ApiGatewayId:
+    Description: API Gateway REST API ID
+    Value: !Ref TotemBoundApi
+    Export:
+      Name: !Sub "${AWS::StackName}-ApiGatewayId"
+
+  LambdaFunctionName:
+    Description: Lambda function name (for CI/CD code updates)
+    Value: !Ref ApiLambdaFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaFunctionName"
+
+  LambdaFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt ApiLambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"

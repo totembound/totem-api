@@ -1,0 +1,307 @@
+{
+  "description": "Shop configuration including gem packages, special offers, and monthly series bundles. Static config.",
+  "conversionRate": {
+    "gemToEssence": 5,
+    "note": "1 Gem = 5 Essence"
+  },
+  "essenceExchangeBundles": [
+    {
+      "id": "exchange_small",
+      "name": "Small Exchange",
+      "gemCost": 100,
+      "essenceAmount": 500,
+      "bonus": 0,
+      "bonusNote": null,
+      "enabled": true
+    },
+    {
+      "id": "exchange_medium",
+      "name": "Medium Exchange",
+      "gemCost": 500,
+      "essenceAmount": 2750,
+      "bonus": 10,
+      "bonusNote": "+10% bonus",
+      "enabled": true
+    },
+    {
+      "id": "exchange_large",
+      "name": "Large Exchange",
+      "gemCost": 1000,
+      "essenceAmount": 6000,
+      "bonus": 20,
+      "bonusNote": "+20% bonus",
+      "enabled": true
+    },
+    {
+      "id": "exchange_mega",
+      "name": "Mega Exchange",
+      "gemCost": 2500,
+      "essenceAmount": 16250,
+      "bonus": 30,
+      "bonusNote": "+30% bonus",
+      "enabled": true
+    }
+  ],
+  "specialOfferBundles": [
+    {
+      "id": "bundle_newplayer",
+      "bundleId": 0,
+      "name": "New Player Bundle",
+      "description": "500 Essence and an uncommon spirit totem!",
+      "gemCost": 500,
+      "priceUsd": "$5",
+      "essence": 500,
+      "includesTotem": true,
+      "totemRarity": "uncommon",
+      "dailyLimit": 1,
+      "category": "special",
+      "enabled": true
+    },
+    {
+      "id": "bundle_rare",
+      "bundleId": 1,
+      "name": "Daily Rare Special",
+      "description": "750 Essence and guaranteed rare totem!",
+      "gemCost": 1000,
+      "priceUsd": "$10",
+      "essence": 750,
+      "includesTotem": true,
+      "totemRarity": "rare",
+      "dailyLimit": 1,
+      "category": "special",
+      "enabled": true
+    },
+    {
+      "id": "bundle_epic",
+      "bundleId": 2,
+      "name": "Daily Epic Special",
+      "description": "1,000 Essence and guaranteed epic totem!",
+      "gemCost": 2500,
+      "priceUsd": "$25",
+      "essence": 1000,
+      "includesTotem": true,
+      "totemRarity": "epic",
+      "dailyLimit": 1,
+      "category": "special",
+      "enabled": true
+    },
+    {
+      "id": "bundle_monthly",
+      "bundleId": 3,
+      "name": "Monthly Collector Series",
+      "description": "2,000 Essence and exclusive limited monthly totem!",
+      "gemCost": 5000,
+      "priceUsd": "$50",
+      "essence": 2000,
+      "includesTotem": true,
+      "totemRarity": "exclusive",
+      "dailyLimit": 1,
+      "category": "monthly",
+      "enabled": true
+    }
+  ],
+  "gemPackages": [
+    {
+      "id": "pkg_starter",
+      "name": "Starter Pack",
+      "price": 499,
+      "priceFormatted": "$4.99",
+      "gems": 500,
+      "bonus": 0,
+      "category": "standard",
+      "enabled": true
+    },
+    {
+      "id": "pkg_popular",
+      "name": "Popular Pack",
+      "price": 999,
+      "priceFormatted": "$9.99",
+      "gems": 1100,
+      "bonus": 10,
+      "category": "standard",
+      "enabled": true
+    },
+    {
+      "id": "pkg_best_value",
+      "name": "Best Value",
+      "price": 2499,
+      "priceFormatted": "$24.99",
+      "gems": 3000,
+      "bonus": 20,
+      "category": "standard",
+      "enabled": true
+    },
+    {
+      "id": "pkg_ultimate",
+      "name": "Ultimate Pack",
+      "price": 4999,
+      "priceFormatted": "$49.99",
+      "gems": 6500,
+      "bonus": 30,
+      "category": "standard",
+      "enabled": true
+    }
+  ],
+  "monthlySeriesBundles": [
+    {
+      "id": "bundle_collector",
+      "name": "Collector Bundle",
+      "description": "Monthly collector bundle with 1 exclusive limited totem",
+      "price": 7499,
+      "priceFormatted": "$74.99",
+
+      "gems": 10000,
+      "essence": 50000,
+      "bonus": 43,
+      "limitedTotems": 1,
+      "exclusiveTitle": null,
+      "exclusiveBadge": false,
+      "category": "collector",
+      "dailyLimit": 1,
+      "enabled": false
+    },
+    {
+      "id": "bundle_founder",
+      "name": "Founder Bundle",
+      "description": "Premium bundle with exclusive Founder title",
+      "price": 9999,
+      "priceFormatted": "$99.99",
+
+      "gems": 15000,
+      "essence": 75000,
+      "bonus": 50,
+      "limitedTotems": 1,
+      "exclusiveTitle": "Founder",
+      "exclusiveBadge": false,
+      "category": "collector",
+      "dailyLimit": 1,
+      "enabled": false
+    },
+    {
+      "id": "bundle_legendary",
+      "name": "Legendary Bundle",
+      "description": "Ultimate bundle with 2 limited totems, Legend title, and exclusive badge",
+      "price": 14999,
+      "priceFormatted": "$149.99",
+
+      "gems": 25000,
+      "essence": 125000,
+      "bonus": 67,
+      "limitedTotems": 2,
+      "exclusiveTitle": "Legend",
+      "exclusiveBadge": true,
+      "category": "collector",
+      "dailyLimit": 1,
+      "enabled": false
+    }
+  ],
+  "totemPricing": {
+    "newTotem": 500,
+    "sellFormula": "300 + (stage * 30) + (rarityId * 20)",
+    "buyFee": 100
+  },
+  "limitedTotemSeries": {
+    "description": "Monthly limited totem releases. Each month features a new exclusive color/species combo.",
+    "schedule": "Full calendar month, rotates annually",
+    "availabilityWindow": "calendar_month",
+    "dailyLimit": 1,
+    "series": [
+      {
+        "id": "limited_series_01",
+        "month": "January",
+        "name": "Frostbound Goose",
+        "species": 0,
+        "color": 16,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_02",
+        "month": "February",
+        "name": "Lovewave Otter",
+        "species": 1,
+        "color": 17,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_03",
+        "month": "March",
+        "name": "Cloverfang Wolf",
+        "species": 2,
+        "color": 18,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_04",
+        "month": "April",
+        "name": "Thunderstrike Falcon",
+        "species": 3,
+        "color": 19,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_05",
+        "month": "May",
+        "name": "Blossomroot Beaver",
+        "species": 4,
+        "color": 20,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_06",
+        "month": "June",
+        "name": "Solstride Deer",
+        "species": 5,
+        "color": 21,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_07",
+        "month": "July",
+        "name": "Blazebeak Woodpecker",
+        "species": 6,
+        "color": 22,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_08",
+        "month": "August",
+        "name": "Tidebound Turtle",
+        "species": 7,
+        "color": 23,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_09",
+        "month": "September",
+        "name": "Autumnfang Bear",
+        "species": 8,
+        "color": 24,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_10",
+        "month": "October",
+        "name": "Phantom Raven",
+        "species": 9,
+        "color": 25,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_11",
+        "month": "November",
+        "name": "Hearthcoil Snake",
+        "species": 10,
+        "color": 26,
+        "rarity": 5
+      },
+      {
+        "id": "limited_series_12",
+        "month": "December",
+        "name": "Everfrost Owl",
+        "species": 11,
+        "color": 27,
+        "rarity": 5
+      }
+    ]
+  }
+}

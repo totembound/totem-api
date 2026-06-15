@@ -1,0 +1,504 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TotemBound - Core Infrastructure (DynamoDB Tables + IAM)'
+
+Mappings:
+  EnvironmentMap:
+    staging:
+      Region: us-west-2
+      ResourcePrefix: totemboundci
+      S3Bucket: totemboundci-releases
+      TablePrefix: TotemBound
+    production:
+      Region: us-east-1
+      ResourcePrefix: totembound
+      S3Bucket: totembound-releases
+      TablePrefix: TotemBound
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues:
+      - staging
+      - production
+    Description: Deployment environment
+
+Resources:
+  # ============================================
+  # DynamoDB Tables (9 total)
+  # Schema matches totem-api/scripts/init-tables.js
+  # All tables use pk/sk composite key pattern
+  # ============================================
+
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-Users"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: oauthProvider
+          AttributeType: S
+        - AttributeName: oauthProviderId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: email-index
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: provider-index
+          KeySchema:
+            - AttributeName: oauthProvider
+              KeyType: HASH
+            - AttributeName: oauthProviderId
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  TotemsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-Totems"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  ChallengeProgressTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-ChallengeProgress"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+
+  ExpeditionStateTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-ExpeditionState"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+
+  RewardStateTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-RewardState"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+
+  AchievementProgressTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-AchievementProgress"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+
+  RewardsClaimsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-RewardsClaims"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      SSESpecification:
+        SSEEnabled: true
+
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-Transactions"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: ts
+          AttributeType: S
+        - AttributeName: type
+          AttributeType: S
+        - AttributeName: dateBucket
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: user-ts-index
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+            - AttributeName: ts
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: type-ts-index
+          KeySchema:
+            - AttributeName: type
+              KeyType: HASH
+            - AttributeName: ts
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        # Windowed time aggregates for admin stats (see aggregateTransactions).
+        # PK is the UTC calendar date so a window touches only the days it spans;
+        # INCLUDE projection lets the aggregate read type/currency/amount straight
+        # off the index without a base-table fetch, keeping write cost minimal.
+        - IndexName: date-ts-index
+          KeySchema:
+            - AttributeName: dateBucket
+              KeyType: HASH
+            - AttributeName: ts
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - type
+              - currency
+              - amount
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  ShopTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-Shop"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: originalOwnerId
+          AttributeType: S
+        - AttributeName: listedAt
+          AttributeType: S
+        - AttributeName: speciesId
+          AttributeType: 'N'
+        - AttributeName: rarityId
+          AttributeType: 'N'
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: seller-index
+          KeySchema:
+            - AttributeName: originalOwnerId
+              KeyType: HASH
+            - AttributeName: listedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: species-index
+          KeySchema:
+            - AttributeName: speciesId
+              KeyType: HASH
+            - AttributeName: listedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: rarity-index
+          KeySchema:
+            - AttributeName: rarityId
+              KeyType: HASH
+            - AttributeName: listedAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  # Time-bucketed admin stats snapshots (analytics pipeline).
+  # pk: BUCKET#{HOURLY|DAILY|WEEKLY}  sk: TS#{iso bucket-start}
+  # TTL on `ttl` expires old hourly/daily rows automatically.
+  AdminStatsHistoryTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: !Sub
+        - "${Prefix}-AdminStatsHistory"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, TablePrefix]
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+
+  # ============================================
+  # Lambda Execution Role
+  # ============================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub
+        - "${Prefix}-lambda-role"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                Resource:
+                  - !GetAtt UsersTable.Arn
+                  - !Sub "${UsersTable.Arn}/index/*"
+                  - !GetAtt TotemsTable.Arn
+                  - !Sub "${TotemsTable.Arn}/index/*"
+                  - !GetAtt ChallengeProgressTable.Arn
+                  - !Sub "${ChallengeProgressTable.Arn}/index/*"
+                  - !GetAtt ExpeditionStateTable.Arn
+                  - !Sub "${ExpeditionStateTable.Arn}/index/*"
+                  - !GetAtt RewardStateTable.Arn
+                  - !Sub "${RewardStateTable.Arn}/index/*"
+                  - !GetAtt AchievementProgressTable.Arn
+                  - !Sub "${AchievementProgressTable.Arn}/index/*"
+                  - !GetAtt RewardsClaimsTable.Arn
+                  - !Sub "${RewardsClaimsTable.Arn}/index/*"
+                  - !GetAtt TransactionsTable.Arn
+                  - !Sub "${TransactionsTable.Arn}/index/*"
+                  - !GetAtt ShopTable.Arn
+                  - !Sub "${ShopTable.Arn}/index/*"
+                  - !GetAtt AdminStatsHistoryTable.Arn
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  Fn::Join:
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - Fn::FindInMap: [EnvironmentMap, !Ref Environment, S3Bucket]
+                      - "/*"
+        - PolicyName: SESAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: '*'
+        - PolicyName: CognitoAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminConfirmSignUp
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminInitiateAuth
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:AdminUpdateUserAttributes
+                Resource:
+                  - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
+        - PolicyName: ParameterStoreAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub
+                    - "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${Prefix}/*"
+                    - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+              - Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource:
+                  - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/ssm"
+                  - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+
+Outputs:
+  UsersTableName:
+    Value: !Ref UsersTable
+    Export:
+      Name: !Sub "${AWS::StackName}-UsersTableName"
+  UsersTableArn:
+    Value: !GetAtt UsersTable.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-UsersTableArn"
+  TotemsTableName:
+    Value: !Ref TotemsTable
+    Export:
+      Name: !Sub "${AWS::StackName}-TotemsTableName"
+  ShopTableName:
+    Value: !Ref ShopTable
+    Export:
+      Name: !Sub "${AWS::StackName}-ShopTableName"
+  TransactionsTableName:
+    Value: !Ref TransactionsTable
+    Export:
+      Name: !Sub "${AWS::StackName}-TransactionsTableName"
+  LambdaExecutionRoleArn:
+    Value: !GetAtt LambdaExecutionRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaExecutionRoleArn"
+  LambdaArtifactsBucketName:
+    Value: !FindInMap [EnvironmentMap, !Ref Environment, S3Bucket]
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaArtifactsBucketName"
+  ResourcePrefix:
+    Value: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+    Export:
+      Name: !Sub "${AWS::StackName}-ResourcePrefix"

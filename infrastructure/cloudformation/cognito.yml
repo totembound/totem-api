@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'TotemBound - Cognito User Pool for Authentication'
+
+Mappings:
+  EnvironmentMap:
+    staging:
+      ResourcePrefix: totemboundci
+      CallbackUrl: https://totembound-test.net
+    production:
+      ResourcePrefix: totembound
+      CallbackUrl: https://totembound.com
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues:
+      - staging
+      - production
+    Description: Deployment environment
+
+Resources:
+  # Cognito User Pool
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub
+        - "${Prefix}-user-pool"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+
+      # Email sign-in
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+      # Password policy
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireUppercase: false
+          RequireSymbols: false
+          TemporaryPasswordValidityDays: 7
+
+      # Custom attributes for game data
+      Schema:
+        - Name: userId
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '64'
+        - Name: displayName
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '50'
+        - Name: tier
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '20'
+        - Name: role
+          AttributeDataType: String
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: '1'
+            MaxLength: '20'
+
+      # Email configuration
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+
+      # Account recovery
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+      # User pool settings
+      MfaConfiguration: 'OFF'
+      UserPoolAddOns:
+        AdvancedSecurityMode: 'OFF'
+
+  # App Client (for frontend)
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub
+        - "${Prefix}-app-client"
+        - Prefix: !FindInMap [EnvironmentMap, !Ref Environment, ResourcePrefix]
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+
+      # Auth flows
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
+
+      # Token validity
+      AccessTokenValidity: 24
+      IdTokenValidity: 24
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+      # Prevent user existence errors
+      PreventUserExistenceErrors: ENABLED
+
+      # Read/write attributes
+      ReadAttributes:
+        - email
+        - email_verified
+        - custom:userId
+        - custom:displayName
+        - custom:tier
+        - custom:role
+      # custom:role is intentionally READ-only (not writable): it must appear in
+      # the ID token for the requireRole('admin') gate, but users must never be
+      # able to self-promote via UpdateUserAttributes. Admins are set server-side
+      # with AdminUpdateUserAttributes, which bypasses client WriteAttributes.
+      WriteAttributes:
+        - email
+        - custom:userId
+        - custom:displayName
+        - custom:tier
+
+Outputs:
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolId"
+
+  UserPoolArn:
+    Description: Cognito User Pool ARN
+    Value: !GetAtt UserPool.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolArn"
+
+  UserPoolClientId:
+    Description: Cognito App Client ID
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolClientId"
+
+  UserPoolProviderUrl:
+    Description: Cognito Provider URL (for JWT issuer validation)
+    Value: !GetAtt UserPool.ProviderURL
+    Export:
+      Name: !Sub "${AWS::StackName}-UserPoolProviderUrl"

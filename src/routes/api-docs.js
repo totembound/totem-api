@@ -1,0 +1,3777 @@
+/**
+ * API Documentation - JSDoc comments for Swagger
+ *
+ * This file contains OpenAPI/Swagger documentation for all API endpoints.
+ * The actual route implementations are in app.js and function handlers.
+ *
+ * Total: 65 endpoints across 14 tags
+ */
+
+// ============================================
+// Auth Endpoints (9)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/auth/signup:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Create a new account
+ *     description: Register a new user with email and password. Creates user record with 2000 Essence starter balance and grants an Uncommon Totem loot box.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password, displayName]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: player@example.com
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *                 example: SecurePassword123!
+ *               displayName:
+ *                 type: string
+ *                 example: TotemMaster
+ *     responses:
+ *       200:
+ *         description: Account created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "Account created successfully" }
+ *       400:
+ *         description: Invalid input or email already exists
+ */
+
+/**
+ * @swagger
+ * /v1/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Sign in with email/password
+ *     description: Authenticate and receive JWT tokens
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: player@example.com
+ *               password:
+ *                 type: string
+ *                 example: SecurePassword123!
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     accessToken: { type: string, description: "JWT for API calls" }
+ *                     refreshToken: { type: string, description: "Token for refreshing access" }
+ *                     expiresIn: { type: number, example: 86400 }
+ *                     user: { $ref: '#/components/schemas/User' }
+ *       401:
+ *         description: Invalid credentials
+ */
+
+/**
+ * @swagger
+ * /v1/auth/oauth/callback:
+ *   post:
+ *     tags: [Auth]
+ *     summary: OAuth social login callback
+ *     description: Exchange an OAuth authorization code for JWT tokens. Handles find-or-create for new users and account linking for existing email users.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [provider, code, redirectUri]
+ *             properties:
+ *               provider:
+ *                 type: string
+ *                 enum: [google]
+ *                 example: google
+ *               code:
+ *                 type: string
+ *                 description: Authorization code from OAuth provider redirect
+ *               redirectUri:
+ *                 type: string
+ *                 description: Redirect URI used in the authorize request
+ *                 example: http://localhost:3000/auth/callback
+ *     responses:
+ *       200:
+ *         description: Login successful (new or returning user)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 isNewUser: { type: boolean, example: false }
+ *                 user: { $ref: '#/components/schemas/User' }
+ *                 tokens:
+ *                   type: object
+ *                   properties:
+ *                     accessToken: { type: string }
+ *                     refreshToken: { type: string }
+ *                     idToken: { type: string }
+ *                     expiresIn: { type: number, example: 86400 }
+ *                     tokenType: { type: string, example: Bearer }
+ *                 lootItem:
+ *                   type: object
+ *                   nullable: true
+ *                   description: Starter loot box (only for new users)
+ *       400:
+ *         description: Invalid provider or missing email
+ *       401:
+ *         description: Failed to authenticate with provider
+ */
+
+/**
+ * @swagger
+ * /v1/auth/verify:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Verify email address
+ *     description: >
+ *       Confirm account with the verification code sent to email, then auto sign-in.
+ *       The account **password** is required (the endpoint logs the user in and returns tokens on success).
+ *       In local dev, code is always 123456.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, code, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: player@example.com
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 description: Account password — verify also auto-signs-in, so it is required.
+ *                 example: "Passw0rd!"
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *       400:
+ *         description: Invalid or expired code
+ */
+
+/**
+ * @swagger
+ * /v1/auth/resend-verification:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Resend verification code
+ *     description: Resend the email verification code. Always returns success to prevent user enumeration.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: player@example.com
+ *     responses:
+ *       200:
+ *         description: Verification code sent (or silently ignored if email not found)
+ */
+
+/**
+ * @swagger
+ * /v1/auth/forgot-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Request password reset
+ *     description: Send a password reset code to the user's email. Always returns success to prevent user enumeration.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: player@example.com
+ *     responses:
+ *       200:
+ *         description: Reset code sent (always returns success)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 message: { type: string, example: "If that email exists, a reset code has been sent" }
+ */
+
+/**
+ * @swagger
+ * /v1/auth/reset-password:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Confirm password reset
+ *     description: Reset password using the code received via email
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, code, newPassword]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: player@example.com
+ *               code:
+ *                 type: string
+ *                 example: "123456"
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *                 example: NewSecurePassword123!
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid or expired code
+ */
+
+/**
+ * @swagger
+ * /v1/auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Sign out
+ *     description: Revoke refresh token and sign out
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Logged out successfully
+ */
+
+/**
+ * @swagger
+ * /v1/auth/refresh:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Refresh access token
+ *     description: Get a new access token using refresh token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [refreshToken]
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: New tokens issued
+ *       401:
+ *         description: Invalid refresh token
+ */
+
+/**
+ * @swagger
+ * /v1/auth/me:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Get current user profile
+ *     description: Returns the authenticated user's profile with balances and stats
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data: { $ref: '#/components/schemas/User' }
+ *       401:
+ *         description: Unauthorized
+ */
+
+// ============================================
+// User Endpoints (2)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/user/profile:
+ *   get:
+ *     tags: [User]
+ *     summary: Get user profile
+ *     description: Returns full user profile with stats, currencies, and settings
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId: { type: string }
+ *                     email: { type: string }
+ *                     displayName: { type: string }
+ *                     tier: { type: string, enum: [free, premium, vip] }
+ *                     currencies:
+ *                       type: object
+ *                       properties:
+ *                         essence: { type: number, example: 1500 }
+ *                         gems: { type: number, example: 100 }
+ *                     stats:
+ *                       type: object
+ *                       properties:
+ *                         totalTotems: { type: number }
+ *                         totalChallengesCompleted: { type: number }
+ *                         loginStreak: { type: number }
+ *                     settings:
+ *                       type: object
+ *                       properties:
+ *                         notifications: { type: boolean, example: true }
+ *                         darkMode: { type: string, enum: [system, light, dark], example: system }
+ *                     displayNameCooldown:
+ *                       type: object
+ *                       description: Cooldown state for display-name changes. `readyAt` is null if no cooldown is active.
+ *                       properties:
+ *                         readyAt: { type: string, format: date-time, nullable: true, example: "2026-05-28T14:22:00Z" }
+ *                         skipCost: { type: number, example: 500 }
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /v1/user/profile:
+ *   put:
+ *     tags: [User]
+ *     summary: Update user profile
+ *     description: |
+ *       Update display name, settings, and the public profile sub-object
+ *       (bio, avatar, banner). All fields are optional; supplied fields are
+ *       validated independently and applied atomically.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               displayName:
+ *                 type: string
+ *                 example: NewDisplayName
+ *               settings:
+ *                 type: object
+ *                 properties:
+ *                   notifications: { type: boolean }
+ *                   darkMode: { type: string, enum: [system, light, dark] }
+ *               bio:
+ *                 type: string
+ *                 nullable: true
+ *                 maxLength: 240
+ *                 description: Plain text (no links, no HTML), multi-line, emoji allowed. Pass null to clear.
+ *               avatar:
+ *                 nullable: true
+ *                 description: Reference to a built-in image. Pass null to clear.
+ *                 oneOf:
+ *                   - type: object
+ *                     required: [kind, id]
+ *                     properties:
+ *                       kind: { type: string, enum: [domain] }
+ *                       id: { type: integer, minimum: 0, maximum: 5, description: "Domain enum (0=Air, 1=Earth, 2=Water, 3=Fire, 4=Spirit, 5=Shadow)" }
+ *                   - type: object
+ *                     required: [kind, speciesId, colorId, stage]
+ *                     properties:
+ *                       kind: { type: string, enum: [totem] }
+ *                       speciesId: { type: integer, minimum: 0 }
+ *                       colorId: { type: integer, minimum: 0 }
+ *                       stage: { type: integer, minimum: 0, maximum: 4, description: "Must be ≤ user's current stage for that totem" }
+ *               banner:
+ *                 nullable: true
+ *                 description: Domain-only banner reference. Pass null to clear.
+ *                 type: object
+ *                 required: [kind, id]
+ *                 properties:
+ *                   kind: { type: string, enum: [domain] }
+ *                   id: { type: integer, minimum: 0, maximum: 5 }
+ *     responses:
+ *       200:
+ *         description: Profile updated
+ *       400:
+ *         description: Invalid input
+ *       401:
+ *         description: Unauthorized
+ */
+
+/**
+ * @swagger
+ * /v1/players/{userId}/public:
+ *   get:
+ *     tags: [User]
+ *     summary: Get a player's public profile
+ *     description: |
+ *       Returns the public-safe subset of another player's profile. Requires
+ *       authentication (defense-in-depth — marketplace is the only entry
+ *       point and is itself auth-only). Returns only whitelisted public
+ *       fields; never returns email, currencies, settings, role, tier, or
+ *       any other private field.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema: { type: string }
+ *         description: Player's user ID (e.g. usr_abc123)
+ *     responses:
+ *       200:
+ *         description: Public profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: string }
+ *                     displayName: { type: string }
+ *                     createdAt: { type: string, format: date-time }
+ *                     profile:
+ *                       type: object
+ *                       properties:
+ *                         bio: { type: string, nullable: true }
+ *                         avatar: { type: object, nullable: true }
+ *                         banner: { type: object, nullable: true }
+ *                     stats:
+ *                       type: object
+ *                       properties:
+ *                         totalTotems: { type: number }
+ *                         totalChallengesCompleted: { type: number }
+ *       404:
+ *         description: Player not found
+ */
+
+/**
+ * @swagger
+ * /v1/user/displayName:
+ *   put:
+ *     tags: [User]
+ *     summary: Change display name
+ *     description: |
+ *       Change the authenticated user's display name. Validates length (3–20 chars),
+ *       charset (alphanumeric + spaces/hyphens/underscores, no leading/trailing/consecutive spaces),
+ *       and runs a profanity filter. The first change is free; subsequent changes are subject to a
+ *       30-day cooldown. The cooldown can be skipped by paying 500 Essence (`skipCooldown: true`).
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [displayName]
+ *             properties:
+ *               displayName:
+ *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 20
+ *                 example: TotemMaster
+ *               skipCooldown:
+ *                 type: boolean
+ *                 default: false
+ *                 description: If true and a cooldown is active, deduct 500 Essence and proceed.
+ *     responses:
+ *       200:
+ *         description: Display name changed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     displayName: { type: string, example: TotemMaster }
+ *                     displayNameCooldown:
+ *                       type: object
+ *                       properties:
+ *                         readyAt: { type: string, format: date-time }
+ *                         skipCost: { type: number, example: 500 }
+ *                     skippedCooldown: { type: boolean, example: false }
+ *                     newEssenceBalance:
+ *                       type: number
+ *                       description: Present only when `skippedCooldown` is true.
+ *       400:
+ *         description: Validation error (length, charset, profanity, or no change)
+ *       402:
+ *         description: Insufficient Essence to skip cooldown
+ *       409:
+ *         description: Cooldown active (response includes `readyAt`, `remainingMs`, and `skipCost`)
+ *       401:
+ *         description: Unauthorized
+ */
+
+// ============================================
+// Totem Endpoints (11)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/totems:
+ *   get:
+ *     tags: [Totems]
+ *     summary: Get all user's totems
+ *     description: Returns all totems owned by the authenticated user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of totems
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totems:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/Totem' }
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}:
+ *   get:
+ *     tags: [Totems]
+ *     summary: Get a specific totem
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Totem ID (ttm_*)
+ *     responses:
+ *       200:
+ *         description: Totem details
+ *       404:
+ *         description: Totem not found
+ */
+
+/**
+ * @swagger
+ * /v1/totems/purchase/info:
+ *   get:
+ *     tags: [Totems]
+ *     summary: Get totem purchase info
+ *     description: Returns cost and available species for totem purchase
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Purchase information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     cost: { type: number, example: 500 }
+ *                     currency: { type: string, example: essence }
+ *                     availableSpecies:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: number }
+ *                           name: { type: string }
+ */
+
+/**
+ * @swagger
+ * /v1/totems/forge:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Forge (fuse) 3 totems into 1 higher rarity
+ *     description: |
+ *       Combines 3 totems of the same rarity into 1 new Stage 0 totem of the next rarity.
+ *       Pure Fusion (same species) guarantees the same species. Wild Fusion (mixed) produces random species.
+ *       Legendary and Limited totems cannot be forged. Uses DynamoDB TransactWriteItems for atomicity.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemIds]
+ *             properties:
+ *               totemIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 minItems: 3
+ *                 maxItems: 3
+ *                 description: Exactly 3 unique totem IDs to fuse
+ *                 example: ["ttm_abc123", "ttm_def456", "ttm_ghi789"]
+ *     responses:
+ *       201:
+ *         description: Fusion successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     action:
+ *                       type: string
+ *                       example: forge
+ *                     fusionType:
+ *                       type: string
+ *                       enum: [pure, wild]
+ *                     consumedTotemIds:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     newTotem:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         speciesId:
+ *                           type: integer
+ *                         speciesName:
+ *                           type: string
+ *                         colorId:
+ *                           type: integer
+ *                         rarityId:
+ *                           type: integer
+ *                         stage:
+ *                           type: integer
+ *                           example: 0
+ *                         stats:
+ *                           type: object
+ *                         traits:
+ *                           type: object
+ *                           description: Trait slots; innate is auto-assigned at forge, learned/awakened are chosen later.
+ *                           properties:
+ *                             innate:
+ *                               type: string
+ *                               nullable: true
+ *                               example: trt_brave
+ *                             learned:
+ *                               type: string
+ *                               nullable: true
+ *                             awakened:
+ *                               type: string
+ *                               nullable: true
+ *                         image:
+ *                           type: string
+ *                     newEssenceBalance:
+ *                       type: integer
+ *                     achievements:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *       400:
+ *         description: Invalid input (INVALID_IDS, RARITY_MISMATCH, MAX_RARITY)
+ *       404:
+ *         description: Totem not found (NOT_FOUND)
+ *       409:
+ *         description: Conflict (ON_EXPEDITION, TRANSACTION_FAILED)
+ */
+
+/**
+ * @swagger
+ * /v1/totems/purchase:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Purchase a new totem
+ *     description: Buy a new totem with Essence (500 Essence). Rarity is determined server-side via weighted random.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [speciesId]
+ *             properties:
+ *               speciesId:
+ *                 type: number
+ *                 description: Species to purchase (0-11)
+ *                 example: 1
+ *     responses:
+ *       201:
+ *         description: Totem purchased
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totem:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         speciesId: { type: integer }
+ *                         speciesName: { type: string }
+ *                         colorId: { type: integer }
+ *                         rarityId: { type: integer }
+ *                         nickname: { type: string, nullable: true }
+ *                         stage: { type: integer }
+ *                         experience: { type: integer }
+ *                         stats: { type: object }
+ *                         traits:
+ *                           type: object
+ *                           description: Trait slots; innate is auto-assigned at purchase, learned/awakened are chosen later.
+ *                           properties:
+ *                             innate: { type: string, nullable: true, example: trt_curious }
+ *                             learned: { type: string, nullable: true }
+ *                             awakened: { type: string, nullable: true }
+ *                         image: { type: string }
+ *                     newBalance: { type: integer }
+ *                     cost: { type: integer }
+ *                     achievements: { type: array, items: { type: object } }
+ *       402:
+ *         description: Insufficient Essence
+ *       400:
+ *         description: Invalid species
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/feed:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Feed a totem
+ *     description: "Costs 10 Essence. Grants +10 happiness. 8-hour time windows (3 feeds per day: 00-08, 08-16, 16-24)."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Totem fed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     action: { type: string, example: feed }
+ *                     totemId: { type: string }
+ *                     happinessChange: { type: number, example: 10 }
+ *                     newBalance: { type: number }
+ *                     achievements: { type: array, items: { type: object } }
+ *       400:
+ *         description: On cooldown or insufficient Essence
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/train:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Train a totem
+ *     description: "Costs 20 Essence. Grants +50 XP, -10 happiness. No cooldown."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Training complete
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     action: { type: string, example: train }
+ *                     totemId: { type: string }
+ *                     xpGained: { type: number, example: 50 }
+ *                     happinessChange: { type: number, example: -10 }
+ *                     newBalance: { type: number }
+ *                     achievements: { type: array, items: { type: object } }
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/treat:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Treat a totem
+ *     description: "Costs 20 Essence. Grants +10 happiness. 4-hour cooldown."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Totem treated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     action: { type: string, example: treat }
+ *                     totemId: { type: string }
+ *                     happinessChange: { type: number, example: 10 }
+ *                     newBalance: { type: number }
+ *                     achievements: { type: array, items: { type: object } }
+ *       400:
+ *         description: On cooldown or insufficient Essence
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/evolve:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Evolve a totem
+ *     description: "Evolve to next stage. Free. Requires sufficient XP (500/1500/3500/7500) and happiness >= 30. Boosts strength, agility, wisdom by +stage, happiness by +10. Stages: Hatchling → Chick → Juvenile → Adult → Wise Elder."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Evolution successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     action: { type: string, example: evolve }
+ *                     totemId: { type: string }
+ *                     evolution:
+ *                       type: object
+ *                       properties:
+ *                         previousStage: { type: number }
+ *                         previousStageName: { type: string }
+ *                         newStage: { type: number }
+ *                         newStageName: { type: string }
+ *                     statBoosts:
+ *                       type: object
+ *                       properties:
+ *                         strength: { type: number }
+ *                         agility: { type: number }
+ *                         wisdom: { type: number }
+ *                         happiness: { type: number, example: 10 }
+ *                     achievements: { type: array, items: { type: object } }
+ *       400:
+ *         description: Requirements not met or already max stage
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/traits/choose:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Choose a trait for a totem
+ *     description: |
+ *       Pick a trait for the Learned (Stage 2+) or Awakened (Stage 4+) slot.
+ *       Innate is set at birth and not selectable. Choices are permanent.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [slot, traitId]
+ *             properties:
+ *               slot:
+ *                 type: string
+ *                 enum: [learned, awakened]
+ *                 example: learned
+ *               traitId:
+ *                 type: string
+ *                 example: trt_quick_learner
+ *     responses:
+ *       200:
+ *         description: Trait chosen
+ *       400:
+ *         description: INVALID_SLOT or INVALID_TRAIT
+ *       403:
+ *         description: STAGE_LOCKED — totem not yet at the required stage
+ *       404:
+ *         description: TOTEM_NOT_FOUND
+ *       409:
+ *         description: SLOT_TAKEN — slot already filled
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/nickname:
+ *   post:
+ *     tags: [Totems]
+ *     summary: Set totem nickname
+ *     description: Set or update a custom nickname for a totem
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [nickname]
+ *             properties:
+ *               nickname:
+ *                 type: string
+ *                 maxLength: 20
+ *                 example: Sparky
+ *     responses:
+ *       200:
+ *         description: Nickname updated
+ *       400:
+ *         description: Invalid nickname
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/cooldowns:
+ *   get:
+ *     tags: [Totems]
+ *     summary: Get action cooldowns
+ *     description: Returns cooldown status for feed, train, and treat actions
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Cooldown status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totemId: { type: string }
+ *                     cooldowns:
+ *                       type: object
+ *                       properties:
+ *                         feed:
+ *                           type: object
+ *                           properties:
+ *                             onCooldown: { type: boolean }
+ *                             readyAt: { type: string, nullable: true }
+ *                             remainingMs: { type: number }
+ *                         train:
+ *                           type: object
+ *                           properties:
+ *                             onCooldown: { type: boolean }
+ *                             readyAt: { type: string, nullable: true }
+ *                             remainingMs: { type: number }
+ *                         treat:
+ *                           type: object
+ *                           properties:
+ *                             onCooldown: { type: boolean }
+ *                             readyAt: { type: string, nullable: true }
+ *                             remainingMs: { type: number }
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/evolution:
+ *   get:
+ *     tags: [Totems]
+ *     summary: Get evolution status
+ *     description: Returns current stage, whether totem can evolve, and requirements for next stage
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Evolution status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totemId: { type: string }
+ *                     currentStage: { type: number }
+ *                     currentStageName: { type: string }
+ *                     isMaxStage: { type: boolean }
+ *                     canEvolve: { type: boolean }
+ *                     requirements:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         xpRequired: { type: number }
+ *                         xpCurrent: { type: number }
+ *                         happinessRequired: { type: number }
+ *                         happinessCurrent: { type: number }
+ *                     nextStage: { type: number, nullable: true }
+ *                     nextStageName: { type: string, nullable: true }
+ */
+
+/**
+ * @swagger
+ * /v1/totems/{id}/status:
+ *   get:
+ *     tags: [Totems]
+ *     summary: Get totem status summary
+ *     description: Returns combined status including stats, cooldowns, and evolution info
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Totem status summary
+ */
+
+// ============================================
+// Challenge Endpoints (3)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/challenges:
+ *   get:
+ *     tags: [Challenges]
+ *     summary: Get available challenges
+ *     description: >
+ *       Returns all challenges with completion status. Each challenge includes a
+ *       `mastery` block (tier, multiplier, difficulty-unlock) driven by the
+ *       Challenge Mastery system.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of challenges
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     challenges:
+ *                       type: array
+ *                       items:
+ *                         allOf:
+ *                           - $ref: '#/components/schemas/Challenge'
+ *                           - type: object
+ *                             properties:
+ *                               mastery: { $ref: '#/components/schemas/ChallengeMastery' }
+ */
+
+/**
+ * @swagger
+ * /v1/challenges/status:
+ *   get:
+ *     tags: [Challenges]
+ *     summary: Get challenge progress status
+ *     description: Returns aggregated challenge progress for the user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Challenge progress summary
+ */
+
+/**
+ * @swagger
+ * /v1/challenges/{id}/complete:
+ *   post:
+ *     tags: [Challenges]
+ *     summary: Complete a challenge
+ *     description: Submit challenge completion with chosen totem
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Challenge ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId, score]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: Totem to use for challenge
+ *               score:
+ *                 type: number
+ *                 description: Score achieved in the mini-game
+ *               difficulty:
+ *                 type: integer
+ *                 enum: [1, 2, 3]
+ *                 description: >
+ *                   Optional. Lowering (1..auto) is always allowed; raising above
+ *                   the stage-derived level needs Gold+ mastery. Clamped silently
+ *                   server-side. Defaults to the stage-derived difficulty.
+ *     responses:
+ *       200:
+ *         description: Challenge completed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     xpEarned: { type: number }
+ *                     mastery: { $ref: '#/components/schemas/ChallengeMastery' }
+ *                     tierUp:
+ *                       nullable: true
+ *                       description: Present only when this run crossed a mastery tier
+ *                       allOf: [{ $ref: '#/components/schemas/ChallengeTierUp' }]
+ *       400:
+ *         description: Totem doesn't meet requirements
+ */
+
+// ============================================
+// Expedition Endpoints (4)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/expeditions:
+ *   get:
+ *     tags: [Expeditions]
+ *     summary: Get expeditions
+ *     description: Returns available expedition types and user's active expeditions
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Expedition data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     available:
+ *                       type: array
+ *                       items: { type: object }
+ *                     active:
+ *                       type: array
+ *                       items: { type: object }
+ */
+
+/**
+ * @swagger
+ * /v1/expeditions/active:
+ *   get:
+ *     tags: [Expeditions]
+ *     summary: Get active expeditions
+ *     description: Returns the user's currently active expeditions with completion status and claimable summary.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Active expedition data
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     expeditions:
+ *                       type: array
+ *                       items: { type: object }
+ *                     summary:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: number }
+ *                         claimable: { type: number }
+ */
+
+/**
+ * @swagger
+ * /v1/expeditions/{id}/start:
+ *   post:
+ *     tags: [Expeditions]
+ *     summary: Start an expedition
+ *     description: Send a team of 3 distinct totems on an expedition. All team totems become unavailable until expedition completes.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Expedition type ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemIds]
+ *             properties:
+ *               totemIds:
+ *                 type: array
+ *                 minItems: 3
+ *                 maxItems: 3
+ *                 items: { type: string }
+ *                 description: Exactly 3 distinct totem IDs for the expedition team
+ *     responses:
+ *       200:
+ *         description: Expedition started
+ *       400:
+ *         description: Invalid team, totems unavailable, or insufficient Essence
+ */
+
+/**
+ * @swagger
+ * /v1/expeditions/{id}/claim:
+ *   post:
+ *     tags: [Expeditions]
+ *     summary: Claim expedition rewards
+ *     description: Claim Essence and XP rewards from a completed expedition
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Expedition instance ID
+ *     responses:
+ *       200:
+ *         description: Rewards claimed
+ *       400:
+ *         description: Expedition not complete
+ */
+
+// ============================================
+// Reward Endpoints (9)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/rewards:
+ *   get:
+ *     tags: [Rewards]
+ *     summary: Get reward status
+ *     description: Returns daily and weekly streak status, claim availability, and protection info. Alias for /v1/rewards/status.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reward status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     tier: { type: string, enum: [free, premium, vip], description: "User subscription tier" }
+ *                     tierMultiplier: { type: number, description: "Reward base multiplier (free=1, premium=2, vip=3)" }
+ *                     tierBonusPercent: { type: number, description: "Tier bonus as percent over base (0 / 100 / 200)" }
+ *                     daily:
+ *                       type: object
+ *                       properties:
+ *                         canClaim: { type: boolean }
+ *                         streakDays: { type: number }
+ *                         bestStreak: { type: number }
+ *                         nextClaimTime: { type: string, nullable: true }
+ *                         isProtected: { type: boolean }
+ *                         protectionCharges: { type: number, description: "Banked streak-saver charges" }
+ *                     weekly:
+ *                       type: object
+ *                       properties:
+ *                         canClaim: { type: boolean }
+ *                         weeklyStreak: { type: number }
+ *                         bestStreak: { type: number }
+ *                         isUnlocked: { type: boolean }
+ *                         nextClaimTime: { type: string, nullable: true }
+ *                         isProtected: { type: boolean }
+ *                         protectionCharges: { type: number }
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/status:
+ *   get:
+ *     tags: [Rewards]
+ *     summary: Get reward status
+ *     description: Returns daily and weekly streak status, claim availability, and protection info
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reward status (same as GET /v1/rewards)
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/daily:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Claim daily reward
+ *     description: |
+ *       Claim daily login reward. Once per day (resets at UTC midnight).
+ *       Total = baseAmount × tierMultiplier × (1 + bonusPercent/100).
+ *       Base is 30 Essence; tier multiplier is 1/2/3 for free/premium/vip;
+ *       streak bonus is 5% per consecutive day, capped at 100% (day 21+).
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reward claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     reward:
+ *                       type: object
+ *                       properties:
+ *                         type: { type: string, example: daily }
+ *                         baseAmount: { type: number }
+ *                         streakAtClaim: { type: number }
+ *                         bonusPercent: { type: number, description: "Streak bonus percent applied" }
+ *                         bonusAmount: { type: number }
+ *                         totalAmount: { type: number, description: "Final essence awarded" }
+ *                         tier: { type: string, enum: [free, premium, vip] }
+ *                         tierMultiplier: { type: number }
+ *                         tierBonusPercent: { type: number }
+ *                     newStreak: { type: number }
+ *                     newBalance: { type: number }
+ *                     nextClaimTime: { type: string, format: date-time }
+ *                     nextClaimAt: { type: string, format: date-time, description: "Alias for nextClaimTime" }
+ *                     message: { type: string }
+ *                     achievements:
+ *                       type: array
+ *                       items: { type: object }
+ *       400:
+ *         description: Already claimed today
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/daily/claim:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Claim daily reward (alias)
+ *     description: Alias for POST /v1/rewards/daily
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Reward claimed
+ *       400:
+ *         description: Already claimed today
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/weekly:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Claim weekly reward
+ *     description: |
+ *       Claim weekly bonus. Requires the Week Warrior achievement (7-day daily login streak) to unlock.
+ *       7-day rolling cooldown.
+ *       Total = baseAmount × tierMultiplier × (1 + bonusPercent/100).
+ *       Base is 100 Essence; tier multiplier is 1/2/3 for free/premium/vip;
+ *       streak bonus is 10% per consecutive week, capped at 100% (week 11+).
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Weekly reward claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     reward:
+ *                       type: object
+ *                       properties:
+ *                         type: { type: string, example: weekly }
+ *                         baseAmount: { type: number }
+ *                         streakAtClaim: { type: number }
+ *                         bonusPercent: { type: number, description: "Streak bonus percent applied" }
+ *                         bonusAmount: { type: number }
+ *                         totalAmount: { type: number, description: "Final essence awarded" }
+ *                         tier: { type: string, enum: [free, premium, vip] }
+ *                         tierMultiplier: { type: number }
+ *                         tierBonusPercent: { type: number }
+ *                     newStreak: { type: number }
+ *                     newBalance: { type: number }
+ *                     nextClaimTime: { type: string, format: date-time }
+ *                     message: { type: string }
+ *       400:
+ *         description: Not unlocked or already claimed this week
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/weekly/claim:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Claim weekly reward (alias)
+ *     description: Alias for POST /v1/rewards/weekly
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Weekly reward claimed
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/quests:
+ *   get:
+ *     tags: [Rewards]
+ *     summary: Get today's daily quest set
+ *     description: |
+ *       Returns the player's 5-quest set for the current UTC day. Quests are lazy-generated
+ *       on first call of the day — no scheduled job. Theme rotates deterministically through
+ *       9 affinity×domain×action combinations on a dayOfYear cycle.
+ *
+ *       **Scope (catalog v1.1.0):** totem actions (feed/train/treat), challenges, and expeditions.
+ *
+ *       **Slot pattern:**
+ *       - Slot 1: themed action (matches today's `theme.action`)
+ *       - Slot 2: free easy (any non-themed action/challenge/expedition)
+ *       - Slot 3: affinity challenge (matches today's `theme.affinity`)
+ *       - Slot 4: domain expedition (matches today's `theme.domain`)
+ *       - Slot 5: hard objective (24h expedition / 3 challenges / 2 claims)
+ *
+ *       **Bonus:** +75 Essence + 1 random rune (80% Lesser, 18% Greater, 2% Ancient) when all 5 are claimed.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Today's quest set
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     date: { type: string, description: "UTC date YYYY-MM-DD" }
+ *                     theme:
+ *                       type: object
+ *                       properties:
+ *                         affinity: { type: string, enum: [strength, agility, wisdom] }
+ *                         domain: { type: string, enum: [air, earth, water] }
+ *                         action: { type: string, enum: [feed, train, treat] }
+ *                     nextResetAt: { type: string, description: "ISO 8601 next UTC midnight" }
+ *                     quests:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           slot: { type: integer, minimum: 1, maximum: 5 }
+ *                           id: { type: string }
+ *                           name: { type: string }
+ *                           description: { type: string }
+ *                           tier: { type: string, enum: [easy, medium, hard] }
+ *                           goal: { type: integer }
+ *                           progress: { type: integer }
+ *                           claimed: { type: boolean }
+ *                           completed: { type: boolean }
+ *                           reward:
+ *                             type: object
+ *                             properties:
+ *                               essence: { type: integer }
+ *                     bonus:
+ *                       type: object
+ *                       properties:
+ *                         reward:
+ *                           type: object
+ *                           properties:
+ *                             essence: { type: integer, example: 75 }
+ *                         claimed: { type: boolean }
+ *                         unlocked: { type: boolean }
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/quests/claim:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Batch-claim all completable daily quests + bonus
+ *     description: |
+ *       Single batch claim — no body required. Server flips every completed-but-unclaimed quest's
+ *       `claimed` flag, credits the total Essence, and (if all 5 are now claimed) auto-claims the
+ *       bonus + drops a random rune.
+ *
+ *       **Idempotent:** subsequent calls with nothing claimable return `claimed: []`,
+ *       `totalEssenceAwarded: 0`. Safe to call from Claim All buttons in card/wizard.
+ *
+ *       **Rune drop (bonus only):** 80% Lesser, 18% Greater, 2% Ancient.
+ *
+ *       **Achievement triggers:** `ach_quest-set-master` (per bonus claim), `ach_theme-master`
+ *       (per slot 3 affinity or slot 4 domain claim). Unlocked milestones returned in
+ *       `data.achievements` for the existing notification pipeline.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Claim result (essence, runes, milestones)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     claimed:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           questId: { type: string }
+ *                           reward:
+ *                             type: object
+ *                             properties:
+ *                               essence: { type: integer }
+ *                     bonusClaimed: { type: boolean }
+ *                     totalEssenceAwarded: { type: integer }
+ *                     newEssenceBalance: { type: integer, nullable: true }
+ *                     nextResetAt: { type: string }
+ *                     runesAwarded:
+ *                       type: object
+ *                       nullable: true
+ *                       description: "Only present when bonus is claimed"
+ *                       properties:
+ *                         lesser: { type: integer }
+ *                         greater: { type: integer }
+ *                         ancient: { type: integer }
+ *                     achievements:
+ *                       type: array
+ *                       description: "Milestone unlocks fired by this claim"
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           achievementId: { type: string }
+ *                           milestone: { type: integer }
+ *                           rewards:
+ *                             type: object
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/daily/protection:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Buy daily streak-saver charges
+ *     description: "Buy consumable streak-saver charges that top up toward a cap of 7. Charges are spent only when you miss a day. Pricing: 50 Essence per charge, or 250 for a full 7-pack (bulk discount). Requires a 7-day streak. Omit `quantity` to fill to the cap."
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quantity:
+ *                 type: number
+ *                 minimum: 1
+ *                 description: "Charges to add (1..headroom). Omit to fill to the cap (7)."
+ *     responses:
+ *       200:
+ *         description: Charges purchased
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     rewardType: { type: string, example: daily }
+ *                     chargesAdded: { type: number }
+ *                     cost: { type: number }
+ *                     protectionCharges: { type: number, description: "New total banked charges" }
+ *                     maxCharges: { type: number, example: 7 }
+ *                     newBalance: { type: number }
+ *       402:
+ *         description: Insufficient Essence
+ *       403:
+ *         description: Streak too low
+ *       409:
+ *         description: At cap (CHARGES_FULL) or requested quantity exceeds headroom (EXCEEDS_CAP)
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/weekly/protection:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Buy weekly streak-saver charges
+ *     description: "Buy consumable streak-saver charges that top up toward a cap of 2. Charges are spent only when you miss a week. 250 Essence per charge. Requires a 4-week streak. Omit `quantity` to fill to the cap."
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               quantity:
+ *                 type: number
+ *                 minimum: 1
+ *                 description: "Charges to add (1..headroom). Omit to fill to the cap (2)."
+ *     responses:
+ *       200:
+ *         description: Charges purchased
+ *       402:
+ *         description: Insufficient Essence
+ *       403:
+ *         description: Streak too low
+ *       409:
+ *         description: At cap (CHARGES_FULL) or requested quantity exceeds headroom (EXCEEDS_CAP)
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/tutorial/progress:
+ *   get:
+ *     tags: [Rewards]
+ *     summary: Get tutorial reward progress
+ *     description: Returns which tutorial steps have been completed and rewards claimed (6 steps total)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Tutorial progress
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     completedSteps: { type: array, items: { type: number } }
+ *                     totalSteps: { type: number, example: 6 }
+ *                     nextStep: { type: number }
+ *                     totalEssenceEarned: { type: number }
+ *                     totalExperienceEarned: { type: number }
+ *                     claimedRewards: { type: array, items: { type: object } }
+ */
+
+/**
+ * @swagger
+ * /v1/rewards/tutorial:
+ *   post:
+ *     tags: [Rewards]
+ *     summary: Claim tutorial step reward
+ *     description: Claim reward for completing a tutorial step
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [step]
+ *             properties:
+ *               step:
+ *                 type: number
+ *                 description: Tutorial step number (1-6)
+ *                 example: 1
+ *     responses:
+ *       200:
+ *         description: Tutorial reward claimed
+ *       400:
+ *         description: Step already claimed or invalid step
+ */
+
+// ============================================
+// Achievement Endpoints (1)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/achievements:
+ *   get:
+ *     tags: [Achievements]
+ *     summary: Get achievements
+ *     description: Returns all achievements with progress and unlock status
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Achievement list with progress
+ */
+
+// ============================================
+// Shop Endpoints (7)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/shop:
+ *   get:
+ *     tags: [Shop]
+ *     summary: Get shop items
+ *     description: Returns available shop items (unbound totems for sale by the shop)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Shop items
+ */
+
+/**
+ * @swagger
+ * /v1/shop/config:
+ *   get:
+ *     tags: [Shop]
+ *     summary: Get shop configuration
+ *     description: Returns shop fees, listing limits, and price ranges
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Shop configuration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     listing:
+ *                       type: object
+ *                       properties:
+ *                         fee: { type: number, example: 100 }
+ *                         minPrice: { type: number, example: 50 }
+ *                         maxPrice: { type: number, example: 1000000 }
+ *                     purchase:
+ *                       type: object
+ *                       properties:
+ *                         feePercent: { type: number, example: 5 }
+ */
+
+/**
+ * @swagger
+ * /v1/shop/listings:
+ *   get:
+ *     tags: [Shop]
+ *     summary: Browse marketplace listings
+ *     description: Get user-listed totems available for purchase
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: species
+ *         schema: { type: number }
+ *         description: Filter by species ID (0-11)
+ *       - in: query
+ *         name: rarity
+ *         schema: { type: number }
+ *         description: Filter by rarity (0=Common, 1=Uncommon, 2=Rare, 3=Epic, 4=Legendary, 5=Limited)
+ *       - in: query
+ *         name: minPrice
+ *         schema: { type: number }
+ *       - in: query
+ *         name: maxPrice
+ *         schema: { type: number }
+ *       - in: query
+ *         name: sortBy
+ *         schema:
+ *           type: string
+ *           enum: [price_asc, price_desc, newest, oldest]
+ *       - in: query
+ *         name: limit
+ *         schema: { type: number, default: 20 }
+ *     responses:
+ *       200:
+ *         description: List of marketplace listings
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     listings:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/ShopListing' }
+ *                     pagination:
+ *                       type: object
+ *                       properties:
+ *                         count: { type: number }
+ *                         hasMore: { type: boolean }
+ */
+
+/**
+ * @swagger
+ * /v1/shop/list:
+ *   post:
+ *     tags: [Shop]
+ *     summary: Sell a totem to the shop
+ *     description: "Sell your totem to the shop. Price calculated server-side: 300 + (stage x 30) + (rarityId x 20). Essence credited immediately."
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of totem to sell
+ *     responses:
+ *       200:
+ *         description: Totem sold to shop
+ *       400:
+ *         description: Invalid totem, on expedition, or already listed
+ */
+
+/**
+ * @swagger
+ * /v1/shop/purchase:
+ *   post:
+ *     tags: [Shop]
+ *     summary: Buy a totem from the shop
+ *     description: "Purchase an unbound totem from the marketplace. Price = sell price + 100 fee."
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [listingId]
+ *             properties:
+ *               listingId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Purchase successful
+ *       400:
+ *         description: Insufficient Essence or listing not found
+ */
+
+// ============================================
+// Special Bundle Endpoints (2)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/shop/bundles:
+ *   get:
+ *     tags: [Shop]
+ *     summary: Get special offer bundles
+ *     description: Returns available collector bundles and monthly series bundles.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Available bundles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     bundles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           name: { type: string }
+ *                           type: { type: string, enum: [collector, monthly_series] }
+ *                           gemCost: { type: number }
+ *                           contents: { type: object }
+ */
+
+/**
+ * @swagger
+ * /v1/shop/bundles/purchase:
+ *   post:
+ *     tags: [Shop]
+ *     summary: Purchase a special bundle
+ *     description: Buy a collector or monthly series bundle with Gems
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bundleId]
+ *             properties:
+ *               bundleId:
+ *                 type: string
+ *                 example: collector_fire_bundle
+ *     responses:
+ *       201:
+ *         description: Bundle purchased
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     bundle:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         name: { type: string }
+ *                     totem:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         speciesId: { type: integer }
+ *                         speciesName: { type: string }
+ *                         colorId: { type: integer }
+ *                         rarityId: { type: integer }
+ *                         rarityName: { type: string }
+ *                         stage: { type: integer }
+ *                         stats: { type: object }
+ *                         traits:
+ *                           type: object
+ *                           description: Trait slots; innate is auto-assigned at purchase, learned/awakened are chosen later.
+ *                           properties:
+ *                             innate: { type: string, nullable: true, example: trt_dreamer }
+ *                             learned: { type: string, nullable: true }
+ *                             awakened: { type: string, nullable: true }
+ *                         image: { type: string }
+ *                     gemsSpent: { type: integer }
+ *                     essenceReceived: { type: integer }
+ *                     newGemsBalance: { type: integer }
+ *                     newEssenceBalance: { type: integer }
+ *       402:
+ *         description: Insufficient Gems
+ *       409:
+ *         description: Daily purchase limit reached
+ */
+
+// ============================================
+// Gem Purchase & Exchange Endpoints (5)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/shop/gems/packages:
+ *   get:
+ *     tags: [Gems]
+ *     summary: Get gem packages
+ *     description: Returns available gem packages for purchase.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of gem packages
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     packages:
+ *                       type: array
+ *                       items: { $ref: '#/components/schemas/GemPackage' }
+ */
+
+/**
+ * @swagger
+ * /v1/shop/gems/checkout:
+ *   post:
+ *     tags: [Gems]
+ *     summary: Create gem purchase checkout
+ *     description: Creates Stripe checkout session for gem purchase. In dev mode, bypasses Stripe and credits gems directly.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [packageId]
+ *             properties:
+ *               packageId:
+ *                 type: string
+ *                 example: pkg_starter
+ *     responses:
+ *       200:
+ *         description: Checkout session created (or gems credited in dev mode)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     sessionUrl: { type: string, description: "Stripe checkout URL (prod only)" }
+ *                     devMode: { type: boolean, description: "True if gems were credited directly" }
+ */
+
+/**
+ * @swagger
+ * /v1/shop/gems/fulfill:
+ *   post:
+ *     tags: [Gems]
+ *     summary: Fulfill gem purchase
+ *     description: Manually fulfill a gem purchase (admin/webhook use). Credits gems to user account.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [sessionId]
+ *             properties:
+ *               sessionId:
+ *                 type: string
+ *                 description: Stripe checkout session ID
+ *     responses:
+ *       200:
+ *         description: Gems fulfilled
+ */
+
+/**
+ * @swagger
+ * /v1/shop/exchange/bundles:
+ *   get:
+ *     tags: [Gems]
+ *     summary: Get Gem-to-Essence exchange bundles
+ *     description: Returns available exchange options. 1 Gem = 5 Essence base rate with bundle bonuses.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Exchange bundles
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     bundles:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           gemCost: { type: number }
+ *                           essenceAmount: { type: number }
+ *                           bonus: { type: number }
+ *                           bonusNote: { type: string }
+ *                     conversionRate: { type: number, example: 5 }
+ */
+
+/**
+ * @swagger
+ * /v1/shop/exchange:
+ *   post:
+ *     tags: [Gems]
+ *     summary: Exchange Gems for Essence
+ *     description: Convert Gems to Essence using a predefined bundle
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [bundleId]
+ *             properties:
+ *               bundleId:
+ *                 type: string
+ *                 example: exchange_medium
+ *     responses:
+ *       200:
+ *         description: Exchange successful
+ *       402:
+ *         description: Insufficient Gems
+ */
+
+// ============================================
+// Subscription Endpoints (7)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/subscription/checkout:
+ *   post:
+ *     tags: [Subscriptions]
+ *     summary: Create subscription checkout
+ *     description: Creates Stripe checkout session for subscription. In dev mode, directly activates the tier.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tier]
+ *             properties:
+ *               tier:
+ *                 type: string
+ *                 enum: [premium, vip]
+ *                 example: premium
+ *     responses:
+ *       200:
+ *         description: Checkout session created or tier activated (dev mode)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     sessionId: { type: string }
+ *                     sessionUrl: { type: string }
+ *       409:
+ *         description: Already subscribed to this tier
+ */
+
+/**
+ * @swagger
+ * /v1/subscription/status:
+ *   get:
+ *     tags: [Subscriptions]
+ *     summary: Get subscription status
+ *     description: Returns current tier, subscription status, and billing period info
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Subscription status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     tier: { type: string, enum: [free, premium, vip] }
+ *                     subscription:
+ *                       type: object
+ *                       properties:
+ *                         status: { type: string, enum: [none, active, canceled] }
+ *                         tier: { type: string, nullable: true }
+ *                         currentPeriodEnd: { type: string, nullable: true }
+ *                         cancelAtPeriodEnd: { type: boolean }
+ */
+
+/**
+ * @swagger
+ * /v1/subscription/cancel:
+ *   post:
+ *     tags: [Subscriptions]
+ *     summary: Cancel subscription
+ *     description: Cancel subscription at end of current billing period. Benefits continue until period end.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Subscription scheduled for cancellation
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     currentPeriodEnd: { type: string }
+ *                     cancelAtPeriodEnd: { type: boolean, example: true }
+ *       400:
+ *         description: No active subscription
+ */
+
+/**
+ * @swagger
+ * /v1/subscription/reactivate:
+ *   post:
+ *     tags: [Subscriptions]
+ *     summary: Reactivate cancelled subscription
+ *     description: Undo a pending cancellation before the billing period ends
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Subscription reactivated
+ *       400:
+ *         description: No subscription or not scheduled to cancel
+ */
+
+/**
+ * @swagger
+ * /v1/subscription/portal:
+ *   get:
+ *     tags: [Subscriptions]
+ *     summary: Get Stripe billing portal
+ *     description: Returns a URL to the Stripe billing portal for managing payment methods
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: returnPath
+ *         required: false
+ *         schema: { type: string, example: /account/settings }
+ *         description: Same-origin path to return to after the portal session (must start with `/`, no scheme). Defaults to `/account/settings`.
+ *     responses:
+ *       200:
+ *         description: Billing portal URL
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     portalUrl: { type: string }
+ *       400:
+ *         description: No Stripe customer found
+ */
+
+/**
+ * @swagger
+ * /v1/subscription/bonus-status:
+ *   get:
+ *     tags: [Subscriptions]
+ *     summary: Get monthly bonus status
+ *     description: "Check if subscriber can claim this month's bonus. Premium: 500 Essence + 100 Gems. VIP: 1500 Essence + 500 Gems."
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Bonus status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     eligible: { type: boolean }
+ *                     tier: { type: string }
+ *                     canClaim: { type: boolean }
+ *                     alreadyClaimed: { type: boolean }
+ *                     currentMonth: { type: string, example: "2026-02" }
+ *                     bonus:
+ *                       type: object
+ *                       properties:
+ *                         essence: { type: number }
+ *                         gems: { type: number }
+ */
+
+/**
+ * @swagger
+ * /v1/subscription/claim-bonus:
+ *   post:
+ *     tags: [Subscriptions]
+ *     summary: Claim monthly subscription bonus
+ *     description: Claim Essence and Gems monthly bonus. Must be actively subscribed. One claim per month.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Bonus claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     tier: { type: string }
+ *                     monthKey: { type: string }
+ *                     essence: { type: number }
+ *                     gems: { type: number }
+ *                     newEssenceBalance: { type: number }
+ *                     newGemsBalance: { type: number }
+ *       403:
+ *         description: Not subscribed
+ *       409:
+ *         description: Already claimed this month
+ */
+
+// ============================================
+// IoT Push Notification Endpoints (2)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/iot/config:
+ *   get:
+ *     tags: [IoT]
+ *     summary: Get IoT connection config
+ *     description: Returns endpoint, region, and identity pool info for MQTT connection setup
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: IoT configuration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     endpoint: { type: string, nullable: true }
+ *                     region: { type: string, example: us-east-1 }
+ *                     identityPoolId: { type: string, nullable: true }
+ *                     registered: { type: boolean }
+ *                     topic: { type: string, nullable: true, description: "Personal topic (user/{identityId}/commands)" }
+ */
+
+/**
+ * @swagger
+ * /v1/iot/register:
+ *   post:
+ *     tags: [IoT]
+ *     summary: Register for push notifications
+ *     description: Register Cognito Identity Pool identityId for IoT Core push notifications. Attaches browser policy in production.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [identityId]
+ *             properties:
+ *               identityId:
+ *                 type: string
+ *                 description: "Cognito Identity Pool ID (format: region:uuid)"
+ *                 example: us-east-1:12345678-1234-1234-1234-123456789012
+ *     responses:
+ *       200:
+ *         description: Registered for push notifications
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     registered: { type: boolean, example: true }
+ *                     topic: { type: string }
+ *       400:
+ *         description: Invalid identityId format
+ */
+
+// ============================================
+// Loot Box Endpoints (2)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/loot/items:
+ *   get:
+ *     tags: [Loot]
+ *     summary: Get unclaimed loot items
+ *     description: Returns all unclaimed loot boxes for the authenticated user (e.g., signup Uncommon Totem Box)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Unclaimed loot items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     items:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           lootItemId: { type: string }
+ *                           boxType: { type: string, example: uncommon_totem_box }
+ *                           status: { type: string, enum: [unclaimed, claiming, claimed] }
+ *                           grantedAt: { type: string }
+ *                     count: { type: number }
+ */
+
+/**
+ * @swagger
+ * /v1/loot/claim:
+ *   post:
+ *     tags: [Loot]
+ *     summary: Claim a loot box
+ *     description: "Open a loot box with optional choices. For totem boxes: choose species via options.speciesId, color is random. Uses atomic 3-phase claim security."
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [lootItemId]
+ *             properties:
+ *               lootItemId:
+ *                 type: string
+ *                 description: ID of the loot item to claim
+ *               options:
+ *                 type: object
+ *                 properties:
+ *                   speciesId:
+ *                     type: number
+ *                     description: Chosen species for totem box (0-11)
+ *     responses:
+ *       200:
+ *         description: Loot claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     lootItemId: { type: string }
+ *                     boxName: { type: string }
+ *                     type: { type: string }
+ *                     result:
+ *                       type: object
+ *                       properties:
+ *                         type:
+ *                           type: string
+ *                           description: "'totem' or 'essence'"
+ *                         totem:
+ *                           type: object
+ *                           description: Present when the box yields a totem
+ *                           properties:
+ *                             id: { type: string }
+ *                             speciesId: { type: integer }
+ *                             speciesName: { type: string }
+ *                             colorId: { type: integer }
+ *                             colorName: { type: string }
+ *                             rarityId: { type: integer }
+ *                             rarityName: { type: string }
+ *                             stage: { type: integer }
+ *                             stats: { type: object }
+ *                             traits:
+ *                               type: object
+ *                               description: Trait slots; innate is auto-assigned on claim, learned/awakened are chosen later.
+ *                               properties:
+ *                                 innate: { type: string, nullable: true, example: trt_lucky }
+ *                                 learned: { type: string, nullable: true }
+ *                                 awakened: { type: string, nullable: true }
+ *                         amount:
+ *                           type: integer
+ *                           description: Essence amount when the box yields essence
+ *                         newBalance: { type: integer }
+ *       400:
+ *         description: Missing lootItemId
+ *       422:
+ *         description: Claim failed (already claimed, expired, etc.)
+ */
+
+// ============================================
+// Webhook Endpoints (1)
+// ============================================
+
+/**
+ * @swagger
+ * /webhooks/stripe:
+ *   post:
+ *     tags: [Webhooks]
+ *     summary: Stripe webhook handler
+ *     description: "Receives Stripe webhook events. Handles: checkout.session.completed (gem purchase + subscription), customer.subscription.updated, customer.subscription.deleted. Requires raw body and valid Stripe signature. No auth required (signature verified)."
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Webhook processed
+ *       400:
+ *         description: Invalid signature
+ */
+
+// ============================================
+// Sanctum Endpoints (8)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/sanctum:
+ *   get:
+ *     tags: [Sanctum]
+ *     summary: Get sanctum state
+ *     description: Returns the user's Elder Sanctum state including seated totems, passive accumulation, and active missions
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Sanctum state
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     seats:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           seatIndex: { type: number }
+ *                           totemId: { type: string }
+ *                           totemName: { type: string }
+ *                           species: { type: string }
+ *                           seatedAt: { type: string }
+ *                           lastClaimedAt: { type: string }
+ *                           earnings: { type: number }
+ *                           tenureHours: { type: number }
+ *                           tenureMultiplier: { type: number }
+ *                           onMission: { type: boolean }
+ *                     maxSeats: { type: number }
+ *                     totalAccumulated: { type: number }
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/seat:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Seat a totem in the sanctum
+ *     description: Place a Stage 4+ totem in an available sanctum seat to begin passive Essence accumulation. Totem cannot be on an expedition.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of Stage 4+ totem to seat
+ *               seatIndex:
+ *                 type: number
+ *                 description: Optional specific seat index (auto-assigned if omitted)
+ *     responses:
+ *       200:
+ *         description: Totem seated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     seats: { type: array, items: { type: object } }
+ *                     maxSeats: { type: number }
+ *                     totalAccumulated: { type: number }
+ *       400:
+ *         description: Totem not found, below Stage 4, already seated, on expedition, or no available seat
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/unseat:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Unseat a totem from the sanctum
+ *     description: Remove a seated totem from the sanctum. Resets tenure multiplier. Cannot unseat while totem is on a council mission.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the seated totem to remove
+ *     responses:
+ *       200:
+ *         description: Totem unseated successfully
+ *       400:
+ *         description: Totem not seated or currently on a mission
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/claim:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Claim accumulated Essence
+ *     description: Claim all passively accumulated Essence from seated totems. Earnings are based on time since last claim and tenure multiplier (up to 1.5x at 30 days). Accumulation caps at 168 hours.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Essence claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     totalClaimed: { type: number }
+ *                     newEssenceBalance: { type: number }
+ *                     breakdown:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           seatIndex: { type: number }
+ *                           totemName: { type: string }
+ *                           earned: { type: number }
+ *                     claimedAt: { type: string }
+ *       400:
+ *         description: No seats or nothing to claim (less than 1 Essence)
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions:
+ *   get:
+ *     tags: [Sanctum]
+ *     summary: List available council missions
+ *     description: Returns all 9 council missions grouped by tier (governance, diplomacy, legacy) with costs, durations, and rewards
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Council missions grouped by tier
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     governance:
+ *                       type: array
+ *                       description: "Stage 4+ missions (2-4hr)"
+ *                       items: { $ref: '#/components/schemas/CouncilMission' }
+ *                     diplomacy:
+ *                       type: array
+ *                       description: "Stage 5 missions (6-10hr)"
+ *                       items: { $ref: '#/components/schemas/CouncilMission' }
+ *                     legacy:
+ *                       type: array
+ *                       description: "Stage 5 missions (12-24hr)"
+ *                       items: { $ref: '#/components/schemas/CouncilMission' }
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions/start:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Start a council mission
+ *     description: Send a seated totem on a council mission. Costs happiness. Totem earns XP and rune drops on completion.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId, missionType]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the seated totem
+ *               missionType:
+ *                 type: string
+ *                 description: "Mission ID (e.g., cm_decree-of-wisdom, cm_peace-summit)"
+ *                 example: cm_decree-of-wisdom
+ *     responses:
+ *       200:
+ *         description: Mission started
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     mission:
+ *                       type: object
+ *                       properties:
+ *                         missionType: { type: string }
+ *                         name: { type: string }
+ *                         tier: { type: string }
+ *                         duration: { type: number, description: "Duration in seconds" }
+ *                         startedAt: { type: string }
+ *                         endsAt: { type: string }
+ *       400:
+ *         description: Invalid mission, totem not seated, already on mission, insufficient stage/happiness
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions/claim:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Claim completed council mission
+ *     description: Claim rewards from a completed council mission. Awards XP to totem and rolls for rune drops based on mission tier.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the totem with a completed mission
+ *     responses:
+ *       200:
+ *         description: Mission rewards claimed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     rewards:
+ *                       type: object
+ *                       properties:
+ *                         xp: { type: number }
+ *                         runesEarned:
+ *                           type: object
+ *                           properties:
+ *                             lesser: { type: number }
+ *                             greater: { type: number }
+ *                             ancient: { type: number }
+ *                     missionType: { type: string }
+ *                     missionName: { type: string }
+ *                     totemId: { type: string }
+ *                     newRuneBalances: { type: object, nullable: true }
+ *       400:
+ *         description: No active mission or mission not yet complete
+ */
+
+/**
+ * @swagger
+ * /v1/sanctum/missions/cancel:
+ *   post:
+ *     tags: [Sanctum]
+ *     summary: Cancel an active council mission
+ *     description: Cancel a council mission in progress. No Essence refund and no rewards are given. Totem remains seated.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [totemId]
+ *             properties:
+ *               totemId:
+ *                 type: string
+ *                 description: ID of the totem with an active mission to cancel
+ *     responses:
+ *       200:
+ *         description: Mission cancelled
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     cancelled: { type: boolean, example: true }
+ *                     missionType: { type: string }
+ *                     totemId: { type: string }
+ *       400:
+ *         description: No active mission found
+ */
+
+// ============================================
+// Admin Endpoints (11)
+// ============================================
+
+/**
+ * @swagger
+ * /v1/admin/stats:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Dashboard overview metrics (admin only)
+ *     description: Aggregated stats — user counts, totem counts, transaction volume. Requires admin role.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Dashboard metrics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer, example: 150 }
+ *                         activeToday: { type: integer, example: 12 }
+ *                         activeThisWeek: { type: integer, example: 45 }
+ *                         newToday: { type: integer, example: 3 }
+ *                         banned: { type: integer, example: 1 }
+ *                     totems:
+ *                       type: object
+ *                       properties:
+ *                         total: { type: integer, example: 320 }
+ *                     transactions:
+ *                       type: object
+ *                       properties:
+ *                         today: { type: object, properties: { count: { type: integer } } }
+ *                         thisWeek: { type: object, properties: { count: { type: integer } } }
+ *                         byType: { type: object }
+ *                     generatedAt: { type: string, format: date-time }
+ *                     source: { type: string, enum: [snapshot, live], description: "Whether the data came from the latest precomputed snapshot or a live compute." }
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/stats/trends:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Stats time series for trend charts (admin only)
+ *     description: |
+ *       Time-bucketed snapshots from AdminStatsHistory for charting. Requires admin role.
+ *       Reads are a bounded query over the requested window — cheap and predictable.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: granularity
+ *         schema: { type: string, enum: [hourly, daily, weekly], default: daily }
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date-time }
+ *         description: ISO lower bound. Defaults to a granularity-dependent window (24h / 30d / 12w).
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date-time }
+ *         description: ISO upper bound. Defaults to now.
+ *       - in: query
+ *         name: metrics
+ *         schema: { type: string }
+ *         description: "Comma-separated dot paths (e.g. users.activeToday,transactions.essenceVolume). Omit to return the full snapshot maps."
+ *     responses:
+ *       200:
+ *         description: Time series
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     granularity: { type: string, example: DAILY }
+ *                     from: { type: string, format: date-time }
+ *                     to: { type: string, format: date-time }
+ *                     count: { type: integer, example: 30 }
+ *                     points:
+ *                       type: array
+ *                       items: { type: object, properties: { ts: { type: string, format: date-time } } }
+ *       400:
+ *         description: Invalid granularity
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List all users (admin only)
+ *     description: |
+ *       Cursor-paginated user list with optional search. Requires admin role.
+ *       Pass the `nextCursor` returned in `pagination` as the `cursor` query
+ *       param to fetch the next page. `hasMore` is true iff `nextCursor` is set.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 25
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Page size
+ *       - in: query
+ *         name: cursor
+ *         schema:
+ *           type: string
+ *         description: Opaque cursor token from the previous response's `nextCursor`. Omit on the first page.
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Filter by email or display name (contains match)
+ *     responses:
+ *       200:
+ *         description: One page of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     users:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           email: { type: string }
+ *                           displayName: { type: string }
+ *                           role: { type: string, enum: [user, admin] }
+ *                           tier: { type: string, enum: [free, premium, vip] }
+ *                           essence: { type: number }
+ *                           gems: { type: number }
+ *                           loginStreak: { type: number }
+ *                           lastLoginDate: { type: string, format: date, nullable: true }
+ *                           createdAt: { type: string, format: date-time }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     limit: { type: integer, example: 25 }
+ *                     count: { type: integer, example: 25, description: "Items in this page" }
+ *                     nextCursor: { type: string, nullable: true, description: "Opaque token for the next page, or null when done" }
+ *                     hasMore: { type: boolean, example: true }
+ *       403:
+ *         description: Insufficient permissions (not admin)
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}:
+ *   get:
+ *     tags: [Admin]
+ *     summary: Get full user detail (admin only)
+ *     description: Returns user profile, totems, and recent transactions. Requires admin role.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Full user detail
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         email: { type: string }
+ *                         displayName: { type: string }
+ *                         role: { type: string, enum: [user, admin] }
+ *                         tier: { type: string }
+ *                         currencies:
+ *                           type: object
+ *                           properties:
+ *                             essence: { type: number }
+ *                             gems: { type: number }
+ *                         stats: { type: object }
+ *                         settings: { type: object }
+ *                         createdAt: { type: string, format: date-time }
+ *                         updatedAt: { type: string, format: date-time }
+ *                     totems:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           speciesId: { type: number }
+ *                           colorId: { type: number }
+ *                           rarityId: { type: number }
+ *                           nickname: { type: string, nullable: true }
+ *                           stage: { type: number }
+ *                           experience: { type: number }
+ *                           stats: { type: object }
+ *                           createdAt: { type: string, format: date-time }
+ *                     recentTransactions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           type: { type: string }
+ *                           currency: { type: string }
+ *                           amount: { type: number }
+ *                           balanceBefore: { type: number }
+ *                           balanceAfter: { type: number }
+ *                           refType: { type: string, nullable: true }
+ *                           refName: { type: string, nullable: true }
+ *                           ts: { type: string, format: date-time }
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/currencies:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Adjust user currencies (admin only)
+ *     description: Grant or deduct essence/gems. Positive amount grants, negative deducts. Creates a transaction ledger entry with admin ID and reason.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [currency, amount, reason]
+ *             properties:
+ *               currency:
+ *                 type: string
+ *                 enum: [essence, gems]
+ *                 example: essence
+ *               amount:
+ *                 type: integer
+ *                 example: 500
+ *                 description: Positive to grant, negative to deduct
+ *               reason:
+ *                 type: string
+ *                 minLength: 3
+ *                 example: CS refund for lost totem
+ *     responses:
+ *       200:
+ *         description: Currency adjusted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId: { type: string }
+ *                     currency: { type: string }
+ *                     amount: { type: integer }
+ *                     newBalance: { type: number }
+ *                     reason: { type: string }
+ *       400:
+ *         description: Invalid input or insufficient balance
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/status:
+ *   put:
+ *     tags: [Admin]
+ *     summary: Ban or unban a user (admin only)
+ *     description: Set user status to "banned" or "active". Banned users cannot log in. Creates an audit trail entry.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status, reason]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [banned, active]
+ *                 example: banned
+ *               reason:
+ *                 type: string
+ *                 minLength: 3
+ *                 example: Exploiting currency bug
+ *     responses:
+ *       200:
+ *         description: Status updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     userId: { type: string }
+ *                     status: { type: string, enum: [banned, active] }
+ *                     reason: { type: string }
+ *       400:
+ *         description: Invalid input or no change
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/transactions:
+ *   get:
+ *     tags: [Admin]
+ *     summary: List transactions (admin only)
+ *     description: |
+ *       Cursor-paginated transaction log. Either `userId` or `type` is REQUIRED —
+ *       unbounded cross-slice queries are rejected (400 INVALID_QUERY) to keep
+ *       RCU cost predictable as the ledger grows. Pass the response's
+ *       `nextCursor` back in `cursor` to fetch the next page.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: userId
+ *         schema: { type: string }
+ *         description: Filter by user ID (uses user-ts-index GSI). Required unless `type` is set.
+ *       - in: query
+ *         name: type
+ *         schema: { type: string }
+ *         description: "Filter by transaction type (uses type-ts-index GSI). Required unless `userId` is set. Examples: admin_grant, reward_daily, shop_sale, protection_purchase."
+ *       - in: query
+ *         name: currency
+ *         schema: { type: string, enum: [essence, gems, xp] }
+ *         description: Optional currency filter (FilterExpression after the GSI lookup). XP rows come from achievement and council-mission claims.
+ *       - in: query
+ *         name: startTime
+ *         schema: { type: string, format: date-time }
+ *         description: Inclusive lower bound on `ts`
+ *       - in: query
+ *         name: endTime
+ *         schema: { type: string, format: date-time }
+ *         description: Inclusive upper bound on `ts`
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 25, maximum: 100 }
+ *         description: Page size
+ *       - in: query
+ *         name: cursor
+ *         schema: { type: string }
+ *         description: Opaque token from a prior response's `nextCursor`. Omit on the first page.
+ *     responses:
+ *       200:
+ *         description: One page of transactions
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     transactions:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id: { type: string }
+ *                           userId: { type: string }
+ *                           type: { type: string }
+ *                           currency: { type: string, enum: [essence, gems, xp] }
+ *                           amount: { type: number }
+ *                           balanceBefore: { type: number }
+ *                           balanceAfter: { type: number }
+ *                           refType: { type: string, nullable: true }
+ *                           refId: { type: string, nullable: true }
+ *                           refName: { type: string, nullable: true }
+ *                           ts: { type: string, format: date-time }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     limit: { type: integer }
+ *                     count: { type: integer, description: "Items in this page" }
+ *                     nextCursor: { type: string, nullable: true }
+ *                     hasMore: { type: boolean }
+ *       400:
+ *         description: Neither userId nor type given (INVALID_QUERY), or unknown currency (INVALID_CURRENCY)
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/broadcast/notification:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Broadcast a notification to all connected users (admin only)
+ *     description: Publishes a `notification` command to the global IoT topic. All connected clients receive a toast with title and message.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, message]
+ *             properties:
+ *               title:    { type: string, minLength: 1, maxLength: 80, example: Server maintenance }
+ *               message:  { type: string, minLength: 1, maxLength: 500, example: "We'll be performing a quick database upgrade in 10 minutes." }
+ *               priority: { type: string, enum: [low, medium, high], default: medium }
+ *               sound:    { type: boolean, default: true }
+ *               data:     { type: object, description: Free-form passthrough data }
+ *     responses:
+ *       200:
+ *         description: Broadcast published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: global }
+ *                     commandId: { type: string, example: msg_abc123 }
+ *                     type:      { type: string, example: notification }
+ *       400:
+ *         description: Invalid input
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/broadcast/app-reload:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Broadcast an app-reload command to all connected users (admin only)
+ *     description: Publishes an `app_reload` command to the global IoT topic. Use after deploying a critical frontend fix.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Critical bugfix deployed" }
+ *     responses:
+ *       200:
+ *         description: App reload published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: global }
+ *                     type:      { type: string, example: app_reload }
+ *                     reason:    { type: string }
+ *       400:
+ *         description: Invalid reason
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/broadcast/force-logout:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Force all connected users to log out (admin only)
+ *     description: Publishes a `force_logout` command to the global IoT topic. Use for security incidents or after rotating token-signing keys.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Security patch — key rotation" }
+ *     responses:
+ *       200:
+ *         description: Force logout published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: global }
+ *                     type:      { type: string, example: force_logout }
+ *                     reason:    { type: string }
+ *       400:
+ *         description: Invalid reason
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/notification:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Send a notification to a single user (admin only)
+ *     description: "Publishes a notification command to the target user's IoT topic. Returns delivered=false with undeliveredReason=user_not_registered if the user has never called /v1/iot/register."
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Target user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [title, message]
+ *             properties:
+ *               title:    { type: string, minLength: 1, maxLength: 80 }
+ *               message:  { type: string, minLength: 1, maxLength: 500 }
+ *               priority: { type: string, enum: [low, medium, high], default: medium }
+ *               sound:    { type: boolean, default: true }
+ *               data:     { type: object }
+ *     responses:
+ *       200:
+ *         description: Notification published (delivered may be false if user not registered for IoT)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: "user:usr_abc" }
+ *                     type:      { type: string, example: notification }
+ *                     undeliveredReason: { type: string, example: user_not_registered }
+ *       400:
+ *         description: Invalid input
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/force-logout:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Force a single user to log out (admin only)
+ *     description: Publishes a `force_logout` command to the target user's IoT topic. Use after account suspension or password reset.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Target user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Account suspended for ToS violation" }
+ *     responses:
+ *       200:
+ *         description: Force logout published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: "user:usr_abc" }
+ *                     type:      { type: string, example: force_logout }
+ *                     reason:    { type: string }
+ *                     undeliveredReason: { type: string, example: user_not_registered }
+ *       400:
+ *         description: Invalid reason
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+/**
+ * @swagger
+ * /v1/admin/users/{id}/app-reload:
+ *   post:
+ *     tags: [Admin]
+ *     summary: Force a single user's clients to reload (admin only)
+ *     description: Publishes an `app_reload` command to the target user's IoT topic so their open tabs hard-reload the app.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: Target user ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [reason]
+ *             properties:
+ *               reason: { type: string, minLength: 1, maxLength: 200, example: "Shipping a client hotfix" }
+ *     responses:
+ *       200:
+ *         description: App reload published
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean, example: true }
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     delivered: { type: boolean }
+ *                     topic:     { type: string, example: "user:usr_abc" }
+ *                     type:      { type: string, example: app_reload }
+ *                     reason:    { type: string }
+ *                     undeliveredReason: { type: string, example: user_not_registered }
+ *       400:
+ *         description: Invalid reason
+ *       404:
+ *         description: User not found
+ *       403:
+ *         description: Insufficient permissions
+ */
+
+// ============================================
+// Health Check (1)
+// ============================================
+
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     tags: [System]
+ *     summary: Health check
+ *     description: Returns server health status and timestamp
+ *     responses:
+ *       200:
+ *         description: Server is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, example: healthy }
+ *                 timestamp: { type: string, format: date-time }
+ */
+
+module.exports = {};

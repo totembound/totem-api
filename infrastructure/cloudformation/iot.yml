@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: TotemBound IoT - Real-time push via MQTT/WebSocket
+
+Parameters:
+  Environment:
+    Type: String
+    Default: staging
+    AllowedValues: [staging, production]
+  CognitoUserPoolId:
+    Type: String
+    Description: Cognito User Pool ID (from cognito stack)
+  CognitoUserPoolClientId:
+    Type: String
+    Description: Cognito User Pool Client ID (from cognito stack)
+  LambdaExecutionRoleArn:
+    Type: String
+    Description: Lambda execution role ARN (from core stack)
+  IoTBrowserPolicyName:
+    Type: String
+    Description: Pre-created IoT browser policy name (created outside CloudFormation to avoid CFN IoT policy lifecycle issues)
+    Default: ''
+
+Conditions:
+  IsProduction: !Equals [!Ref Environment, production]
+  HasBrowserPolicy: !Not [!Equals [!Ref IoTBrowserPolicyName, '']]
+
+Resources:
+
+  # ===========================================================================
+  # Cognito Identity Pool - Federates with User Pool for IoT credentials
+  # ===========================================================================
+  IdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub 'totembound-${Environment}-identity'
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        - ClientId: !Ref CognitoUserPoolClientId
+          ProviderName: !Sub 'cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPoolId}'
+
+  # ===========================================================================
+  # IAM Roles for Identity Pool
+  # ===========================================================================
+
+  # Authenticated users can connect and subscribe to their own topic
+  AuthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'totembound-${Environment}-iot-auth-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
+              ForAnyValue:StringLike:
+                'cognito-identity.amazonaws.com:amr': authenticated
+      Policies:
+        - PolicyName: IoTSubscribePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: iot:Connect
+                Resource: !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:client/${!cognito-identity.amazonaws.com:sub}-*'
+              - Effect: Allow
+                Action: iot:Subscribe
+                Resource:
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/user/${!cognito-identity.amazonaws.com:sub}/*'
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topicfilter/global/*'
+              - Effect: Allow
+                Action: iot:Receive
+                Resource:
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/user/${!cognito-identity.amazonaws.com:sub}/*'
+                  - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/global/*'
+
+  # Unauthenticated role (required but has no permissions)
+  UnauthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'totembound-${Environment}-iot-unauth-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
+              ForAnyValue:StringLike:
+                'cognito-identity.amazonaws.com:amr': unauthenticated
+      Policies:
+        - PolicyName: DenyAll
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Deny
+                Action: '*'
+                Resource: '*'
+
+  # Attach roles to Identity Pool
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt AuthenticatedRole.Arn
+        unauthenticated: !GetAtt UnauthenticatedRole.Arn
+
+  # ===========================================================================
+  # Lambda IoT Publish Policy (added to existing Lambda execution role)
+  # ===========================================================================
+  LambdaIoTPublishPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub 'totembound-${Environment}-lambda-iot-publish'
+      Roles:
+        - !Select [1, !Split ['/', !Select [5, !Split [':', !Ref LambdaExecutionRoleArn]]]]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: iot:Publish
+            Resource:
+              - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/user/*'
+              - !Sub 'arn:aws:iot:${AWS::Region}:${AWS::AccountId}:topic/global/*'
+          - Effect: Allow
+            Action: iot:DescribeEndpoint
+            Resource: '*'
+          - Effect: Allow
+            Action: iot:AttachPolicy
+            Resource: '*'
+
+Outputs:
+  IdentityPoolId:
+    Description: Cognito Identity Pool ID
+    Value: !Ref IdentityPool
+    Export:
+      Name: !Sub '${AWS::StackName}-IdentityPoolId'
+
+  AuthenticatedRoleArn:
+    Description: IAM Role ARN for authenticated IoT users
+    Value: !GetAtt AuthenticatedRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-AuthenticatedRoleArn'
+
+  IoTBrowserPolicyName:
+    Description: IoT Policy name for browser clients
+    Value: !If [HasBrowserPolicy, !Ref IoTBrowserPolicyName, '']
+    Export:
+      Name: !Sub '${AWS::StackName}-IoTBrowserPolicyName'

@@ -1,0 +1,128 @@
+# TotemBound Local Development Environment
+# Run: docker-compose up -d
+# Stop: docker-compose down
+
+services:
+  # ============================================
+  # DynamoDB Local
+  # ============================================
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: totembound-dynamodb
+    ports:
+      - "8000:8000"
+    # Use in-memory mode to avoid SQLite permission issues in Docker on Windows
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:8000 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Cognito Local (for auth testing)
+  # https://github.com/jagregory/cognito-local
+  # ============================================
+  cognito-local:
+    image: jagregory/cognito-local:latest
+    container_name: totembound-cognito
+    ports:
+      - "9229:9229"
+    volumes:
+      - ./cognito-local:/app/.cognito
+    environment:
+      - CODE=123456  # Fixed verification code for testing
+
+  # ============================================
+  # LocalStack (S3, SSM, SES simulation)
+  # ============================================
+  localstack:
+    image: localstack/localstack:3.0
+    container_name: totembound-localstack
+    ports:
+      - "4566:4566"  # All services
+      - "4510-4559:4510-4559"  # External services port range
+    environment:
+      - SERVICES=s3,ssm,ses
+      - DEBUG=0
+      - DATA_DIR=/var/lib/localstack/data
+      # WSL/Windows Docker Desktop - no docker socket needed for basic services
+    volumes:
+      - localstack-data:/var/lib/localstack
+      - ./localstack:/etc/localstack/init/ready.d
+
+  # ============================================
+  # MailHog (email testing)
+  # ============================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: totembound-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    logging:
+      driver: none
+
+  # ============================================
+  # DynamoDB Admin UI (optional, for debugging)
+  # ============================================
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:latest
+    container_name: totembound-dynamodb-admin
+    ports:
+      - "8001:8001"
+    environment:
+      - DYNAMO_ENDPOINT=http://dynamodb-local:8000
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    depends_on:
+      - dynamodb-local
+
+  # ============================================
+  # TotemBound API (local dev — baked image)
+  # Talks to the other services by hostname (DYNAMODB_ENDPOINT=http://dynamodb-local:8000).
+  # No source mount: rebuild (docker compose up -d --build totem-api) to pick up code changes.
+  # ============================================
+  totem-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: totembound-api
+    ports:
+      - "3001:3001"
+    # Load the full local config from the existing .env.local — this brings in ALL 8
+    # Stripe vars (secret, webhook, premium/vip + the 4 gem-package prices), OAuth creds,
+    # table names and feature flags. The environment: block below WINS over this file and
+    # rewrites the host-localhost endpoints to their in-container service names.
+    env_file:
+      - ../.env.local
+    environment:
+      - IS_LOCAL=true
+      - PORT=3001
+      # Container-network endpoints — override .env.local's localhost:* values.
+      - DYNAMODB_ENDPOINT=http://dynamodb-local:8000
+      - COGNITO_ENDPOINT=http://cognito-local:9229
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - AWS_REGION=us-west-2
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+      # App origin for email links + Stripe success/cancel/return URLs (not in .env.local).
+      - APP_URL=http://localhost:3000
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  localstack-data:
+
+networks:
+  default:
+    name: totembound-network

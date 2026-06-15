@@ -1,0 +1,1457 @@
+{
+  "gateway": "https://ipfs.totembound.com/ipfs/",
+  "species": {
+    "owl": {
+      "brown": [
+        "bafybeigipgkw7rsczqa4gf2ql2l52dgkaozmeltijoh2zf7ho4v6j5zv7u",
+        "bafybeigd5bvk6gf4whlfdmqwmn2gcp52xnpzuloencua6cdonkhlcqxumu",
+        "bafybeiddyh52wkcqikswa7ngv4mbg5jtztpwgzvdv3eg5zpgbtjtstluh4",
+        "bafybeialepkzppvqe7tea73mp4rqqm7zp2jtdb6yqhequyq3gdjtme455u",
+        "bafybeictu5qxiald532wev65232juwwgqh733d37zmj7utrhjev7qbotbi"
+      ],
+      "gray": [
+        "bafybeiagzp2vhnizfsryzknaabd7tn6pofu5nibtilg7ua5bsa55y3uvwa",
+        "bafybeie3eocycuarllo3d6k4uxl5sw4ijufgv6afqufov4rtlhtpkofxmm",
+        "bafybeiavtzemgmydf6mqfkqxzrgtljr2u6fmux7pl6bob5rxfoxmzxw2mu",
+        "bafybeig43ykhdybplmfatsfqfcci7uqkzoxe3fiuh7w3oldjm7w4grzroi",
+        "bafybeiejhhfuzj6gyomduu5yfwqmrplz6d3swriftapqrr7okdl5izc6a4"
+      ],
+      "tawny": [
+        "bafybeiedpt3ozjgrignsnnwfofer5hpkuaixml26vpyea3r2m6rhs5bizi",
+        "bafybeie57kuqvorer4lkh5ip45jzavqdnklxl36miwe7b27f7kqcpf4fh4",
+        "bafybeibvdgxs4sg2ozhf3ugy2lbkzhpcp6lgy5l52ftasab3qsau5ye4la",
+        "bafybeidqr6nbdxsutxnmtsuabxkmy6upcbsredikmd4ud3rrggcinvnuvi",
+        "bafybeicobwpk2frfneznvx64vzvodlj2ouy5e3w2cujoetuqts5fx6wtsu"
+      ],
+      "white": [
+        "bafybeiafwz5ygpk4byjpldzoefhto663jzlel4eukpclfaczwnnnwvnmzy",
+        "bafybeibbllkqg7td2px7ouywgynham7y5rzg6t6agd3bt6weclofww6x4y",
+        "bafybeiao5wzxetmyrmdqthmnlxm25qza7glzieug7f4lgvkbvq6qwn2n2a",
+        "bafybeigrq74qw3egjnn57scsid5bffpmb2j2byjvzpbwep4yqo6qrqjvcq",
+        "bafybeieftoncmtjnpqvpcvc4vh6ehfjo7waqnl3x7jrd6ujpq6rj6hs3ji"
+      ],
+      "copper": [
+        "bafybeibl2mbrg4j2vi62cqjkcrqonkgo3p37vo2emv3vxnwa4ingvjpgd4",
+        "bafybeibfhu54nwsmdj4soagtzquywf26c32b3zb3i6otazupdsn2a6nf2a",
+        "bafybeiesvov2phpshrlyk4opb7jewujy73qadezri5lgxlyvf2wk3o56qm",
+        "bafybeice4fhcfvhsomgrjkocsaky4sx73b4dgmebuulr6tglwank3k6inm",
+        "bafybeid54a3ovkiuh5xsisanz5xaysel7oko5k2tqqexpihi5pfzvyhx7a"
+      ],
+      "cream": [
+        "bafybeiherhcntdqsvdjjb6wjlbnlgnwxo3r6zzjpzxcspfykbh4mxc6slq",
+        "bafybeic5dgyp447rf4726ti3sfhpy5piwnaswx54medpzwp4lygv3zcwj4",
+        "bafybeia2mzhuhwnenx3zel6kgkfzcltiwdhfxeqq5crsddmmshpuhvaaii",
+        "bafybeigl33l7yp4nfh5iuck2vxr3dclqgldrg2se545iunqwurae4atqua",
+        "bafybeidh526f4br6pfocuv326o3qlvrcx46uleyqjhxq4iqwiymfq7vjcu"
+      ],
+      "dappled": [
+        "bafybeiat5z7uyhhfyt2rzccn7lwbpbke55tf2qmsjqjgqwnu6dtasdcyam",
+        "bafybeigz2kn6nygb52u4iqcqkhqsydcuw36gr36ythacustrylkn53gqpy",
+        "bafybeih2knly52h6zrc5oyy22d2j6k5xzybbz5ab4mxdrzdds2xfhj3wcy",
+        "bafybeidpk47f4vo3rw5jhush73w542doj25ckfzwxkqzljm52n4zdov2ri",
+        "bafybeih2he4hruntwuezgmprnwnxrpwvib24zz2qbngcsuc6d4m573mpre"
+      ],
+      "slate": [
+        "bafybeif7hiasn2rllzms576mksv5aarrxkshrwr2rmi5qr4zybiz6ywcye",
+        "bafybeihimhdul7pvei6zr465cmsauzzhnwwsbc33d6tnz6k2jxu2obdpfe",
+        "bafybeievao5767d2g4jsmcg2nl56owes5gu3v2pvfc7glne5abl2j7sc4e",
+        "bafybeigg3x63ji3xivqf7ac3zjptaeptncmllpe3fw76xp7fcrc4jo2p7y",
+        "bafybeigl3ci6dialp47fr4qtj6ctzzdc2eqtsvjkjhb5ya5o6jsp7slhhi"
+      ],
+      "charcoal": [
+        "bafybeifpmb2a6abj2updgesr3i6lns6trkzu2iutpyx3qowp7dtvykoj2u",
+        "bafybeighq6vkh3tlfdomtgv72suoslsgky53edmtzvjcyfd6lk5ozpwzzi",
+        "bafybeicdq25j3ugenbr2orfuztayjchpe7ysswftnzuh5uzo47hnnuqatq",
+        "bafybeia32k2h2n42iqjpgmvxxlw3g34wk2g6uvw5b5oixev66gdz5tqszy",
+        "bafybeia6ehie5tyfxmffprfyvswp4fwhts4557wpxj7ylgd6wcoplzvs3m"
+      ],
+      "purple": [
+        "bafybeif5oyc3g25ce6jdo4rqzxdwktcgzyehpmtwom3vcrn6yapqixxnxq",
+        "bafybeictauo6tundtr7yvjkpvmgs2gjn7ufonrdsm23fx6znnjhd4qzsby",
+        "bafybeieue5nkt5x3oju6o3nzxkveoqiavd73yqqdgrbxqy2pbla554y354",
+        "bafybeif2werl3qcfgdbjvjjfwgcupxgcyasnwadlwv3govo5rywckblce4",
+        "bafybeic4a5wz6rn277rmo5zu4hlmqqu4u5hf3ahdp2tugrvimdumkpbwli"
+      ],
+      "golden": [
+        "bafybeibeouuugi4cbdrrkuvs5x6oifzcgzeforxk6yc7hvsz7adjfyzx2m",
+        "bafybeictew3zeorxxk3khs4actqqfhotybmmyszh3svm3gjpnld3iyuu4q",
+        "bafybeianqvok2m5j7ws7k7tv3ahgdu43lnj7ma22xjqaxv54p52do24bim",
+        "bafybeiar6uj6uoitjw45gy3jpvp2jmoovat2bldnch6gjgdb5o25l5az6m",
+        "bafybeihkkyh7kvwf2k2uwt2225qdzqqqbmnkvvmkms4lev4keqmpgdbfzq"
+      ],
+      "crimson": [
+        "bafybeihsysju7fsvmh7hhwq6fe7pgsnihqjxsvctsgmi6euu6q7maxoxcm",
+        "bafybeidyrqfgnprwqfizkrndnhkair2shzehvgm5g6pomj5oaunkxmes5u",
+        "bafybeibuiqk6mbnk73evllkcia5wikilsur2sl7gj5f3qv6t3ttqy67tqa",
+        "bafybeidy2sa4wju5sksra2xxlxde5vr7zbaude5g5qpjnfyz7xaco4orx4",
+        "bafybeid5lugg4pbklxduktpjki6v72c7xs7diqnsegmmiqksvzrmcfouxe"
+      ],
+      "emerald": [
+        "bafybeiholh4lqqvallbsjxecxb6lzbsnsybuyljfwurhf5sauepe2j62ca",
+        "bafybeiaxp5cafja27nchwhynzits2ukplh5po5eqoypp5cowry2gdjpmz4",
+        "bafybeiabco42o7pinmrcchsn37tqotlhfjkpwfkymngotw4ykn53lmccli",
+        "bafybeih4xn4kucrx2uctk7kudidkfzqobl34wm4ixya7v252bdczx3obeu",
+        "bafybeicy3p62inoxjue4utf5ggddk4z2n4f4vkgb3viqaut7qrk2tp5jwy"
+      ],
+      "sapphire": [
+        "bafybeifnsmw4la5mxwbm2fgy2try5twmbochtyud3rlfh2r2do6oqhqmaa",
+        "bafybeifn2i4du7k5v2jn2s6pebwzzjvcb56c3oavjhqor2pjfbj6srxvju",
+        "bafybeihngixknjetypnhoul5cjito63bfkydg7ctamu2jfsjrqrtw6b6qy",
+        "bafybeiftm4rpx6xzrz7soysuaocfu4mzebgrg74wwodfmjorn4u6vuny7u",
+        "bafybeibeuyb5jipxttbc2vn5zwudfmunzuqcqyum7sovvdaimi4rb2m7pe"
+      ],
+      "gold": [
+        "bafybeidk2bmdtqgzf5nxq33cepfql6uelqtxzljn3bjgdz7fnv7vt4gtlu",
+        "bafybeibzam4c2xgl2ptex2sxnycah7swim3wdgg74lz33n6rseedhv2zxq",
+        "bafybeia3u6likrcsjondqqud2di64jmpt2nph3nvenrapgg2tfr5bifjiq",
+        "bafybeig6jo6cxojnaev7xwisen564yi2qqsg67wlwexe55tcwhpx3gyexi",
+        "bafybeigejvh2fkc5ipx5zqgqxsutwvxq7vc5ekjx4n52e6qsqznj5cglpm"
+      ],
+      "silver": [
+        "bafybeiaml63mdtzjka2ms4qnmfwvyp3dhsoi5i6k5htc22jz45ofhm46iy",
+        "bafybeidcwyc2xutfmot3ew4gxvmopnejqi52nivr3nwawqe7maiq2qudni",
+        "bafybeian33owhzywvkhf5m2s4dfcfklvmmeobx7eoizb36dtqrxbeyxclu",
+        "bafybeigqtstzke2i57jtdtvtopupucjmmm5dcdbeuuhyobz7v2ju4oftry",
+        "bafybeibdyel7ev5mvyo6pesohlq7czdmlfpjlx3x77ribeq477jvgnqrge"
+      ],
+      "starlit": [
+        "bafybeia5h3n33pvf47yqinlbphgvbqnb2tckbrcwdv67ewexxfzfpzctai",
+        "bafybeihueruyjj6gsunjbzrtra4h372dbcageeq3zyu6elgqfifi46blne",
+        "bafybeidnuv3z4nqt656fno652ne4ts5zesvmdt2lmzvhwps6fmohrmqlba",
+        "bafybeiarpmzyliiju6hatzoxhmyph4bjdqmbre6blm7ve4jztgxw42b52e",
+        "bafybeidrgo47drqhzpumxsdlykir2zo35cvfj4f5wlryjyqh7knh3sjm5m"
+      ]
+    },
+    "goose": {
+      "brown": [
+        "bafybeih67w6len2bh4iqyezikguccwpmzi656j6sou6bhbezjtmrti2su4",
+        "bafybeiguy3xssl4hxfmzf2fskr6hqmnib4io6qgmrtkylurvpijoj67yl4",
+        "bafybeihbzwdg4sf3t3s4r24p4bezbh2w7tkztut64kyfi6yx46octbfhra",
+        "bafybeicweny35qjksvwqeeluzxsjit36htgkctohkkc6yafg7dywaft7na",
+        "bafybeig6lpw5hqgkmgn3f3mo2xuulgyx6bqngqvwr6itcl3dmxxc3jovny"
+      ],
+      "gray": [
+        "bafybeiervdglagz3dqzivn4pbcwxfts2txq45dggnecqjwbhs3p2ufvwqu",
+        "bafybeiffuzibivnbbvcleuw7jn4qvng5k6ewfzas3p43b6d23n4afqbrbm",
+        "bafybeigs6mozgqrekl7cweyhreuc6uyunnx33wimzo7ew4ulzp6glwruti",
+        "bafybeignshywbb6v6jphjgnaqzpc7cyq5tfhfy4s3ksq7a4knerklxj7ye",
+        "bafybeicgtxy6sdc7v3z4zmlar6u36q6twrjnbd5arib27qkseq47d4u3nm"
+      ],
+      "tawny": [
+        "bafybeiakzqtgxtv5a5h5y4bcohwnypa5ucif22fi32wquahyigmo5244nq",
+        "bafybeibirknh6ivahip6dyhpraenxrms5ict34cbydohzfwkod2vivksum",
+        "bafybeiabwotnu4km5aqs7igbpid7dr2w65pv634uhueacbzmkwhdzbgb4e",
+        "bafybeidindogeso7vfszgesnuigfuk4qk5dqgtqdo5bt2nbnovvj6dlfmm",
+        "bafybeidd3qurblgoygrmbze4hwp73zjaksm5c2onvh65usjmwhkrzqmbxe"
+      ],
+      "white": [
+        "bafybeigw67q3qc22k5h6hcj6gzb2da6mvtlm6w2jydo6blvqvgts7y3l6u",
+        "bafybeif7wi7qi5cvwuefymfg2nwrutrmve4nrcp6uitjtydajvbl2w4qza",
+        "bafybeidc7x4jb76mpkkar2vfvw2unqmxtgqosajufoht7f7lss6ijtuahy",
+        "bafybeibk4bzndmqrjxk3b4tiaarg37exxuulz5k6u6hsrxxw3gksuivvqy",
+        "bafybeifuxzs3vribchjb3e4n2cmz4u5uewnwt3zofzvvfo67vmgkfnbx7y"
+      ],
+      "copper": [
+        "bafybeibxsgzpsz6lmlobuazo56zrle2wjob6v7ngoedraw2ahjmw4znpfe",
+        "bafybeicm6z7bpfeho3ptm7qriz2eab4pq3vrhhfrejm3djb2oyavxibdgq",
+        "bafybeihbtpqj3aggmliwmv2a7sn62zzs46iymmm6p3mdl75gpyuw5rg33e",
+        "bafybeidm72ywmvt5fgw6umq2ofcoecmfn5a5tmyxrbe25c2qiqwsloyjku",
+        "bafybeif44qtqzmbfypp4u7pm2rjxqy5x2xbc5rpmey2b6xixlid3iuxol4"
+      ],
+      "cream": [
+        "bafybeie6ewyjuufiflac63v5g6piyqqzxshkbyqqupq3c3tucfgdswtukq",
+        "bafybeibnfo7rt6taycrvhbp3bcpjjfofvakgetbhz56bp6tecxmglduxyu",
+        "bafybeibdfrhqbl5jk2q76g6l3czwk5lt3bf4legqm4pjat3g5mopd2ph2q",
+        "bafybeicf77r5flp3gm3qraxxultygc5rfr37ruxns4f3mfp22yivwrlqbm",
+        "bafybeibbpekxdze4okq2a63js4566rcqefttvyq6unff5ms647xd3yqa74"
+      ],
+      "dappled": [
+        "bafybeibzy55d25h6llzhjuxnrrw2kkpp6kcqhes57khfdboslleorkukay",
+        "bafybeifvkc5l6wrqct6ooaahd5wduk3nr2pbzn2xs7ncxnrq2daqt4q26i",
+        "bafybeieuj2xvgewti3c3nqzlowxlrvfoxwoj47lns3pvi7eocsbwkrbcvi",
+        "bafybeihds3ewldz276zf7dhr4njynodidrlgbc6a3y6g3qkykwq2fxmgbq",
+        "bafybeiemgxxn6mm3lke7runjczhsaqvksifg4drdb7ovk7f6434zcszhga"
+      ],
+      "slate": [
+        "bafybeichcdqioyw2xeo3puj6vpth5tet7o6aefrjoiaibsapgwt5d4wkyy",
+        "bafybeieorshezz7nbea4qeysybmpxnfviu7ervqihsx5mp6lcbc2bjhrhy",
+        "bafybeie2keq7o3w2ykvdbqdnv4fn4pho5ox6tioudw3aksj65ijrydp5c4",
+        "bafybeia2yo4b652xlvwgdbd7nz3mshlmztjccxiskpxb4zvovvclijuqwu",
+        "bafybeidnhudwv43chaarpxa6ltiii7js425zreyg347jw7skpuzchlnnbi"
+      ],
+      "charcoal": [
+        "bafybeidbarxnpjyalrtonxq5z3k4e3kbadak44mvyhjgi6joykuyycka2q",
+        "bafybeicqauxnjdes3rc36q2vpwq5bknnfin3c3rgxek6wrxlaq5b7rrx44",
+        "bafybeif2ph23n4m3ysautokjg62ctavhfbgc5sv565fasua7jt3oe2yzyu",
+        "bafybeicu3n7mukuhg4uqo6ztsixs3vf7qkpnklmydrewycqyyjf5uyv3mu",
+        "bafybeid7vdy4exxbs6rogcvd6o6nlu4kb2qmecxsgrvwap2v2osazrvsx4"
+      ],
+      "purple": [
+        "bafybeig64vnyiheqxnbsoxulo4lsbbmngl34eayvbwelybfz6astgiya4i",
+        "bafybeiaxbb37lrbfcfimsfvn4pdlngd2kwzktgea2iiqox3aykxujze2t4",
+        "bafybeicmv7gi5z3dfw63kyggtfojdraanfaoxqqop6mumeorg2afgg6eyi",
+        "bafybeigf3dffhtohpmkr3yfze5r6bk2gjollvpwrgaih4pjrqptxzjmg6y",
+        "bafybeigbmgbdwybifu2wulvjpl6syk5fepiamsswbfs6432rppxka7nrca"
+      ],
+      "golden": [
+        "bafybeihn6kjfldsqbg6j67pcmwia2o7kbvdl76ytkulrttgfjgs5b7xh6q",
+        "bafybeibdtdrybvsqs5kljnvavgyb74qav6xi5deyil5g6myqdzdeohn7rm",
+        "bafybeihegdj2z4q7x365fkepzz4jl6vgkdpjgpocasvzzmk4lqsbkdr3sq",
+        "bafybeiceusepk3p4ukkjbxpzzikrie2x4xedl7j3ejskxzjbetwhkc5iza",
+        "bafybeiggzraxgyvrllvasxaexluj466fchi3wycf26bnig5iprzcgufsxm"
+      ],
+      "crimson": [
+        "bafybeigeavfjwbqp7fvmher6hrhpveaavg6h6a3hsv7ccle42bfystfdhu",
+        "bafybeibx5plrwxknsilibfkv3nlb54j2tky7wi5ebdrushmg2lh64lxt7u",
+        "bafybeiad5jlrwai2ecamgjs42ygeu2erxu4skqbxsb2wai2lqgkakzsyam",
+        "bafybeiholbcxiwi7xf4hpam5itujzofczhfrhkvdvls3yn63shc2zob45a",
+        "bafybeicjyadvlshy5u6o3ruv7f3god22lnfg25zsgioxkuo25vhosih7ou"
+      ],
+      "emerald": [
+        "bafybeibjc4xgp2bzn4bvs4b5f3lubnu4cuqu42jx3cophboizqduetjgb4",
+        "bafybeicnydcl4jchyxlzwyle7r4bkpomuq223f4isvmhbd4s4plgu5tczy",
+        "bafybeidpk5c6x75z367l357htpw3rowhatsc3d75aq4ger5wp62uye2kxm",
+        "bafybeiglvnkpy34o5a7c7rotmbhc5zs7lhgfnyxhti2rcvgmfh3lz2ql7m",
+        "bafybeihdyrq7rru2bsfahjvyzqty3g34m3vurc2btzbckcnjo5elujfasu"
+      ],
+      "sapphire": [
+        "bafybeihfekilzd4nvi7bekhzr7nujtjhm5maniro74fq72jyts3fo7y3a4",
+        "bafybeigfbc4qgyziktyxqh6qgrrdkzpy6oazuqndmo7ja3caygtsh4pcji",
+        "bafybeicjym33bvwtxrs5cjnzlnltke7gcp6ks2m37yxjnsdjh5aiv4bycu",
+        "bafybeide22dmvceoqwesv5ryahjglsigankh54qanbdq3od2hbzbu5bfeu",
+        "bafybeigbtppli6pyk7l7gzcv4hzovem5qd6mwwudo67bly6ukgyebtwbsi"
+      ],
+      "gold": [
+        "bafybeifouhfvea4y3azh3l33kjy2excpliqgwsffqi76gvko6gatv7kuy4",
+        "bafybeihtgdo6mdd5euliuugckaxtqjsf7bp7pqbdjgtd36iqzu7dwrix3q",
+        "bafybeigtfvkeuovawxhlf7wmkobqnnajf3mf765jnzpag6y7chbtfe34za",
+        "bafybeiexg5xpwzikmnoftbppwreuxnhmst6qlsf64hidexn7hosu2mp5gq",
+        "bafybeiacsxj46lsrvloiolo3oigqh5kzqsjjtrcwzkf5k7ubts6vyavozm"
+      ],
+      "silver": [
+        "bafybeiftdnk5e3n36k5pvvcpoammj2jik4t2avdzrbrr33xliazlms36li",
+        "bafybeidx7reoqppu7jrhbue5fcnxxgyvv3zs2dvj3gqhay4qmjlqjnlzw4",
+        "bafybeigfq4xgrllsnlgidmokhwuu64qksextyhmqrwylttl336ljsbfxqe",
+        "bafybeidrnrww3hscddjkdfeyper7dsftgyvsxsw6sgrx56r7e3jkcvt7sm",
+        "bafybeibq5valenzqerw2xl5g6c6bxvrt5cpn77a7eliv3ocmpcttkzn6hm"
+      ],
+      "frostbite": [
+        "bafybeidyswpx4qd6q4vu6eqtyqzuc75uh33cczspbvxtq4p2qajjxm6ora",
+        "bafybeihlakbavnkkjxpjfnjuocdhyckupkazekefbtbqyn3v575tnr75ju",
+        "bafybeif5uz32bznqjy4b5yykhplqurqetydspzrj3fczwr4yegmwuqg764",
+        "bafybeiaeba57cn6c2bbblv3zr2y7kxv4kzesi767uwlmv46mskynuouepy",
+        "bafybeic3a77tqkpo7z7wgyqlvhqegly4x7wnhqjgqdy7q3cj75tiwhdmeq"
+      ]
+    },
+    "otter": {
+      "brown": [
+        "bafybeihvnz7oa5n4kxtn5r52f2tteld5q6q3j7twjfh43tpdpoxx3hn6di",
+        "bafybeihxxg6r33h2ulkktmkrhdvgv6zqal7sattrcewa3ok3b2pqfilnru",
+        "bafybeieg3d7sbp7r37g7frbzlule5tfjjilfcda4l4io2lmpdld2x6d2dy",
+        "bafybeih2efkpk5z6qnwmswgo52w43twk4gytxvl7qgozabvxyacsf2zwp4",
+        "bafybeih3fya2m3tzj2s6qy3vnkxhwu7r4ues6ipvttaddxfpi4cyayo5wu"
+      ],
+      "gray": [
+        "bafybeidng77cqxojtxfvuwhtko5iznmdj6gx7bfjuz4fjcufvyvetgfpwu",
+        "bafybeidtnyfp6u4jcg3yklggfqdkxbwmpdbpw7xjvudfzazbaewbr45qbq",
+        "bafybeihr4m4lyu6hscqhxp3lb45ar2oc6tw2bijbzgqdnmvimy3cn5lr24",
+        "bafybeictagwre4bvoqxtpyduper34oxpdho34olktzuxzmelmziokpt5ju",
+        "bafybeigzoq4j5c74ctro4ok3aing5rvsd3y2zgxegslvsgyfng2y7s2iou"
+      ],
+      "tawny": [
+        "bafybeihn5ywlblyo3o2hamvfdppgksagyxwqfkj3c5sdmeedcg7os5uveq",
+        "bafybeidfcn6f5f4plz7ozbv4b5wglcwrl4hevfgp5mwwtro37j6whklhia",
+        "bafybeiggnl573abrttdxsfeqyte3gfsuvutcmkejwgt6e2vhayw7k42zy4",
+        "bafybeifbse7htptlgitf376fseivnuh5c45hv2s5sze7efvhg3m6e6ywly",
+        "bafybeiarkmsm76z6jqigajsg33asn3vgkas4wj5ni6xd6cm3rlsumhild4"
+      ],
+      "white": [
+        "bafybeif5gsdbufcbm77wbkjdu2vw6lv3ekkp326qdh662sk7t3pgr4bply",
+        "bafybeieosnwpczcvjv26earvr66ufvazdbjps25o54o7xge2m542ofnwxu",
+        "bafybeihvdctiy26vopx4cgyaint4kj3ppl6w23uw5j64ypspm5ycwk66r4",
+        "bafybeidv3asdavabn5r3p5tekliwinpgfmdczxpzu72xovcae4jioenhrm",
+        "bafybeifpbicmbcnaj3trtwbiielt7ysea7dvmm7zc7onpfdevrftxwu34i"
+      ],
+      "copper": [
+        "bafybeihfic6cbmmbsn3qecwpxkbm3fq7whthd2iqlqrlvwubvfnkxbu3cm",
+        "bafybeihdt7v6qm5ewmrip7dbe677bkmhpny7jr4fvh7oe527yz7ckhr7tu",
+        "bafybeigwpve7iraabikrvo3oaixthdqv2sbl2p4gyglklsul7sy5reeewi",
+        "bafybeih3qy4gmd4qohxmogs7saz4wzdfmrgjjctk65jvdngu2borzc7ota",
+        "bafybeiesxbwcq2pqv6wrn6ql2v5mtdjcb6bjtrepryi3jly6lklomoasxy"
+      ],
+      "cream": [
+        "bafybeif3dssv5tl7zwn4jpmrv6yykjmohhy3a7zuxgxdlom7icllwmcswu",
+        "bafybeihtes4b4p6f5diamz72bf6kpobaexid5oj7wecilh2xcsdssqydwq",
+        "bafybeidhuxc3qph43wu2wuwexatad46hq62pvkwrza2b5fa4eom7ekvrli",
+        "bafybeig3fzs63h6qtybus33ovbflv7t2vjbf2cqofjdvobnlhhohmnbwmm",
+        "bafybeiexcwvv75ku3hxvmbr65desd4zw7jdpecr5xx7igbwbw3tnvkgydu"
+      ],
+      "dappled": [
+        "bafybeiceqfsdaizzqkt2mqmrzumeaqpzfpxx324cd4jlpoc7yea4fycg4e",
+        "bafybeidgdijd5mfrnk7zi4o3uhyczp2qsyw5yau2n6ykwr4idkwv4l6rg4",
+        "bafybeiafjlqrviijfdvvycqauh4llgoptxzkeh7o7dcdlexu6c7ddlnqey",
+        "bafybeibqbm6wpaw6hgptgez2bfqph3my4ubrvpl2icbkqhwxcirfioqj6u",
+        "bafybeiezi2etzovw5mlc5xasxvwtapbns3ql6zkzbjvopdzx4kgb6aeqwm"
+      ],
+      "slate": [
+        "bafybeieo5oloocy4dolsntwi33j47ydfcgmcqzqorprof4rt4r27xfpo44",
+        "bafybeighwaxbuiyfbdteyv66f26hizcvtv5r22v2ejrywr4qds7dyqv6y4",
+        "bafybeibirmiotfjh64yqcicjwursdc4nj3o4ljtvo7zs2v32nxaoymuxum",
+        "bafybeib43qwbyptakpg6cx24fbtpprs63cg2zcsmlarwypfp2rbyur7cta",
+        "bafybeigo6aoreflf2vod7g6qu5rohg7lnsj2ddcem6dcmvnhss66b27yba"
+      ],
+      "charcoal": [
+        "bafybeictvfbbvhd6i3znhknynz6qh2kc53dphfzzjehxqhsv7mktyfwlaa",
+        "bafybeigl42nudjeutb3ijyqvbfz4nlbga7jjkgkbqzi7iq32boa7q6isky",
+        "bafybeied4d5qrqrflceznsejvnh6rlqf3d6fhafos5nh6onaf4jes4fsty",
+        "bafybeigdhnuuunddnviqxl3jvk3v2z543kzft3sparnw5l7cx7hpvmoib4",
+        "bafybeieffue65oqukler5blvlvmdwb3cffblaf4pgz5z2u72fmiumfwmzq"
+      ],
+      "purple": [
+        "bafybeib4icwpsyzjwunbado6gin3eybjo63n7wa6rgltmswe3ump7y5ioi",
+        "bafybeidtp7q6kmcnap4molmqs7hqv7wqbunlcxqgzagpfvugfea245wf34",
+        "bafybeicavi6abfvthrapzzbpqwa4n7v3zlisjkn3cb7sbaf45mftv66byi",
+        "bafybeihc3y4y6xz23jhnu3lac5mz5w72fgnipapxeodskundfruvejbkmy",
+        "bafybeiby73bwz4qpgonbbg2pn6i2vsll6z33k2xpllbnfysa55flu6adl4"
+      ],
+      "golden": [
+        "bafybeih2ytrhcwghhfzkzagh5tk7ihdv2xeuoh35uzikkpg3sw5n3lakzu",
+        "bafybeig3zifadbohjlgmpckqbg5quzito6stzkmb5d5szfk5cqkjnnlxce",
+        "bafybeiekmwhxwhila4x3inex3frwp6p2ovld2q5cg76rii7cgaptjbock4",
+        "bafybeib5alklaehud5imtpieqp2jpjgzegyqmnqws2tnk6po2frpva54pa",
+        "bafybeiaaqzpibzacmxczb35nv56ytzpvlh4opwmw3j7ucvca4izywvfwu4"
+      ],
+      "crimson": [
+        "bafybeicmqch5rfy3uprc6zzetknbgnzre3wwudcclqvhhbili552sjdi4a",
+        "bafybeierxilvdgor6gwxks24uzxj3lusve76sszap2jbd7rn7lbr6owhwu",
+        "bafybeif7s6z6bnf6nntmktb2duvbzuknmcudlcujzy3jnqmfmrxeiyegdi",
+        "bafybeigsdnqfh7es2643pn4e3odbx4rmtkwlop2vfsj2l6ustmt4k2dr7e",
+        "bafybeidgoa7epqbaq3qliizhrwwqnh6vu2rpoaf5lsrtn5dmaxkktj6huq"
+      ],
+      "emerald": [
+        "bafybeieu27bdrwecjzv7qiqhty4kjhebpvbhjwieko4fi64fl3qd6k2qou",
+        "bafybeieqb5czfhiz3aq7mht5b553x5qbvzgx2a66lolrnod4jvxu3nb3rm",
+        "bafybeiginizdlilie3hd7rjvybmbiunyyjx4nphdbpz66qrzbyr2cjyriy",
+        "bafybeie24jicgoveb4dyof2zsuys5kf5bdrim4m7igya7ad2skuj7oyyn4",
+        "bafybeihznpsvit354lszp43lav3a2wob7tfsszrnatt43eyn2sjqwvdmc4"
+      ],
+      "sapphire": [
+        "bafybeif3m3btajot4dqyuljqcnvs4oa2jtlirxpbzu26rmbwiuhc6dbbw4",
+        "bafybeicrliq4ymbsoskpcvryl6zgiekksuixomc6x2hjcksmgqp75e2fy4",
+        "bafybeihtyjk277cd7lswulrqjdvhvgxq3jcepm4wo7b5io7v2ykpmarvee",
+        "bafybeieqcnllv3pwocjpdk4k6oswe2exqzcbaptis434pjb6mxi4hsc33e",
+        "bafybeiffbjoftmhxofqdfu5qwp2ogix7yqh7i4gyjkklyus3vighr7hoku"
+      ],
+      "gold": [
+        "bafybeiauhrywv5ims27sulksfzabwyhfjjuhpcna7dyvhg4fh7rgqrp4qq",
+        "bafybeigchdxl4zztd3sj7hqmediweyd2jltvpl3i6ffkfgh5zafcowzupe",
+        "bafybeibzatc7djpewfghke2ytgtdarig67fuug45ntte7bvqr7uhivqmqq",
+        "bafybeiciucjam6k7deqrw2dnj526eqk5e3x4plhlnjqi5iplf63rz2moae",
+        "bafybeiahctgxrfhyyixdhdufo4ciahqobiddleinbyzav3oxpfur7wg7si"
+      ],
+      "silver": [
+        "bafybeiaczezftzhrnynfegjeazhuioosfrhjahzeabzf3xhhqoxufxlq6i",
+        "bafybeieonswpvofouc5fszgqmv54swul4rbe24wyvdfhfnwrcrzcxwtx3q",
+        "bafybeigljot2eqsghkt7rcwrnmmhefdfaqbyvsmr5qx5ve3a73cli75suy",
+        "bafybeicsndnix7ayo3skb7mnniu5piaqi5qxvmcvthcpaeffhcy6cjpumu",
+        "bafybeibduauevtya7y7pknv5enmteyeat46p3uqilwp4t42pv3fk7spg44"
+      ],
+      "rosy": [
+        "bafybeibyigve45wxxu3r22rx2xmnt5fxjusxxbrqxds2d334hkoyge626i",
+        "bafybeibssqhk4wxlvhyakbz7sj5mltcssy5rsopb2umj3gyw23srjuffeq",
+        "bafybeibxxwsl54y7luu5hnbero2mw5ymmcc44t6ab2xoyriis2fuyg7iw4",
+        "bafybeictpc5hrkraacfbb6mvgqcdqu6voflyfqaeaorh3gzbt2esebqbrq",
+        "bafybeidsydwaidnhrygqk3iqrp6eiwt4jr6ipfpjsl7pgesoq7poks6yqy"
+      ]
+    },
+    "falcon": {
+      "brown": [
+        "bafybeihppmy5vxggtp4v5u7earr4y6kiy77xcuiwds22tgs3ojasjzzdva",
+        "bafybeibppwlrl4vqv7y75owwlsyy6saz4lzmf7z5duprdnyrqeazfgnxtm",
+        "bafybeidfirknvm7d2y2nmfjhnpu4xi2oahgjrkagsanzgindwk2o77ngae",
+        "bafybeienxwlogrdlbkj7eidohaqjt4rzsy2rivmun7oatycfutvdmlqp3y",
+        "bafybeid3ry3hgnc6vzlh3xavawrwscbffoes7citq6npbnzhkoof45yeea"
+      ],
+      "gray": [
+        "bafybeidesm3bji4ubmwfausbbwbssrh3tcex4w4jwthiymmogghwn7qrjy",
+        "bafybeieb5q7licqjgxd5qabosabuqmo4iebmbtff7hccfxa54ix7qiqf3y",
+        "bafybeib76dtho3dapuhrdmkpphemp5indwx43oqnfthf34z2ks4jxvj4fe",
+        "bafybeiezjcy725uiy55r2cvhczehycurekk2c6i3wvhp7nfdgmbdgn2tcm",
+        "bafybeibuts65ui4xxvslrss22vifczmo5mr736hzimumoxp7e4x2oqkgvy"
+      ],
+      "tawny": [
+        "bafybeifl47bxdgkb3dsmzoyisrm7ny6sa7kyjppujvogrtogfbhhc3nhry",
+        "bafybeih3u2arxlyxznzmjgbtlthl7g63vuyeglzplgnucas6qpurxug35u",
+        "bafybeigxnnro5lizjlglnf2zq3ydhfwyw6i7x76thfkrdtedpjbduw3y4u",
+        "bafybeih72mbuwe6iltrpftwwjya377a7bgnim5cdb7yx6dvpjqsjlchkje",
+        "bafybeifj7iqeutj63mfodaec5u24zzremgyhdk5iv2r6dw2m2vtrwilofu"
+      ],
+      "white": [
+        "bafybeie4njhi5bgviju35nwcevmqyv7xaywmpwrdact6vm4qdgahmcsvda",
+        "bafybeibu3kbvaqqjd2vhvdwomictika4y2u3q5avkwvyqwymmufu2wymo4",
+        "bafybeiduu445fk2ayhd47663ov4nnzs2kaabjw5u5shctscsfdh4nz2d2u",
+        "bafybeidcwwaxkglrbaw7m5evdcu47pkgyi7msgx6eikmafepkuy24gebsq",
+        "bafybeid3rbnzjtwis4sbdkgzsl7qw5u3cgafyztaha6qj572zwr7sjwe4m"
+      ],
+      "copper": [
+        "bafybeibhorvnumhgqhhwop22rhzr2gk7abzvhfoxvhckc34xqsmnc5antm",
+        "bafybeig46ai4yczx4sc7x5h5g3osq6vyzki5fy6c53yaby7ccfgwtvyrnu",
+        "bafybeih3holqb2zzzfhxz7lecsmrhi7ceiuycz7kmq4q5gtq2ziavskmze",
+        "bafybeig5rnkjdtiofzkkd5lnrvvid75zd6rys2vujyc73ld4vtnp4voq4e",
+        "bafybeih2n6qh4wbsahlxku5qubod5lb6h7aye6657aex4pxaoabcczlkj4"
+      ],
+      "cream": [
+        "bafybeidnko7ra3u4fidblxx4rdqx66cne7wmmhxio76kcmffiep5zh7gca",
+        "bafybeigjpxicyv72ri63gyl52vux7cdotbifurbpisi3vm53sbh3d366qi",
+        "bafybeih2dp6j3wvguvgyvpszhwliwnny3hhdtxhrlcvwf2h4f2koobydky",
+        "bafybeieg5kwnx7rwdsws5e4saxk53zdcscsddthctimp27lkscgg5thzzu",
+        "bafybeibedy4yxc5ogkpzd6i3nzpf667djsgvyfl4z7dfwuvktso5zq4xii"
+      ],
+      "dappled": [
+        "bafybeidjohs5c5goscuula76gmznf6tizafnchjx7anefrzka2bn6gjolq",
+        "bafybeiaegfbidlfqwrk5k2tt4z345wi6xbd6d3vhfdaeetgubdsxcteszy",
+        "bafybeieecnqvlswaw7fxb2w4dhu6dxkuxfhqmce3423qs444fvddptffua",
+        "bafybeihrq54n7rgasskjvwapktqjwwjxfqjjg3by2tq3rr5bx3k635prfq",
+        "bafybeihet6ir7oud4oalsw4f2ov4jkp43lxdgn2gztdlljuc57jrltd3qq"
+      ],
+      "slate": [
+        "bafybeifinhekhahdfplev2idysbhwz5vukaemcwcunfnqqfb2wi77x4ptq",
+        "bafybeifqhxo33mns2o6dypbd5hnhf3uvjgcvgm7wgrmlwxp4rjlhvhlxcy",
+        "bafybeicowdbx7qo5p6mmwdfhriywdnl637e3e5fcdps7qmpzicmy5exgnu",
+        "bafybeigowlv3j7masxbhzuifpphupf2hdtbt4bvdwwrdxqxfki27eup7g4",
+        "bafybeig2v4zvbpelwemlr24gjz7wlpyqgrkwem2owgvo7jzdkbjbtftiny"
+      ],
+      "charcoal": [
+        "bafybeihb3ji2qgar6a3yxpdzcgy2nldxhwxwluifxrxn5ywupixlpf6gkm",
+        "bafybeihsrs7kdgzwcuaowuzwlm6eqsvfne5iz6zm3ljlf6td7yvdyb6q7i",
+        "bafybeics7xltdwlzpfvh6zqothazgcnkhzzf7dcy46mok47iapdzxmtmwa",
+        "bafybeifaruaqne2ijs3yol6ui4c4z6nvbmb4gngvfg73rdfq6jpvmmz2wu",
+        "bafybeicyp5dnmrgj2sx7ndbjuhrpoekbjyccw5ehmp42hpkrd7qor7e7sy"
+      ],
+      "purple": [
+        "bafybeiafv6elafnyxcshja3n7xurlohvxsqbdy55bbwdbrqkxiw5tmcypq",
+        "bafybeiesmghwcuankmkyvi3vfgch5u4rgi6nd555kweyxhhgwqaa3oeq5m",
+        "bafybeibfrycwjfhqetxyg62oe5wcqoxbnh7scj6g5dbvv5faagcbv5rjpm",
+        "bafybeieduz7ujfgbc62tcl7qb62ntc2ftxcabmrk4jmjblstz3oxra3zuy",
+        "bafybeihq5z4xgzd2ydc7kafb4ugnnvqqjmjfh64mk7u4szma4ht5hejity"
+      ],
+      "golden": [
+        "bafybeienb6e3mspmx3nlztrttedivtnzgzfkzh5ec3sim3zohelzfxpbt4",
+        "bafybeigbrypp4tbk7eoqklxbbpbgablj6hcjrk33edqt4hbfltyzkubhbi",
+        "bafybeiccuh5rg4npqskr36uib7e5zkr5vqcrfvmwtd2cataxltgjzhtbkm",
+        "bafybeiah4a3vpfbm3d6ehicyzmy2q7fqiz4psvyorxsqken2suc7lkz2by",
+        "bafybeiazwzfgci66zhoecvoexs4fclgf3tfu57dm63uwpfzlna3lliszmi"
+      ],
+      "crimson": [
+        "bafybeif7ce2plmvlm2ybzzfjbtmie5nyo2s2nlniilf2lvddamjyu36p7y",
+        "bafybeigdbe3y3xjz3buprqzy6jr2sqcwnfgxqkjkgg6xclaen6tu7wddka",
+        "bafybeiakxsuzjf7pigyvhkklamtm4t3dtq2dmmn7lsswt5j724e3ejz6um",
+        "bafybeichcdmtgw2bkfmabqh6bcbh3sdj27rxx4d7fmqu7ukbz22mspy4qq",
+        "bafybeifbqykky2pmh3rb72y4fivpz3iba6cwnwhg4yj336lf3yax7nsusy"
+      ],
+      "emerald": [
+        "bafybeia4cvqgd3zgjbfaw2qxcvci462cgih3opdcin3ldvdhki6xz3iq6i",
+        "bafybeibaz5zht4gbzo35mwcab5drrktwxavpuqssh44uudq5th7e6md2u4",
+        "bafybeidyfa5ue7x6ty3c5wfn5ifpwednkhenoovvkqoc6lgxyhhg6le4k4",
+        "bafybeic3aencwjmkqn5pwvqywtrsaikflshd5gnalbelpafdk2ckfztjc4",
+        "bafybeiho5at4uwnjadyjnxfd5raex7juwd7dxrh4andmuakrdsiajgye7i"
+      ],
+      "sapphire": [
+        "bafybeif45wur7jn6gpc5wqwfty3kfihhb7arifohk3m7bnon4tcvr2sagu",
+        "bafybeiaakx4gltla3muvdf2vvtcd6vmuu7eo7qsvlunop77nkeiufsl6z4",
+        "bafybeifrphymfwfeevoozg7ibeilmmbt7l2ttrgvpiiscmhh7fdmkup3x4",
+        "bafybeiaayvprlrg6o6rljqcd5pcptmrdfcmy3subadbpkzbn53k3gpdh2a",
+        "bafybeiakmcvzogf4p7lq3v77yfllr4jvnt2npc6zug5gncfwezcttshayq"
+      ],
+      "gold": [
+        "bafybeid7fnkjwryr42ijwugtle5y3lccg5b7uxldenqxzs5gzmhueeunha",
+        "bafybeiejxoe4ep3mt22t2kdqv6ensawpqgnv3iatc2ixvnfbjxjqa4hsy4",
+        "bafybeibhxnegphmjil4hbfp2l4ybsc42rx32bkdvl7gbq3icvkp2qcu5gq",
+        "bafybeigcolsgdruuj2i2o74neutlb3zugpnnvcdqtjwzuunogfhqmmhfw4",
+        "bafybeia5t3ifbvtsoa36fn6nslwke43w36taz2j3mv3u6uib2sbgtadhz4"
+      ],
+      "silver": [
+        "bafybeifdo5qymg5aiwjcg6d6ixc7fbrcuaid7o745cbknowpoagoot7gau",
+        "bafybeidlhortw7ddvidmoouqhdf2y7jfjue7i6inkjo64hfolg5dfzkr7u",
+        "bafybeif5unufapjyldfwoywcn2qworivotdzxsxh5iopgdyem4a5z646bq",
+        "bafybeifgphtsgvn3aipbaulunpolq55h5ejxxguhr5dqdr5j45ay2p5w4e",
+        "bafybeif4ylafpphnhbnloi2mmx3adqlq4fs3qxkanidfbh3eqqpustuexu"
+      ],
+      "raindrop": [
+        "bafybeibskxpmkb4pg4iszesux4t7rpjmx423dfhyilqxtmbecbiy6hydk4",
+        "bafybeiaeeiw4w73vflgkgnjsntkhh5aaljv5emmdwnfr7ifsre674kzaza",
+        "bafybeifd2apofll6whnvvq3gefkf64rd7kbgsr5h5rlsumykcvbllpscuy",
+        "bafybeighoyqepgztpfvrsatm4l3wxnqddbrevprmbagfepxuvbrsfsqzgi",
+        "bafybeie4a3o2dz6zd7fdtefcj3cn75hmdt4p2abd5hezdogzbu2fapx26m"
+      ]
+    },
+    "wolf": {
+      "brown": [
+        "bafybeibo3ttzjp3r5n4n2zzsristr6segyvowtlms6n3gxalyx7mppl5jm",
+        "bafybeid534zorzdbxbzcwqyxk2irifjuup6jlbwzzgciyxf4ko4j32btqq",
+        "bafybeieswb4ymgnfexxvtg4lqbqsghkk7rhtbgm25uhfow4jpftca4s5da",
+        "bafybeie7yav3eh6eok4euvq72kp4666xzwmea6frtacrzk3gxtiuhdtbwa",
+        "bafybeiefupoc6zmximov5msmay56r45mcbmfspxzqqs3r2czfhzvcerb64"
+      ],
+      "gray": [
+        "bafybeib3qdygoysu4de27xckbkzu5f5sis4ix3nxgrezqeetaq7pmnwh6q",
+        "bafybeiem7qtodwgcvq37zk7hovcve4d6znpbfpuiqnhjbt445fc5j7ssv4",
+        "bafybeibombrfvrwssoskyjwo2j2ryuxe5h5g346aywhjtdawf275fgoxcy",
+        "bafybeig3272knycw46utwu6ch7jfwtuh2un6pzo4n3a4trh5jj2hzixlrq",
+        "bafybeicrwzwiinqs6n4ytzghpaslz3wxhq3tu3asgwca5p4k4lvbiawmfq"
+      ],
+      "tawny": [
+        "bafybeihf6gt7lpolfhrjs5jmnl34oq6n5x2vtxhu4mz67lv73gmmhgitxy",
+        "bafybeiccf6e34murp2yeu66u5lkxoh36nxnnzvzobovqjm5hcpmzto22re",
+        "bafybeidujmma5egtnziepwlf3ib725a3dmjt2gfomwxee655wzvvtkedsi",
+        "bafybeiffkemvqqucs5r2bbmcs5nnbiaiywa4cgtqjeyipbnnxotridzmd4",
+        "bafybeign5iw7bwo4iar7hfpic2sbkbdmkdiwxgnyqkbssan44dk3fd6tnm"
+      ],
+      "white": [
+        "bafybeif5lbrlgs22ucyadi3h7r7wsbis37asa62x2cdjsktj47cwpoyxaq",
+        "bafybeie6egp3wrwfvbjchctexpwtirqeyo5dnfkni5kk3kaxsokpygjjuu",
+        "bafybeidhehs2jj4xlxfmz6euw63fbjzy6gllw5cgez5hfejwaxo65ju2ru",
+        "bafybeihdutaxetnl2t2qai4vz25lxsintj3evtw6vomx3xlqrkyth3g75u",
+        "bafybeic5lvfy6r5h4ltv4sfdtwazjrkqco34tcotvii4xvb55fetu3mk7y"
+      ],
+      "copper": [
+        "bafybeifbrytl43fjiabzkmim7jrckygndlwdjekuyjqrlitdntzcsuuxqy",
+        "bafybeigxuqkkd2gdiaf2ybca6ut26ivoofo66gst5cuoaiikoz7pk4ereq",
+        "bafybeiaprz4lycs27t3nfwgalyigf7lzdk4vynzwn2xuvcuk5mtgxhglyu",
+        "bafybeihvphoygd73bmnsjtz2lm4dum7mksjkt6c4y3pvr5kuraon5e4wyq",
+        "bafybeiafesuis6uzlvjfwblmwqo5d4nueblo57md66buuub7l7b3ajn7d4"
+      ],
+      "cream": [
+        "bafybeihwztoeqyrj7kes4xomq77e4ybpb6vlzjf3k52iqjo4tf5akuachi",
+        "bafybeigctotuzw62bkvc4rdmnelic5tmva5occrv2idshx4aadfiml2nyy",
+        "bafybeialpsf6uhuachowjm56dqttvmwn6mtlw2zed6qr6e6s6tnb2nuehy",
+        "bafybeidgau6bsvzteahpyipfuypsyhrlbbktapuaj7h4oafqedcwkatvaq",
+        "bafybeic7gea4ybytrushf6vdaqjo65lckvyyvpwqj6n5yhwjghkfd3rdfm"
+      ],
+      "dappled": [
+        "bafybeiffp4oamlsq6skpnu3z2yq6n3y4lkkooduiszyer4yhx72gvsr2g4",
+        "bafybeigasurtggud3oyiixss237ysh5fn3a5qasdohxyczi5snykgxlnsq",
+        "bafybeiebdi4sfjel4lq4f2od5hpaqiuujlesnsf7orxpw5u4dmsj2ypy6q",
+        "bafybeigsw4v2mwi6oqpl3xiqqhx4fubw75ns3zexrcwusqyh72lopgusaa",
+        "bafybeiftmzcfnkjy2gp2vcycgl7xl4g2bwqkba26q3rynfzohslz4va7oa"
+      ],
+      "slate": [
+        "bafybeie5bovoqxkrbjggvpm5thmng64d3hnjfyzu62avk7ehshlrv3lagy",
+        "bafybeiaqyza5fqc3tplftvt63mjicj4km3ni7wxjnqvyybio5v42gvow2e",
+        "bafybeifshe4ijoouo5nmp2u57i6brr6ob3jb6guh6pwu6f5rkdnwlfeaxa",
+        "bafybeib5jzsq2dqcox3fordmq6luhhlhoj6xfhccue427ceavt7inec5sm",
+        "bafybeiekluuv3tkxkriw6ccm66ksyeemqzkatthpaxsgvvvuky4zhukzny"
+      ],
+      "charcoal": [
+        "bafybeigsdzz62fsv5tuek2k7o5akjur3dqea4jouhg5uurxohbhrticmue",
+        "bafybeigskzy3yd4rrx2lz3zinbx4dknb7fmlfvxixad5ibq5hjvyvrgsym",
+        "bafybeie533763gdyae34hzemx674g2m46wfqoa7ve5dij3bksehz347kb4",
+        "bafybeicnn6a6kf2wrohlipyxsjdc3l66ovgnkrxopxhh2tehz33b3lslqi",
+        "bafybeibtgljj6syy4z63ohjlbo53fkmrv7jdvq5tpfg73qbhruhi25nh3u"
+      ],
+      "purple": [
+        "bafybeienrc4vdrwyyshei47iz256feue4yk4czydyhwkl3pyc3t67pslza",
+        "bafybeihpa432lzulte6uwhsrwviw6hqdluns344nedjnhn6hvxkehsgwem",
+        "bafybeicutiq4mmcyjobkotcmapfw2ozxjjdotxc2de33skfmk5jmy7mdb4",
+        "bafybeia2kzfj2mgriy3tkvj67ofdc56hvqy6azeebo5bsucgxipbtnioxa",
+        "bafybeiacclifr6coylrm2jpemyvmakkhmde32oxkywuhpkhzbklbd7jp2q"
+      ],
+      "golden": [
+        "bafybeieol25lnnbqdfvkh5sted3w5ikbojjejmykgrqwe5wwhibnn2w7ja",
+        "bafybeiffi2bjihmmpzvxlbvrm2savlbirhoni5rrhyk6wx7aik2cn7krp4",
+        "bafybeib4oecjg2n3spxtvdf3n5ucwutkyyidvpu5kkoqlgznzbg33ie7bq",
+        "bafybeiekalocfyvy7ys5alzc5bmpnga7iyhnp4566pjnbpadp7obizzdou",
+        "bafybeihu2gg4mfdzqnu4rg7h7py3q356cvsfdueewuzqisbuuaud72mnf4"
+      ],
+      "crimson": [
+        "bafybeiewumg56dwukxhdvv6fhkqvkoimf7pdgn4kdwvqn5xzdolwoxfrxi",
+        "bafybeibaps4bkfx5yoan4ucwnenjppi42dow532354rd3rwpihinwloyey",
+        "bafybeia6iao54bmzuuc2kfoorz353ndkgdvncrfgrq7y45sbwpm6g4dzgq",
+        "bafybeiacid7q4ic2zuadhoq3rpvhqp53v5sz6u5j5xjppfxnb45iw2l4da",
+        "bafybeihgii5eyqvihthfrhmkc2rmh7wicrf6sxqg7g3xic5luqw4rkipxq"
+      ],
+      "emerald": [
+        "bafybeigysqzrg7u54aqy7yq7t4gq54st6ipzivulc7as6ne26phpybibqe",
+        "bafybeiawyzjke7z3c66wbczmpsmwwdhq6u4lq43umpjzrjb3db25fdocau",
+        "bafybeigwzr6yc6i3certqckgqyurccnojbwl6jey6q4rqnjw55fe4dzww4",
+        "bafybeib75wns57st7xsogtffvrhh6t2ah6sweockkaykqkrimfu5ohhirm",
+        "bafybeieaj37rh5ldbkuy2n4vxpwcw2mk3gr4fgsu6lfv7qvq4eircvfzpi"
+      ],
+      "sapphire": [
+        "bafybeia55ttmypxlqvbi4wlhlb5dt6ie26fbpi2h5bi6ryay5pigwzavza",
+        "bafybeia64tltmlt6ob6nvw2e3dvpnmh5yozotqpdkzuwby6f5a7mggiare",
+        "bafybeiddfae6aar4l7nxrvdnsap2zekzdtlv3l466cd43hls57ajatglfa",
+        "bafybeihqoohdpzwmln2hsqvdjatb3wzuka4b7kgetjye5kkyoltqj7qste",
+        "bafybeidwocpr3ej2yphasldmkxl4fssreb6ysxtcribq4z4zzejewd23jq"
+      ],
+      "gold": [
+        "bafybeighykr65um6tcdvz6vrpf64vdfhjkzfqecvk6icovhlxnnx55ax2e",
+        "bafybeibniehornyax22e4m5rdi4liyc4ebdirgt53gcf7tndaxrj4u3q3i",
+        "bafybeiaqgqfxq3icftrbiixxjw3xqvhlrcn5qsv2lvs7rozhxxy2gjrhca",
+        "bafybeiasfpznj5dxw55isswegvsas4ag2gg7e2jvsdbf77revzj74yfz7m",
+        "bafybeifwc4423utu4m7ikkgdchzc2zwwsljpmo7bdch56uznxoobnblw4i"
+      ],
+      "silver": [
+        "bafybeibinbdjqkmossbnfmxqx4kyxidrncxtcfhyp2prdxjbjtaokgei5i",
+        "bafybeiagiwcxprkbxdseh3tudm2e43yh4bu2adtxnf5owxwjwz5hh2pp5m",
+        "bafybeics37upm4kw66alfm5wjkiaqeal2z3u37uv3leu3memr3h5fvyynq",
+        "bafybeie2vlwnohjfi4rfomeqka6ut5hnynj4zmx3uqx6cvmgjshjdt4oze",
+        "bafybeibgfw6z7xi7hibkeq7o2erf5yuznhz5f4edcqwgsn2jsqb5wtqp4i"
+      ],
+      "verdant": [
+        "bafybeieezvdacnrn36zbubevnb67b3pezoumpyepwzoyvlmjqsnosluu7i",
+        "bafybeiamuk7yvoohlqjx4b4trhe6hzvn6wrxktm4sdpyouapjchmz7ziga",
+        "bafybeiasosaxuwuzrkf2p7condhhzkienryl6voki3d4bjrnta757t7rai",
+        "bafybeig6t345rlet4oj4chkg5h32aff55twk2yfhxfrx3fya2k3sotdck4",
+        "bafybeifbciz4p5f37dc6hluakcrvodmytqpmwspbdr47sbqijxtfk2p654"
+      ]
+    },
+    "beaver": {
+      "brown": [
+        "bafybeiczvakwot4e4jkkzfjafgxypaopmyqqtf22ha67q253a6clor77ue",
+        "bafybeigm3qjfqm6cypngw7roiqiyqp447ddrfuyt65hpn3vsty4g4sfnca",
+        "bafybeiaal4c6wbqbjjpdlm42bix64rwrkwscsczujwaa4nsp5kuk5jy45a",
+        "bafybeidvuu7gzy4ht255j2o25xqiq5s4mzvul6hj27qiazr337lrx7n6ey",
+        "bafybeieljr4s6ptavwpc4vq4immmfo6r3hjzbnn3737lmk7pfoummp4oaa"
+      ],
+      "gray": [
+        "bafybeigkpyy3xjd656rd2dntqagtheytmwsj6kdpoj4metnrbh4mf4u4bq",
+        "bafybeigdwaw5dxkz2gywsreq3ledi345zlvqfcrf6a524tsyllfuqrzopu",
+        "bafybeiav7bjlwuxkkqry2jffmujrep3vd3quhvumnrpamkfefzlzmkwc3y",
+        "bafybeiakma3cgzf4r7p36lap4zjjitova65p2c2bme4sli3vwyb67kgww4",
+        "bafybeih3patw6fzhriqqicq6yojgumqw5wcmlj53yz47yzd7mwz5rvtw64"
+      ],
+      "tawny": [
+        "bafybeicajgmn46tq2ryox2a3ern5xrdxhwxqzyqgou736xeq53yio756wq",
+        "bafybeicvyxlkbehj53sqhqywq7dfqgxm2ahycgime7eyqtjbfpf7luuipa",
+        "bafybeigvtxddpnt4pntrqhewmcrbrwz6444cs72vz7uonhsz5btudnpm6m",
+        "bafybeiatl5ud6cxwxxtjfulheukuwb6vegmhssvjoatgfi2yrlt3nvttaa",
+        "bafybeigdhvqfvv2qnyoulcwe5phpmlraqdium3i3f3wf7djbsx6gcvrdeq"
+      ],
+      "white": [
+        "bafybeieoknhthzqzh6m2lecfllaauuzrplffvsdewp4w2x3at4quuiuaxa",
+        "bafybeiasm3zqt4h5cdl4637aqtunos3q7c3ins2gvedpe66cz3hqy354tq",
+        "bafybeih5zzegzanc7ulpa6y2ix2ihyox4n3dqy4gixfnnaqirvavkdldba",
+        "bafybeic6s2kngwzdpbs7jdrc3e7eqvpv5wd2sgnu5l6dfhopuo3wua347q",
+        "bafybeiblzgnxf2qvt2coypuwquyvhkijkmqezdqe5xohlgtou37j7ahede"
+      ],
+      "copper": [
+        "bafybeiddonybtxamiditfs4atjanzyeoq2vqxfp7qninxlrxrgsif4e5la",
+        "bafybeiet2ammooecxmfxhjwr4l7zrxh6uz5fsw3vkynj7nboewfzqqrqlq",
+        "bafybeihsngnzwggbtyfuwtrgtz42wm36ndvkxhk5mmkru24iglxfj4ng4m",
+        "bafybeiao3oxizog7ngxa6rxkoydvvgqxg7gm7kxcobzlrrfon3a4kjxtkq",
+        "bafybeienpdjf6bgfpftx2lp6qs6sg7wkqnlkdfm67req4oxyoaqbhk2qzm"
+      ],
+      "cream": [
+        "bafybeigurfv3k4e36g7wb4e2szhsmobacvfaafxvqcyd3e4wcoxk6i36ia",
+        "bafybeig5u3zc7rzvl4ww4t4byaz4dw6ux7iriurie7z47flpkyayele5za",
+        "bafybeiexfml6dwsxbn6nc5f37ntfgnj2d5bd4ibwv5vhvxa6epg4colaiu",
+        "bafybeibg3vfgppwabhb3liqid4hfw3sikncobc4xymkne4glonj2ltdlli",
+        "bafybeibvc5xynygfj432cjtdckcnigc45d6tjhk3pojcdoejgojbql673m"
+      ],
+      "dappled": [
+        "bafybeiamuiooy2jjwjzqt3lzek3i5ftqneguq7yg6cldrfvunfwc7hw3qi",
+        "bafybeicmzgjcxawcvkiyvuu26u4wzohe2iyr7nmdfqpoqohv65cyz3qowi",
+        "bafybeicakoia2qmgvw5tpu47h6fv4hn3scvms3y3tjozb7utvimvlyypn4",
+        "bafybeifti3q7ucm4taqumyfcl4t6vxufa6hccc6pwopjxou7djkg5qzkci",
+        "bafybeiftpypwalydpdcjeg352o5gfzw6b5cbjmwslhfh7vmqtqj5tq2o6y"
+      ],
+      "slate": [
+        "bafybeid4t7uimf7cbcxt4y3resxmbcaswn6n5dt3kfqihya4acjqopa73u",
+        "bafybeicsg4rtejuk6oecswn4az2lpqygcsgagkt6bv75vr5aevfdfglsge",
+        "bafybeiebx52tz7amikatsdaox5huxtheiotyl3w5h7epk47nqwpe4lfci4",
+        "bafybeidyieptyt2zpnhv342zuyh7f3be4yiwy5p564qi2fzyektlpktkeq",
+        "bafybeiaf2c5ojpcjffv6cepa2upg3jl4qw36awojgoekl2xlrdwh6b4yji"
+      ],
+      "charcoal": [
+        "bafybeif7pgxkxqpiwiyhduclgv7mhcxz4wxon2yczgmkf4zsombzizx3pm",
+        "bafybeihxjlhutztvw3fgokc5uq2yqcshlgo5rmrq523ihvyc2t3lkdltne",
+        "bafybeibcfrxeuhzb7dcgdxrte67nvix2rvc2b3tytasbxltlj3w35vcoda",
+        "bafybeigiy5otfzsltscn4bwoveeux4wklfkhrhthvyrijxvm56gyegahoe",
+        "bafybeibfcwlyhbfijy3h6vzhqzyy64gehq65fwdz4i6ohst3uztw74gbsm"
+      ],
+      "purple": [
+        "bafybeidakor6idad6qfzly4nr3k7irfrgasn4ddwtf77abkbr4f2ag5hga",
+        "bafybeigxv4uz2nuzgp5jpfdwi3p3i5yk5p2ifouky2lkrvc7qhuqw5sut4",
+        "bafybeih5obegxfg4xcuqzyc42jlyqlf7qrugku7af42ajio4wjlpesouqa",
+        "bafybeiex2qoddu2dspl2fqfx5jvquf5gpbfyeiipbqkxt5btquxtwuyfwi",
+        "bafybeibzogybjdotimzjxrkjz6mutkfqptju5ewsyhqimdbxhhnsr5dlle"
+      ],
+      "golden": [
+        "bafybeidt6yeej4xdp3xqbfuzzacux2lud7yl7opy74o7lbo7i2chzt7wlq",
+        "bafybeidstw4kfwqa3js3nhir7ypwnehldqtqssfrtdtewckruhjhubfiv4",
+        "bafybeib3qnrmoeiaaewox4ochtqvsikul7jbsrr6cxpb656dyhcey6ssym",
+        "bafybeiag7hnmgyrpq52rktwht7vrzalac65q2llw7oqhzsj4znveeqqzle",
+        "bafybeibpgiq33cngdazbxutgl2swbbmwdsb4w7df5u2xgbumbhli56mpvy"
+      ],
+      "crimson": [
+        "bafybeigxkanr6g7rlsimgijxr6svzgyjqqkqkj5regbrgwf5or3owdmdpi",
+        "bafybeiedzavz2amcfr4st62it4yzymjryh3dmhmhx4deagdwopzjpyl32a",
+        "bafybeighn4v227plr7lnqdui4vkyz6od7f6c6frcjiijsbtu2nubdplwau",
+        "bafybeier5gokmel7dg656ee5z3nbdyp3c6kz6wtjh77s2bqeachhw3gszq",
+        "bafybeifkog5leaj7pyamxqutx244syi37cofore3txadpz5tt26mbefhsi"
+      ],
+      "emerald": [
+        "bafybeiakxazrnjrcakxy2hocx6jmw4icyggbihruvv55edt4fsub7mdijm",
+        "bafybeiepl3fcazpsrhwnsiwpq6nbmjc6f2ziyap4cr3s7naenhrkgmy5kq",
+        "bafybeibliswvx6uwgmths2spuc4du6pschcfd5lusatfw2tk2sq7ondskq",
+        "bafybeicjkf7eqsln2zd3wtjbcx2xjwbaddst5yvkuvtioe2donttm6y4be",
+        "bafybeihzjntbw2a767dbgzn5cfszlyfiz4ahe7eaxbjfhn5ocqfm2inbnm"
+      ],
+      "sapphire": [
+        "bafybeide2lpjkera3ishqda5w4zgsxcv5z73o47ax5wcyx5psi7uslisfq",
+        "bafybeihn7aewly6lksb43da6t6i3k3y5doyiqrt3hn22dqr5czv2tuuwxy",
+        "bafybeicuc3zyhci6shzp33upmebkaz3b55xfxlrrz6jsfbfvkjhptfp63u",
+        "bafybeiglovpvhfxrawhykb6753hpnmfpsna3ukshgbdet2p7rtqjafywp4",
+        "bafybeiefpy2kd7hagvasihlj6bqp2jfa7txcuv5vbwzpzitzwbkvkn2cuu"
+      ],
+      "gold": [
+        "bafybeicjeax6zbyt4dpxfdibm3jqbanrj6yldzipj2oj3w23d6foqfhkcq",
+        "bafybeiay5r2g7lma2mxivt654bugb5pdmqr6yxzmchg6zrpqs2xefsxtci",
+        "bafybeib43icrr7fshfutmzmuhokdp3bcnknfnlpria6jb6vzolifb5mt6e",
+        "bafybeid4mbfyo2nimmvten75ifq5na73hdnthcwes2gdit6yfnin4qoeli",
+        "bafybeihgcoj5jjgvxaevnuvag4wy57lxjtdorkpwfxpjo6orbig5sqinje"
+      ],
+      "silver": [
+        "bafybeigrodxqqzfa2lcippgxoonhwtsxouuahb27nbb6yvdlxvttibukjy",
+        "bafybeie6mkdtoxxp5iqkvaefkns4fxaekhq5cf6qaqjjqextlw2dsn3e24",
+        "bafybeias4zhmk5dzwqejgum3n2y47m2bbced4zldidc2gvdyjujqbron6e",
+        "bafybeibkbqimj4bwnhdsxtna2ftwkkammhjjx2bhslhuhblntvhbkfy5au",
+        "bafybeigkwk5boi7yyqdr5pafa2kdb6fu7nix7nellwoufqgiwwzqx6uafy"
+      ],
+      "violet": [
+        "bafybeicz3qwrvy5a5p7d3rmn54ojgwvpmkmdqfcjbtkv5o2riklo4fpxva",
+        "bafybeibhkblwzp2k3nncfhnet3k75rlicabre5innw3t5pofcnpi44islu",
+        "bafybeibnfxp5iu7dyhmsymfje7pz2h4hdaa7bcyevgioertmf6dq5kn7ve",
+        "bafybeicaioomzmomtv2qek6vgd7mxq67c55c6ipz7vskgeirwvxmwbbp4i",
+        "bafybeiakuzq54z5igdfhnyhdkudl27ye5nzar7coz3cs75qtndbyaiafuy"
+      ]
+    },
+    "deer": {
+      "brown": [
+        "bafybeiaczt2b5ztdmx3kdbixowqchh5aqc536cbzarzuxbuqsdkdgcjv4a",
+        "bafybeicl4ctmqcypvfymnvclqqdsjmzmllxrjzmjiovhvfgkupm4iwpnmq",
+        "bafybeiakonbmcpgcgeo6wo4hpowhrgizta2eodwgixijf6txfu7o6fwsoa",
+        "bafybeiax7x4yljgjpuvx7c57dpxsokkoiaqfobrcedbuuwpje73fneyrdy",
+        "bafybeib3vlx6aottocoggoxp3ruvdcnbvheiwkzigmyohtozwi4xud5lrq"
+      ],
+      "gray": [
+        "bafybeifcyzwyjx5q7y55jfvcaktrkua2zrpqya4xs2kslrv2embjnq53ge",
+        "bafybeihevkt6kds44tejyqhfwwxkjijj77kcdudqcw6ky3b447ztg7j6ti",
+        "bafybeibt5ddt7vghwztqpbtqtm4tfx4auu2nttay4ykyrcru76dnzy7shy",
+        "bafybeifiqnjkovnnocwyf3ol7ymbi6zicfk6dtvn6wamkvfgngc363abjq",
+        "bafybeigweuyzlwuhact4t6352zufzelyjkiafdty7pzg6iztffq6ppdjmq"
+      ],
+      "tawny": [
+        "bafybeiczqymbrbtaxi6kirluxoxpl3ysbe5zfv2aeamansgouxb3jvq66e",
+        "bafybeieg3icjctjlmmctwixpdfzrn4vrdrj223iylxltae25gxf64vpxnq",
+        "bafybeihjfjhvivyxqrup3iq74bjsvw7xa2pubxyusugzpmhoroq6muzwqe",
+        "bafybeihg3bm36mktixc7qcgt7crfquscpevdcfnrf2y4yfja6plini6bgu",
+        "bafybeibfvocjr4inkd42mdbvervrcbrvk3ciqkzunyairfhzndaeff4f2q"
+      ],
+      "white": [
+        "bafybeicxlh3nt4r77calcfksdktciki2jah3lnii6r7co6avp2rabh5ule",
+        "bafybeibs3xzni2jww6yvschcj66yxzezjkm6ij52xasydaiem5lncwqsou",
+        "bafybeicqrxumctlzqfyj4j3wkvr6j6dygb6fbeqpgabgtq34tweual3d6a",
+        "bafybeifxkpak33kuesmx2dd4g424pfzxoeifqht6fjnqd5b3u3yppkz4cu",
+        "bafybeigcacikokdlwgupvudmtt7fla7k5fqdsmuny543cyc2re7si6s5si"
+      ],
+      "copper": [
+        "bafybeibz3peyfx6u4t5fpahyecnm6lvryxupz5lwwpqvjmqesiltlkcb2q",
+        "bafybeihd2rlgypzsktzhl552weynshhakof6ycpgywiilx2ohkkqp5hx2a",
+        "bafybeihgq7alhhrlvkoctzx2jt7x4ti6c2rlg23j2hnxua2itx4txjx2ly",
+        "bafybeie2tieqcaj6fgoito6pmhprc5cv3obsjqx3jlexdkclpyftgge6ki",
+        "bafybeidbmsxtazlkzscw2b2becu4de4g3wcbghffjqjd65wxqm3a5xetiq"
+      ],
+      "cream": [
+        "bafybeier7rhh6nelzkhforwbayymqh5io3f2fpmis34vuqv4x7ixlkdaxe",
+        "bafybeiasjbwzgenp4tgq4kw4gq2djj2qg34toxkkp32tfmdyhibq2vwo7u",
+        "bafybeibdg6pnelhmvrbxenrdi4n6eibhg4mzfe6zecwjo477zfmg6l2yjy",
+        "bafybeigogatdkpend3b3t4amujbeeoultqebz6jaouijmzxbvo6zwl5opu",
+        "bafybeib2qednadovosu5myfvsyfspbavyp3ubuzfcj2loec7mpm727ch5q"
+      ],
+      "dappled": [
+        "bafybeid244wamd4rcigcy4tvcsfzefkc2ifqehfdbtt3ncptd3wxclhnvq",
+        "bafybeiekjc3enxwnbbhbavx5xclovczzg3x7ttt54kjz7os2qilcufcusu",
+        "bafybeihzeodf32bwaxrpu7m2pdxig34b543qgyx3iwr5i4ez6n5kr6vs64",
+        "bafybeihsdmaa2t6tay3leucwjwihlhlbh6s52gcptdjrdc5mcbt4keyxfu",
+        "bafybeibbn2a43bi255tilinx4d2ryoyf27bcttndz6mnfl3pnlg5liqaua"
+      ],
+      "slate": [
+        "bafybeiezmaptquplvizvbggyqxk6waajys5tp5y2sgcavfjaivwfkgp5rm",
+        "bafybeid6uhnznh2rybmy4vtnqmhg6rhvnj7bxizh76r3p2z3wcgp3vntta",
+        "bafybeihygmwoinejl6e2bmnvagdazmmxfmc6smweygjahp4nyzdjkvr3va",
+        "bafybeiely5ix6x2ukkyb3fqatsdk5vpepwuxtpq5q57r7mehhxnqav3esy",
+        "bafybeihpbrvc3tws4gatqv3zjlwy4lpopyxdo36lnbm3l45oouwwnrw7yu"
+      ],
+      "charcoal": [
+        "bafybeic4d6i6p6l2xa7oqi3zvckwpdij6ie63wam6xktkxuelgjxnzz2gq",
+        "bafybeih6amlrdrdlzxjf5ugxmgsy5aqdaypywbvc4sjxp2v2plq3xxhfyi",
+        "bafybeifdpyuz4hazlfguuiwpyibujzrjslpbepcoibp4dlnmdtegzdgof4",
+        "bafybeib7destxdwz3zbl7kb2skzuf5zlqxamhzmxzhidxozptys4n2whja",
+        "bafybeihpymlnm4u32hde6w6xgwm3cnwa6pxmnrs37tntfkaqkhqgtq2oym"
+      ],
+      "purple": [
+        "bafybeigqwire2xr2lqhwhshol4pkgjkcuiqs27nao2ox4rp65wftjholky",
+        "bafybeiejw36bfjwqwynj3rfoqwat5zrnle5jwqyl6gkaykmcsdtywj6uba",
+        "bafybeicnbuhylcgg2sjxu5d3svaoh4y74y3mtf5yx35x46kxsj24k5l45q",
+        "bafybeibblnwgn6efkcaoejcnen4s4kpo3ngrsrlyspgfksazcetylgahny",
+        "bafybeigizxnjhqwrsov5cyok7elcbrpgiyrd7yqr267sfuuk7mhwgsjltu"
+      ],
+      "golden": [
+        "bafybeifofafnivd5sns4qpnko3dcxmig2yyrg5743glmg5n5yvmporst44",
+        "bafybeidp7zstl7xylm7ricr2yczykored5wqis5b7npbnafkdl37cxw4du",
+        "bafybeigeoflupdjuumxm2uydx7jsfrmzhtqqtzxo35no73tjhlhxpx6d6m",
+        "bafybeifxnvdjifkwhyv65mjv62omu3c5mc2gw74wil3x4ma63rtjipjzlm",
+        "bafybeifkjepvrn7agmlxqdzaf2ugz7gtdnnvfopkq73l7o5zlzus4vuozm"
+      ],
+      "crimson": [
+        "bafybeicivbb6xwtpezmgygsg73hoyohxdkjy7ipyjtu4aegjrwgy2o2zve",
+        "bafybeib5fyoypgz2gs57kot2opx55d22ygvz2sm65emgb7urjkoy24smuy",
+        "bafybeih4chmk7vjgtlqufsjld2daw5rhgjpizvjb5yde4w3fve7nz3gs3e",
+        "bafybeiga5bsw6wdcagmk4r3y475sjya37dtyorqkc7t5puvzqw5g5b4t6y",
+        "bafybeigu7rhyygtyylodxd4ofvshirxps43p55ucxzyrxkeieslxz4bdfa"
+      ],
+      "emerald": [
+        "bafybeiak5s3ptuhnyjtewtvf44o55w3mygx4ape6resrmpjebodte53aki",
+        "bafybeiczvdyiqoq4d2u22qojfbwbzinuvcoyzsm6jsui7ioez4un6jqnsq",
+        "bafybeieonj4ru5jnjz7b7v3xq64tegfkvaty5t6bc4f7nwwqorx5oed2pm",
+        "bafybeihitcwvynvkw4zqptf5jt3q56bm5x3mvxip2pzw75x6y7vnzpg4tq",
+        "bafybeibnuqtc3qqgnozsbm5u2ef6smwzl45l4uil545iea72tqpnl6brwi"
+      ],
+      "sapphire": [
+        "bafybeid7437rbvwinnw454e52yv4avdddbo2vx4py6hras2winscfrwydq",
+        "bafybeie3ufeu2qwcdmcafqtwhqburiktzvzfi2fmxhwr2zp4zridn4re4y",
+        "bafybeie37sesj4whz3nx5awxanxabqkxgv2hgc3irbxmosfnn7pftsf7ra",
+        "bafybeicmfkjzlf7nnku2k3mfsjjpfxwdeecoeq7b5oux76h7rz3fu5weuq",
+        "bafybeicaibmzn4smz6ydyfghdyyue7fqjtqtfpwoeifvjqevsnq5sxkpxu"
+      ],
+      "gold": [
+        "bafybeiekiuti5evqspr2rge7s4nhcrdbiidqy2udhozhusazffdcewrzda",
+        "bafybeiggu7eozzyss3xkxe2gu7ka2af4flxriu4exvsa7hzp5k4lsisgi4",
+        "bafybeibgq5cv62oo26rfnunpmkgs65dlzv46cp2chqdyayesk7pcgherpi",
+        "bafybeidfx5ernj4wsycethlx5kx7o5r7o7klybgxqv5ytimhwc6gxhdq2y",
+        "bafybeicjsbnj5ketjeyhhuvbyivpcanemlmms6owdm3ouanhybmrmvvci4"
+      ],
+      "silver": [
+        "bafybeibnm4t5veyztx3ccu6qylkpeahs2udc24skudyywc5cxu7q3j3sf4",
+        "bafybeiceo4baoflmv63fpkppwc5musytsjdjpdtim7nqldk7jpvvbwoxqe",
+        "bafybeihe5lz27e7uikczn5sicjvivz5wql6i4hfk7hjnxwvuxxnkzwxqoi",
+        "bafybeiblj3hzckuexi3nr3qm2kg7miq3cbqdhqoz6kpimlqy63vtcg6kwi",
+        "bafybeig6w2jnongfjhh63lif5v6ybimad4cmrqdkklxswzy35nltpscr7i"
+      ],
+      "sunset": [
+        "bafybeifocx5phnjridwieygwzjhsnxcw4k67i3y7y3uct3veuwtyybu3ni",
+        "bafybeidtvf6vspo3hgo4rt2bxytnvtqpkvosrntwfmyezlm2752v6fnd6e",
+        "bafybeigyneuw4fkrubzczwzty52q4k6gah3a5n6fcof4mcabadbfrfg63a",
+        "bafybeif5dzjtfulqs3e4jbvfxvpwestot5i2bvabnqki52s4uolsdyvwvi",
+        "bafybeicdqakp2zpavl6kdi3b4y36vo7phi6srbdtncv5smhexw3dsaekr4"
+      ]
+    },
+    "woodpecker": {
+      "brown": [
+        "bafybeiarfal27rylnq2azdjwjkygts6ltgid4falcopssteseempyt5cby",
+        "bafybeiblpqsqikquc6j6lxoroay54jey3g7f25buu566nxdt36ogvc4i7q",
+        "bafybeievdzgulyrvcf6bbfmrejlapmiepwya2waicwjv6jxpumdrjxjkyu",
+        "bafybeihgkzalbx5mu4cuwa35hzguqve22xkurp5ov4uetty3krxrzhorgu",
+        "bafybeigkb663e7skdz2ujvir7rfxygxjmcbwwxpf4iopx7ah2izf4hzsxe"
+      ],
+      "gray": [
+        "bafybeibiegxtiyw3yrtddyjiuwbgcnqordukbe4gekq5dho7g6pw6xcjri",
+        "bafybeid23hsviqljkwdmhs5ixt4y2a5vbjtgepmnrcwuor5vdzu635w55i",
+        "bafybeibj4qahuj4sb2uykuh33binv7zmxwdrb62oaordr4xruepuaohicy",
+        "bafybeieawjy5itjcd7lkrj7e2v6xcmpyjcfla2rmejmcvcgdsouburcldq",
+        "bafybeibd6d3mezj7elo2wnkybxz2qtvi5tkgek2uue5exezfctieif7h2y"
+      ],
+      "white": [
+        "bafybeidocdxm6kfdq2f2bug447ul6acckjz3ix53yo4e4h7y27alldtcfy",
+        "bafybeibmgpudninizwhj7oogvuyndu6pdbokvgiccajz4t2rzg6ltsrrpi",
+        "bafybeidjnc5ab4ywmc5ejflf2xvxyvvxrdrqhditeimvd5yxmpuk5cwoym",
+        "bafybeiakuzoz7wskcdlc2wlmdxixe7x4psojcygu4a2x2bghi4wt6cgpq4",
+        "bafybeiacee6doljyswm77qr4rnck7nfhdr6oum2pbp72uxlfcqqjkrlrkq"
+      ],
+      "tawny": [
+        "bafybeic52q537wvralgx4rsudflfvfxv7itgwkh4qbdobzy4mr5qpepmia",
+        "bafybeidgxfiaig5hczrvg6xlyhvgtpqihgeppoakdiconcxnabaos45uci",
+        "bafybeicvblsxqrhsqjx7htstsvuvqi4a5xtw75ne4cyabwafharwnhpn3i",
+        "bafybeibkxa45cy6dxpi3vxry57i5rjrxeay3dltr2zxjhuticffb3svtw4",
+        "bafybeielgug4rwblaz3ibk4r6b3lkp4tfepjm7dncpfihrkbjgdncwdb3y"
+      ],
+      "slate": [
+        "bafybeidskfmurjxtfdwwar4rofj5rxvmb5r2j2e7amahsghyhech5jyk6u",
+        "bafybeiffkx5xi7hxur65uq46xfqglayt4rdyfdsttysprmauyhckuzluxq",
+        "bafybeifa2iacornov4nssgv3lbmifyge6kyzqsbgrfn7zrck5vm2x34nam",
+        "bafybeicpodcpil7i2khlcrgn4jly5add2gcdzwhw7zrduorlx4yp5ztvju",
+        "bafybeifau6npuavjzfcrfq7z5bf5keujpk5rnvslzvovg6f2cgro3vctay"
+      ],
+      "copper": [
+        "bafybeiclhldad2yn6wc2oxs5u66vdhjrlmlb3fpfwmekn7s5wnzwjtsyfm",
+        "bafybeigcstf6pm5cfuhraryvktvitqzhdqnkgkbwzmwadumed72gslxe3e",
+        "bafybeificfv7kdur5vlhsizcyd3fadt7bl2eosyohse7ftlksu5nmdr4wm",
+        "bafybeiege726yrervbqu4tfudom4b64rrpb322irr27brdtpkmjrissshu",
+        "bafybeiamlksggtn3zmclpm23ppnnyemehpxryjezasysbnzsnqvumdesgu"
+      ],
+      "cream": [
+        "bafybeiepylk3x4wjjfoqe2ai36yuc3w5hccuthq3lpmep2xelfmuwvasaa",
+        "bafybeiajofgstfacyawv2bsh4rtpaxvca3cw5pa4vdlkm2booxyg6tstci",
+        "bafybeidogje2kseymzhae5yhno5x4mawuv4k2tfnaenqjja4jbitzwhwzq",
+        "bafybeiffwpdcfqj3l4jgcfyk3cfkpnef75iod2r6kwoyrgr6ubecrhr2ai",
+        "bafybeicq4prcwemmxfjhprhdjjoopvfqhp7szgfsykq2gbf4u4lveeywoe"
+      ],
+      "dappled": [
+        "bafybeiahyejh3s6hgjlkpldhj2u6sv6lhtoerdatvmtljwqv27wsoanneq",
+        "bafybeih5ufwyiajrrdw756wep5edzcmuz253m5cntfo6f2aw6rdg26agny",
+        "bafybeiehwmkd4pglacjjcmpp4trqtmdnrn5dtwmyrdp7ae7635lil32pcm",
+        "bafybeibrdkjapq6lvpdjhqrhsbtz4z36hhtiscuigcerkhto556ygkw6dq",
+        "bafybeibqbtckdinixgggok3jv4venmnhoxgagaxk5csy32bqqeszndrnzm"
+      ],
+      "golden": [
+        "bafybeiepwh253mp4djdtqszceb2xexx4igigxzedn7vr5roegvdfp7s5lq",
+        "bafybeif2drnz4v3lsb34rcct7eziaqzxxetkl5nry65unjvdh72qvf2km4",
+        "bafybeic3ikgsxgn5pqx4bkeadubpziw7ce44uf5vzkxschgw5rb7tsgu3y",
+        "bafybeica5retoysztjrbq7os6f272u3da7cae56wh63hf7xbtxz5xjkmsu",
+        "bafybeicpvbxseuj3vwcb6hqcnqlovdyqz6qqdwoxnxzkw5fzgqjxnso3zy"
+      ],
+      "purple": [
+        "bafybeicsddeqau3r2ux7vlfdn5lhtpzz6isho3tef7cws75x2nu4zqshom",
+        "bafybeig3taawebm7laph2lrzhvkgvnc5uxzphwo56dtpufpm3reyvonkra",
+        "bafybeibsk53fa4skanw2szc6p4nnzdraglra6disom7tmtb2uczakzfrke",
+        "bafybeiegeswthva3ab7hfn7fynvqt23rauer6jz2hm43wwcjqy3pybkxou",
+        "bafybeihf46kjtewqgbp3pxjuqjhp63ek2aphnez4rkngyaa6umm53luwge"
+      ],
+      "charcoal": [
+        "bafybeia2mcz7h2vlwgpyq4srsu42valfvf6jv5pb3msdt2yy5mijpfjn4a",
+        "bafybeigkpczrsj2innhcydedglfuuc7axihn7jvps2awvyhq6z4kshbcm4",
+        "bafybeiad3kxtgphxslhuge227anqeqr22hawaahnsxu4kyvqg62p4ev7ji",
+        "bafybeie24fyaeydntqyduhhqjsylf656emafrpee4ifzjogaz5iutslhg4",
+        "bafybeibzgw4wlrnqoph7jsokk27axohhia6e6rf3mm5tmjr6ct2oqelej4"
+      ],
+      "emerald": [
+        "bafybeidaud7a3ye7iw4xevmjjvbw4dklbhlelge7gjp34536l4pjgg2x7i",
+        "bafybeia6xoqqx3gzqqgf7qwaip3a6v66husaxt4orxmafyma4hedke3k2y",
+        "bafybeia6kabjnggyyi7jnlgr7t2gnbn5gsuu3exi3exdecb76viahmkorq",
+        "bafybeidtncve7wywxrcs2savq5wf5iquiub53gweobh6gcyh3yhiozr2fy",
+        "bafybeifkoc2c732wtmztxzyi7aeenxg2726zgixvfitcdvupae44srljwa"
+      ],
+      "crimson": [
+        "bafybeic2hg3bgfkg4mu3ufyaplaiqtrjtmnt235w3xbhweuujwts27fipy",
+        "bafybeifm5duiwf4k42qmpu7nh2e5hvdxtmhvsb747fcenlezszgqvcr6va",
+        "bafybeibsl526aybsvhkdpgm4hae3ebapxovgnoawgrbzoyj325qqcu34fm",
+        "bafybeibf7i7lvzbntidbkd2tnvrhpxv7eudg337lui4snbsaggucnxlg6i",
+        "bafybeihocrx6rzltecqvjoy6nn7f5pfsmkp4kx4f4tk2ouwy5s3xmh6l6u"
+      ],
+      "sapphire": [
+        "bafybeidan33pqkqosmbw6xk4iltvagyj7nunxwc2fksihc3gobgdxfbw7y",
+        "bafybeia5xr5f3m4zghgjuwn46hocq4mng2vdxf2rygvvdae6q3psvizpk4",
+        "bafybeiawlirutp5lvgmtwcjkitkgsovlek6qydhpd25lt4bjz5obsxjsnm",
+        "bafybeifyzlec3cvkypjvuqc3flpkf6ctgpxsauzly2hflczwg6l6q5x3fq",
+        "bafybeicg4lvbrptqfno7ayxluqla5bk4pbv255ul5qj6ddwoe4ca5oonhy"
+      ],
+      "silver": [
+        "bafybeidamjz6ih5o6epklgq7dy2trkrrdb7szpt5edzp6tqr63tlemv5cu",
+        "bafybeibm4a2jegiaidzaup7ibu6nik3fvznmiifsmo3xepa2sfo2ljldiy",
+        "bafybeiee4325zqdz2q3acf6g52hy3x5pusbc7df2rdhiqyrghb5pifozny",
+        "bafybeiczjn5zzhnotwxa7yziidahgeohidpm3nvk2lczmndnwz2kcs4n6q",
+        "bafybeiedaoi67pufcb62iilhllpx5cvev45orowjsu3dhl5k5vctelg3wy"
+      ],
+      "gold": [
+        "bafybeiekcehajnxb3orcwbe6u3li2mqeyitlpuk6emfx2ywqg45asg6kmi",
+        "bafybeigrkfr5yrzuxxbgc4ji57jiekbwoduer4iiopxfactj5wioqyyr3i",
+        "bafybeid4c54yctyuy7a7icytcphnmnp6t63cf37irq6yjb3ichma5tmgq4",
+        "bafybeifu4wsjaxpj4nvr3euuxc5xz4bsrher27jws7j6efr5ls5owy3xcm",
+        "bafybeighgxflmczuakhlbyf4nxsm6puhnykiuc6uhrju56ezbf4kt4oooq"
+      ],
+      "ember": [
+        "bafybeigesgsle2yp6bjdmlyrl2pq2synsjqgn6ukzydv2wfztyoroc3n5y",
+        "bafybeif4amiz6e4u2v4f6k7sklmg2tnz5l27ylrqrnvjpcrqbmrl4zcnle",
+        "bafybeigdsxqll7vnaeyn4kiu5hjigojfzphcgt5k2c4ugspurza3p5d7za",
+        "bafybeicmgo3auohqp66avfhoavvou524ssyk2lr7rc3lgkvlkawd626lz4",
+        "bafybeiefdtln3jvlts3nzol6ayct65hnkmjfiexkda6a6sern2rx2c7pvy"
+      ]
+    },
+    "turtle": {
+      "brown": [
+        "bafybeicibvya2qi5qctmtwk6ybm4s33d7x23sn54lcobmevdgs7emyafbi",
+        "bafybeig62jfexfvm2y5ubhmj4g2drhpnzh5yahg77ul7f75isyk5ekfq24",
+        "bafybeieuyzdx6csmcx2ywuecvyj525c7r2lqorqgtmn3jdhuaupygsw6ty",
+        "bafybeidlwgqzmiztmvmkduubt3zqhm6g7rwt67t5uncksq7qldf526wxde",
+        "bafybeidqj4wnv3ne52wlgjfoxt5zhq4i7iafhmezj5jrasivqa4hqg3sqi"
+      ],
+      "gray": [
+        "bafybeigkupk5a7xrqhzoga5z27wfcvzkoujobugryox6oekr2oqocozfti",
+        "bafybeie5szpangxj4nw5m4zjivkv5sjqm74fehi6w55el7zy6gic7uxqdq",
+        "bafybeift66zikh7dflekro57nbg3acibatlpmb423f2vpn67oun77jffji",
+        "bafybeifzrc2xr5ttwlylqrvgad4uprn2vohcjqqn7q46ktishedntuqv4q",
+        "bafybeidoqnnhygztqki6e3hnhuyznhtamdxngqucpj6tujiss6jsciw4im"
+      ],
+      "white": [
+        "bafybeifknriinwr7ewox57v2kdmigsermw4ysulzyiwu7oow7jweyr5tiy",
+        "bafybeihoj4jjxb364v3jt7ahtnf2vhexlkqu4jcx33cvys4zvbk4micnq4",
+        "bafybeibegtp7qxcto3wedcu2qiilntjqe7777uqhhbyfv6byuonyanjgua",
+        "bafybeie4x3so4ehiszkggia3vipdgr3gpyf6qx5ussw5uexlmub5ymryiu",
+        "bafybeid2rrpec2ulryvt243s5ugxp62jilxusmn7s2mqahiie4bnfsptjy"
+      ],
+      "tawny": [
+        "bafybeiauognpo5odfexnxlrsi4fbx6cfb6kp3prtwbgeur6vq2cm6l6o5q",
+        "bafybeigwohin4in4qf2zcf7otqcne5mbvu2egyomdwv4bzfijy5wzdvnee",
+        "bafybeigjcsw2onampy4zcc74ifwea34cz3qnb6xnjidte2t2sqvvxdceea",
+        "bafybeihyp5wsefehqulnunjkmens4jyclz2s574k5yo2dc6yuig2vvgtti",
+        "bafybeibmw2cwuaw6mmos5aoinkswa6hxtz3pwf5fvpnzp3zemuayvf2khe"
+      ],
+      "slate": [
+        "bafybeidxzl5srnqqannefrfmhe5jklaxp6ldzdhmy65a7xbn7l43ecvw74",
+        "bafybeigyzvrd3tn23mc7j6a2hblg3ge664l7o5bnkty2hcs2il6pfslld4",
+        "bafybeigmb7c4kqgix2a3clmimltwwejdjmu4vgtflapk3zlzxccamjtal4",
+        "bafybeic4scwgbypwi2xzxfs2nq4twf75qor2wvqnnkkvsqqkxjepzra3nu",
+        "bafybeidy7miybkem4cpshyjzs23qc2j73fryq6s333xeeefxlxl5fc2lzm"
+      ],
+      "copper": [
+        "bafybeic7rerahxbgo6d6md22bxcnffw7jyes4iekwdrocw62iureh6mltm",
+        "bafybeifp4ax2eonj43wwvecrmugdljqoyp6gimjqiftgux3vmo2fwmj5me",
+        "bafybeiclpimcqr5afkh3cyrwkw2eij77f26ds5fyoi35hdmebv2kxtrkcy",
+        "bafybeiay34wlvg62aro6zg2jzmtdp6vtssnozkc3qy2mducvhp347a3sze",
+        "bafybeigjmenvdmpkjtxzyqrhcf7vasu6ne3k4wbtliuvl2o3ocjy2rjevu"
+      ],
+      "cream": [
+        "bafybeidnxqpsxtobhpfdv5tzxxx4gczxxt4xyzy4fok7jew35vjwdkuepi",
+        "bafybeiffsywawm7lesx2uffujmnjdo663tdqqdptvdhh64u2nlzogpthn4",
+        "bafybeidy745y4pksakmk7wkv6qizobc4qtazqikwaerabitkzxzghsgava",
+        "bafybeih2ma6izh4wxnomhl6v62ymboprbjpobrf37q6txrixxzjs5vqs4i",
+        "bafybeicd6effbtqk7zk4j2uxtwbvgf75h667hdoqxuzb6wjuc5tpmpj7wq"
+      ],
+      "dappled": [
+        "bafybeifa7yqrf37ocsd2rr2tuhe4egrb3pemrqbiir57qjfsdkfgmdtfeu",
+        "bafybeihoum5abz6v4sni77xrt3ffawqfgolbwecgbjlkfur6ogru7w7pui",
+        "bafybeiamrxcczt3crtsufjrzsxebsvytj6rzzfscfwsify23klgnz2kqim",
+        "bafybeicogbxa6rlmgn34oizqhkmr7aynqag6az2bmc3flwt5wpsf6h3mwu",
+        "bafybeie4nbm5uvtrwazhg2uvxt2x6mjhl2e2lgzebnxbl6upcigf4vky7m"
+      ],
+      "golden": [
+        "bafybeifng3ywjfgg2j4kxwufe3pn37mnfs6d4mgugplpyc65j6nmkqpyky",
+        "bafybeigv4evt4cjykxzsrdv2pxpphehgowjjxor5yk632lot2wvg5iy7ja",
+        "bafybeid27gaoyycuo2fmapsp5wklky52wjxbgnss4neba3yuyysdt2f6ka",
+        "bafybeicmv4j72z27pqh7spw2gjae4pggmbzk2yem3rmwun353gsawsurui",
+        "bafybeigajb2znymdveo2ow32vk26k5xa4vfqwn4ubgdvwuq7bxmoayy6gq"
+      ],
+      "purple": [
+        "bafybeihwgm6cctlnn2ynncdzlxi23ud3jmpir7kixiwdurb46mursintiq",
+        "bafybeifurgstgb2n2dnigsvlze2sdqijevfp5clsdkg3uctwpoxakfcjze",
+        "bafybeigpqg5or7e5qjlhe4aeazfwe2hshpxl6xvhtskzku7m4irwlxvfym",
+        "bafybeiaoh5mas4wysierlbvlvtaivwbpr7ygxfllxxivqruz5emeppu5gi",
+        "bafybeiggdt5alwwofsmzmmqphzigpdg77n3or5bkjq2zs7e5o6bxelawhy"
+      ],
+      "charcoal": [
+        "bafybeiaivzke474nape7sy6g5uociqvpui3lxrhdeem35fiffysriuzx7i",
+        "bafybeie3gjcbljsagqwubvyrmj6k2lwjfnjbj4fyxyk534obfs4j5mom7e",
+        "bafybeihihbisx2fdzuuvm662mxqnxyrycjwriuku32nlioqju3mb2yntt4",
+        "bafybeicc5fzmfuc5jo67gdpsthktx2f22fdznthvylvfoowcvuew5vuanm",
+        "bafybeigtjloxrhtyfvfhdu7igrln4sqrlpvjsafclogep7rrbv3nh2vzzm"
+      ],
+      "emerald": [
+        "bafybeia7rmmhsmy4yhbqxwaf44etrrw4blkov4ouqkhiv27ptxsqql5api",
+        "bafybeifsazogyeyyq2oewjbfm2jie4oshp6c3y35v55khocp677eeg42ci",
+        "bafybeib7b44m5rnzm36ygiqbanc7xpy624bgjkm62twyq37fa2p5c2ggii",
+        "bafybeif2iv3ydgh5ezlavkhprnymjp23lyalc2ihmjg5ecrmos2hmqrlsa",
+        "bafybeigy3ovqmxxbr3wc65yhjkkj2t4bh7avpvgusvfqkppyqyoobieucy"
+      ],
+      "crimson": [
+        "bafybeialozmgznonrwxgvc2wmctplokljaumtr2h4uzvj4dvkfjmxf7f2q",
+        "bafybeigxktu53jtqvqze7iafqjkm5hfydg2lkdccjrddxydxdnw5ji6iri",
+        "bafybeierqmx2gfwvjltebsj7gt272bbtmbt5do2hi742zz46kmpipwnsrm",
+        "bafybeia3twz6irlk4totwecybckqzxxqcpx554l44mlguq4c7uvbxbfbza",
+        "bafybeieidz4pql7krvqqpr2oawh7nry7aqytepxmrseqjcwtpk2cbc3454"
+      ],
+      "sapphire": [
+        "bafybeigkzt6vtsmxzzawqificmu4bdpmsjv75yxc3u6vc6vkf43boz33me",
+        "bafybeid2qdkuycoeuzlwhmqd3ez3z6odohib2wuvdd45vp36dl7eo4k4ke",
+        "bafybeibnxfzac6k4fn4phifymdhny6kjznukpoaethofra4gzt5uyxfbqq",
+        "bafybeibywl3aqrbwolltlrjehkrnxlhh32p4ar6iddoymuazw2ffgmzcea",
+        "bafybeif6aj7v4d43zwqntiocj5iqnbsxobxswsref33bdf4a44e6p3hufa"
+      ],
+      "silver": [
+        "bafybeieqfz6mg2pxvu2pdf27tzroj5buay6jnxv65no5qr2ewpa6jdvpmm",
+        "bafybeibkimmt4b4q6vvfvxj32jkdbgayw44mny6xv2y55c3metbsvqdgmy",
+        "bafybeidea4eepquqvkojrcpa62j6bbava6msrrc5nndz54ewu7z3gknolq",
+        "bafybeiflg3yqcg75fqtxxiqhnvdak4nyqi46hophzjdkutftjiqdxba6ru",
+        "bafybeihlunwaebahgkl4rxuagd2jal64ahycpkav3welt363uqa5a5alne"
+      ],
+      "gold": [
+        "bafybeifzrpe3az6uixqg6gpnmtmg44vlmcs6nv6hlhugj6cnrn472bni74",
+        "bafybeicju3otf4u6dmtcm6go7zi47avf3zxkklwtdlsmrp7qucyskwknxi",
+        "bafybeifbg2zx3xkrv5al37fc5ige673u63ed3tyldjlkczz7p34bitij44",
+        "bafybeidbxicpfre2ippfhuhjk4tosmibb23qdrfq2ny5m3z7xhsir6on3i",
+        "bafybeie5tcnjjwqtgm2mmwff6uk2iyl5hj7gplsg6xhh653gr2fhx73luu"
+      ],
+      "oceanic": [
+        "bafybeib4i4vhhabe2toyw6vansdu4v6xgoz6rk6zok7q2nlxr3mdnq4hvu",
+        "bafybeihkjk76e4q3mbww6shrtdci33cs3nhc4hky4o6zted3pv2gs4ics4",
+        "bafybeicdixa7dldntip3w4h3pjvvybtslznmizzkg37jjs7uxg3tnbkpg4",
+        "bafybeid7pq57sq4k4xzpbnnivxdjkjwq4ffuartw6omc2a3h7o67v72ir4",
+        "bafybeignyhpkwamc3aosf3ag2ygynb2zuwl4jk42tuudgltsznte3o5bia"
+      ]
+    },
+    "bear": {
+      "brown": [
+        "bafybeiho2kmwj7ag5cem5aescamyu3t6edjqcsk4cokjntxgcyjasqpsmy",
+        "bafybeigq5fgxgkddnigoqjh3kqe77r4vyzwwilahursooyzqmf32dexbke",
+        "bafybeial6ducbzuwg5ugzosmtirjg6klknjvuqyoyskra7llglulitfrzu",
+        "bafybeifjzfwrcle6oehw53co5rtmyjlw2ncoeeu6swgpvvuvao2ltc5jny",
+        "bafybeigyhh6jrtxl4u2qf6cghv2fweokh3yvjq45afwfyyu3yifqx762tq"
+      ],
+      "gray": [
+        "bafybeihxy4jxwqk27r2u6pn4ggzqyeuyoz3frzmn7urw7fj3amfehcxrui",
+        "bafybeibweifl54ma5b3z4ixxxjdgz6hgnknwqbyvqmlouweqdg3xbu42re",
+        "bafybeiacvczbszckqxd2ypqw2toq53xww6e6y45obakdk4vgq22ya65xdu",
+        "bafybeidrt5tpvi63pv5b5i22doyspwyokjquk25tkasltjnfpsqzlttlr4",
+        "bafybeibihzqgtbdeggizbtgjckgghuhscddtxu7wiuojar4jnr3xeo2vjq"
+      ],
+      "white": [
+        "bafybeihdzw26paxl7dan3txfi7wklknj7symdhkkgw7nwpybhz5ysoeqpi",
+        "bafybeicevlvowej2iyqvzlu25j6owdq3spif6lkdsjnwusbwt55zj5v4a4",
+        "bafybeifweh5ek5c2wom5wsboo5d5csr7432svxaqxxwx7aqndtb3qlv5vq",
+        "bafybeie7rmlp6vyluukrk6mhigg6hylwpvtcz23aggt2vyptafl6vnf53q",
+        "bafybeigoel5hxuvcbzqa3lxxwdpbslii2zn3v3pjkt6mmjwhvpfuo7ezau"
+      ],
+      "tawny": [
+        "bafybeiedegcyopxeo4jhppv7wzo4pkx7tren3cbiyjqo25i55b3idiuel4",
+        "bafybeict6nxkow3p5dzsu3lvyrow5nnnlcndwhxulemnrwp3amffs7fdfm",
+        "bafybeie5gwzdakmduxel4rnwly574vnmav2cgt4lklgwaseu6l4f34zwci",
+        "bafybeibwa25ua7mfcdrruyng6pqopre5hj62g635x2jyvh5yw23gh5chwm",
+        "bafybeicfyhixxvebouqa3ybte6mezew6dizz2adjufckryvk2hqhdqwyo4"
+      ],
+      "slate": [
+        "bafybeigvfos7kogmk25oid2sfwqufgpopqozmf3b2kzluehjgm6bnqoneu",
+        "bafybeidj4ymkjue6ludupztxqzfpflvmfvurzrwqjzxumtliwkrrarlr7m",
+        "bafybeihaegzr47os6xfdbrpf2qrtlflmkcytz2oix3tyxcvtry7jgwcxfy",
+        "bafybeihxl2brol7vqgvwettwhqwhi4pku7l5gej33q5k7iz227f23odyym",
+        "bafybeie2ndpvdahynej3xtqn3h3zvdungadqjkdbltmh7akbdbsec65x2e"
+      ],
+      "copper": [
+        "bafybeiho45yajtmmmeyyr7d76zqsipkfg6q2ho6m243lzhp3uxantn3oki",
+        "bafybeigdq5zpk2eqrn6vdhqlxuewtlw44pg2esz2buiav6d676cifo3c3q",
+        "bafybeido2unufhhpjb6uflzkufhscdf2ysmdp272bwa4yizydn7fee3frq",
+        "bafybeifqidm3nirfj7wiicxo62exxus4be44cvfrhkwrsyqoaizfgeiddi",
+        "bafybeibhstcgqwlksxbgrlpd46x6vvfhzc2st2gfylfj2rokygbs3d452y"
+      ],
+      "cream": [
+        "bafybeidye7yhf7fltbuvj6pfob3m2iksoukiyr6p6dtmuz7r6k5ffswqzm",
+        "bafybeiabbn5g2qn24tevxkbrnbuelio6s4dah7p5hg6nufc2g42l3rlamm",
+        "bafybeiajtjmnxf7e6n5eaxt4yiw4kf6jqbscaq4jxu2zuitxm7iebnejo4",
+        "bafybeifdbupp73l3aoburubsulznryuuf6xjv2oxo3jvzbk2kfvrlcuq6i",
+        "bafybeicleymiawkh4cjckdvhcz52nqat6gzigwlhg5gdjvqlavzgmcjqfm"
+      ],
+      "dappled": [
+        "bafybeib57xkj6jgzse7ldtf2wgvwc4g46uhtgjao7qd7cy5ejs3cxardli",
+        "bafybeielbaht22khuvyfxhjgikifagrigkeag5a62eqrqqc77alg7sdfy4",
+        "bafybeienldwtzsg6rqrs452xk5u7cpewy23bl4hhc5epqg3tahsv6wscoq",
+        "bafybeiarpmvcqauewraoqaammz7vz2sygux4pfihgkfbx6wcuzq3mhsd7a",
+        "bafybeid3dvz6bf7o2l5tk3glkwncl5c642impejrtfpzj52jb3z5q7ioxq"
+      ],
+      "golden": [
+        "bafybeiet4o5q4c4a4fmf36b7dxra4zwglug7e2srmwclcah42gzyteunpa",
+        "bafybeifj4f3z2jxkae7tvijmdxkkz4sfgtyqwfo24r2xhwqvgtelmqtcve",
+        "bafybeiftqhlasivof5bd37w6yhoi4yhnbdtjosrydcdsamgj63y2dn53pu",
+        "bafybeiarfro62msdas5tysizjxqc5frha4r2o7dpxloxab75pmvaamqtsa",
+        "bafybeifn7mbegdgoibnydkadb3v52evsof7k4nhe5yuohevi46uhejjbsm"
+      ],
+      "purple": [
+        "bafybeig23xel4xleikvymq44zp5uivmz773wogiej7r453mhrmbxuw7mlq",
+        "bafybeic6j57jf7jbwgbivfeq72iexnocf76jeqntxslgumjjzhihb2exsa",
+        "bafybeifwzaus42o2nz3wvjvmxfzcsywteiiuczcjnwypac2ozthf3csaly",
+        "bafybeice742ruxj64snoevn3yjroj4xymt55f6xbdgjehcyxaby6gincpe",
+        "bafybeicwlqmssajmyqkyoqnvensncmtdvpapn6rojnzvw6mas3vav6rxti"
+      ],
+      "charcoal": [
+        "bafybeidlyiwjpaxpbxac7waazkbjxkvd7oycxct53lklrpg7ptsdomg3fu",
+        "bafybeiaz6ywgyxdkdnmcd5yoeypt3o5qtoce2s34eswkfbj5gqit4jff4e",
+        "bafybeiblnz6mkkttcb3o327xo6al37ziejfctnv22ees4cdp5jeync2yum",
+        "bafybeidltts6l6wmu3mip32xwl7kosqpyzjdksey3p6gvlqdbmo4ayd2xq",
+        "bafybeif2decth7qfzad3blg2i4mzq7u5mzdwnrccytztkxnsxgsxkqrsma"
+      ],
+      "emerald": [
+        "bafybeidhhavk53a7loqpoqvuu2clbj6zet2lytppdlmhak4njsyaebd5q4",
+        "bafybeihj5s5jr3jg7cgqkp55zoyythrggm2hfxfnyg5gtaghsv4gp66j4a",
+        "bafybeicxgeqkaqlpblc7spt3bqcxof3qn6nmbivk4d64z7s7vyvkkz6x6y",
+        "bafybeideld4o3pi5tjb3wrpepxz7phrkhdyl3svastmzgtf6evtq3uzs3m",
+        "bafybeigee4n6trqobbqkigzbkgcljwcvmndjg5youj6cxoeu5aax3vlhcm"
+      ],
+      "crimson": [
+        "bafybeif7m72ai3ydvgnmnwwlgzbmwauzgi6m5km3ms3to2guls6opzcyka",
+        "bafybeihagj7phbnlarnkrtidnop5wcta26ejvx7shvdsnzkxl3ddwbwudy",
+        "bafybeig6j3hh6xd6am5fgaclobsx3uiupfhgjmytxz4bwbnyz4u46f2lkq",
+        "bafybeihd422edyyq5mhzas4vej3454tnqidr4rrejipsquepx7ckh2wvgu",
+        "bafybeihdpe3cwq3h4uicsttamczpjgty5stn3pdfbeuzmgxe7t2njcms4i"
+      ],
+      "sapphire": [
+        "bafybeidlvhb6bqil42imnqj3z5uosxs2pzzzvvybyjcomp3luil47svsse",
+        "bafybeiemcpakuroonqb7z57cbvovitnkxc6ebu776tn3xvo5iqjwzmz6wu",
+        "bafybeifpwunpgjeebbohjkdenpggpz72c2cjqkigcuscpgtt6xdzjurca4",
+        "bafybeialeltjdb4lduzvxxna2ryyzefyrfjisnrggl2ettyv4t6ai4x6cq",
+        "bafybeidyzzrkoujxv7hhy5lcjllu4mzkz6sd3o45nrpqtx5i73xris3fd4"
+      ],
+      "silver": [
+        "bafybeieqmst4oepi2lan4or5amrom3xk6xeajnyy7itnvsny7zgfdgieoy",
+        "bafybeicssdqm5gqnvpbyhypuaq5d6plibhxn3ip5dcbr6t22sl3pc5nj3u",
+        "bafybeicfa4xqrmmi3hbosjh4nuuj7pejhaqt52gcpjqxmdoucdq6u6ivjy",
+        "bafybeib3hosdy5qdfifva7xfzapiaor2qav5bf322dpxikvi53qfxhphwm",
+        "bafybeichcd6v7c64oobuhdvcqb6a34blwbf56izrwp5lsysunuhtmg6x3y"
+      ],
+      "gold": [
+        "bafybeifwsrtmsjfseydmivjatbgacl7gmpzm5ta5urf6ot2mendcj53qym",
+        "bafybeidpgfm3ip7oxyv6bngbh5pb6asl6b6znzjrvradh7ecgj3bggaasu",
+        "bafybeieib65isy2e73sidld3k6npbzum6y5ueabw4yohwm2axjgecluu4a",
+        "bafybeigg4s456o2i734vdm3p3rtjypvxxqzfrr2o6mur7j7g3ukngcdmp4",
+        "bafybeierzza4v7g7kczvhlmi6lwl4p4nbg2routm3irn5iqdtgadwzkhhm"
+      ],
+      "harvest": [
+        "bafybeihj6czqap7thwef4sy24k7qbiyu3rwfcib67cydnwmxghzlazezwi",
+        "bafybeighbhpxvnejiqj3dxujaav2f63zdiyq2nbu7djymbm5mwwy3ksuem",
+        "bafybeiehxpq4ystpp3s3o2pa4if5rdez6bhhsrp66nh5tei7njy3gh6iki",
+        "bafybeieno6m4wegkiifmovo5jtabrf4u2tb74lr2sdpvbuc4ryaogjvyle",
+        "bafybeidpbkrt4dv5em4x6r5k6qfmhtmxl2uv262bscf2jicmyfd57rmkzu"
+      ]
+    },
+    "raven": {
+      "brown": [
+        "bafybeid5zle2uq4ohyinjcn5ipi3ej52uoeys75uuzcx2hgin4s53dpxbq",
+        "bafybeicosc5645frbnoa4y3iigzlyje7fnj2ebkga3yomsn6m54ts63akm",
+        "bafybeifm7gj6oiwsadhzjepqtzmkelrdiyjpiqt3hkqc6q4gku36p4vqqa",
+        "bafybeico6hnw7fpxg7hxhvwjjf5anq2icjfe3xkik56rjbevc74hcn6j2u",
+        "bafybeid7uc5c5p5mysmzcru64ghgzbglgfp4ypy3r7spffke63qicemcp4"
+      ],
+      "gray": [
+        "bafybeieqhaeirmqg3bxfal4o4fqoomo3kh2caqemplyuh6oy3z352rpad4",
+        "bafybeib6hdx4t2fwstnzhzljbk6dalk2pak4wkngtnauouki7w4b2z4z7q",
+        "bafybeibu5iaet5gjxwscz3cgcq23buqip3r2dtlrf4n7im5cyfl7pdc3rm",
+        "bafybeibalnitv7mw5qm2dazv33ktvhyhitsxvuvk2otgvoo27gnrvohbeq",
+        "bafybeiei4k4if3ctgzxoflojhzbw52iejzmn6b4gv6i3tp3jjuasemg5li"
+      ],
+      "white": [
+        "bafybeihy6dl44c73td4xgxejnnsxdc2ak3zlcbivwhlf5jqdjqxangtsza",
+        "bafybeibtlztawyafh6jehbc6272a5saku5v442bk3wfavulfeldquqqd5m",
+        "bafybeihumv76hsffvx5bhqnkicdvct7pm57ax6lhosz7vlnaixyf6ifune",
+        "bafybeiggwaik6uyk37mpwjjpthwxzlatup33bek23zvvrdhc4rbs4g5dqu",
+        "bafybeid2lksh2wagos5gdygioautujfnbpwqld6brm2qcu2vyr2pmab42m"
+      ],
+      "tawny": [
+        "bafybeietnp77arntd7i3ace63ebxadgosolgktgobfuslejkhj5d6abt64",
+        "bafybeif2hp6aekzqxk5z2gat6pxvnokm25rux4ivsesqziwgtk5dtk5d3i",
+        "bafybeic7b7nrgf2uz33xlto3jhuos3cgfxr7b6q7e3unxeinxlbgb3vnee",
+        "bafybeie5kv7zpgnunclrz4tvifrhapovzii4tx3r6lzkplsrng7aylfwtu",
+        "bafybeibhm6iwv5zzluf23adyt4g72lpcsqoq4hyc5pct7urncjosog5rd4"
+      ],
+      "slate": [
+        "bafybeifkdhzve73ma3upartjl5pim6lxrtltli7wdako4y4nf64ubpnefu",
+        "bafybeichunlsdmrkcc6vpfrhtb6q7kwsl2tf2tv32ygpv5hcclhheqv42u",
+        "bafybeifgtr44l7gsrk6ljh6jyjixmrw33je5io3drjm7w4g7ikf73zbnuq",
+        "bafybeicw6nhxn5jaiu55frcbjkyjov3qsc5c2jfgg7iujjhxmj6qsn2em4",
+        "bafybeiae3j7opkthy32qoikry7kym7djj2kwlxrol5um6ozk4kb4y6clny"
+      ],
+      "copper": [
+        "bafybeibkwu2ra4uivajbk3aejygiat2ab6p6vg6fskh3mycy37by3hbl5i",
+        "bafybeifqfvbqxml7sk6vgfeimvwlti3czpfjbyi24xiats2deyosu2mxuy",
+        "bafybeic5xdh5jirpydqqh2dtl7k32doclcn6g6v7xexrvtxbegob2sq7lm",
+        "bafybeiebbyaf5zphm4scdneh2trxc4w2laiv35bii4njuy6l74bik4mnxu",
+        "bafybeihd6r6qdmgnwe7b5kgu4spwpe4rnmub55re65wtreujyhfpp67j6m"
+      ],
+      "cream": [
+        "bafybeiddfxyncadrrbvjvwd4zbbjy4fed7uzi5jrc4xpfw4ompqbnfkbka",
+        "bafybeicm5gp2wodikwz3dqt742f6pvo6skoxhwnsjs4aglewqpjxogdlki",
+        "bafybeid3g4kur6djrvbacavcngvpvcnmgu3o3xnw4cxopyqe7zxfzqsl44",
+        "bafybeia6hptyxmzbru4yppqzpd5y2t7edt5fahxn7qosq25faylqslhtsy",
+        "bafybeiewagepyrexok66i7phijuvzpahbqu3t3t7w2vagkdchj5jtvpv6y"
+      ],
+      "dappled": [
+        "bafybeifeuvwqdcno747zwzshioir7ycs56ho5hdea72qvk2qgampgl6tuq",
+        "bafybeielv5x2stkceitt3qne7c5sqxvoaemkrrdhfyikix27vszkg7vrly",
+        "bafybeib4cpfuemtmctumyytkc4x6rxigfosuoh6jywzdanky457pqejawa",
+        "bafybeibum7c3gh7u54aor65stxmbnj4fht3vxoroekkogedbla5tte72pi",
+        "bafybeibw3m4cqr2kgkuxhyuiuox2eusjlzsowkvbjydjmthbhzbr5lijia"
+      ],
+      "golden": [
+        "bafybeib57jdbtbftdngushg56ue47vnfyj3qswbzyzqpw7sohm2jbcxdiy",
+        "bafybeibd33zkn6su4gjbt577owlkixvkcpbfofow2sdrjw6r7j6knyph6u",
+        "bafybeig7b6hnu532yows2u7px3k35b6ahitutodoa4r2tgkxb5udbroaxq",
+        "bafybeidr2jnqtcoss4ve753i7qfyggdnt2ntewxybbyhx6h3v2kmzy4aii",
+        "bafybeifmsohrf25kk3dadium4a4mcyfk4i7ngieof4qaz3m7nlgpnhhklq"
+      ],
+      "purple": [
+        "bafybeianvc44cirjagpsosxat7u3lnztiu3yleojnrooalnt7dch5uv5iq",
+        "bafybeid2bnumuz27dgq3l5nkgv7an6jseb3hpe7nrb5vxwwpmurfflwvcy",
+        "bafybeiexzg476nkl6333jn2svnezwpjflh3z66cj5jd3xtcdtoylizumvi",
+        "bafybeifz4fl7wsyfq6ocus3k6vhr7eeg6svtijgikduzr2cfbmpk4zqqau",
+        "bafybeiappu2g7c7eemuj4dcbylritzsts7u5tfnfeba2mq6h2l3hgoxvay"
+      ],
+      "charcoal": [
+        "bafybeibhrxn3okrtkx5xjgoajqbjb7oocfcngjymmsoz375karkckco3ji",
+        "bafybeiff5jhvdbma5yy6volgp4svi423tbtsfgwar6paqv223psqlvmxvy",
+        "bafybeihgj2g5pcjtf4nlu2hi6unns2hqgvprlp4nkdui6hhwg3nyg2pnhe",
+        "bafybeigchck6he622yd2nr6jdd4642kbh6xgch2ro7btv7qswjnrqf7dki",
+        "bafybeihimofphobxgbw3q3m2hqxcwrmh5pibojd4k3lsgwvrtids2pv3le"
+      ],
+      "emerald": [
+        "bafybeibyzmo66q2fwrt2h5pmgv7rwieakynxdn2z64tnxzkwfy7zva3xu4",
+        "bafybeibkve653pgy5iptfdi7okfkuyfcq2i5ebcl3zq2wvkbimqx6uw4by",
+        "bafybeiennoc7zvvqdrnlriwxcxzbyjheybizocd5abll72qwjexd6fkuiy",
+        "bafybeidusjaqisfxetfxlminvmlu2pcdrtsihjqxsmwksu7ynvamquh43q",
+        "bafybeicfyni7yd4trgve4pa6avltbd3pgkpx7jyucyse5o3khzbn6ctq5u"
+      ],
+      "crimson": [
+        "bafybeietb2vlyomjhjbjmniuf4bpkzi25s6rnmuggbqpngv2wb3zvl3y7y",
+        "bafybeiandordvskhhnlyicp3gfdxusqutc44k7hstnc7zxyqbnn3taufam",
+        "bafybeie7subexpjksoufcnarazyblzbpshg5gkmkewgfwvyviywgfz5qui",
+        "bafybeiacioyeot2sjxw4v3y4vpez7anjxvzhlbiff74pzonczhjag5vuam",
+        "bafybeigblgi42fz7qnx4qejwzex3g26phtz2o3qbyi7cemmx6hrubo2me4"
+      ],
+      "sapphire": [
+        "bafybeigqf4jzoba67zacm7gfa4v2h5vnygpban3xygv7hysysso5pahpfq",
+        "bafybeidfphxqgubejnsz2ogla66wwcjhpoqt3k6flubejhbxi5jino2atu",
+        "bafybeibcl3757tw2qxp2lz4ctfv3lgsgessedx55aaz22bufsunc7oesny",
+        "bafybeiellnkkti45jimzsgxwvxxcfbrcmrrbhvw4lnjrrm6rfbyxiro6na",
+        "bafybeid4ok6cmjzqitmybqbd6edrlzdb3iflaxbyltozafqonh7c55tioe"
+      ],
+      "silver": [
+        "bafybeih6wolbhzlv6npalz26ffcqckpodvaoyvbgikc2smfy35bgtfwmue",
+        "bafybeih3tq3jmr52xvarytsr6ctmf37e6anpisf2nvthzmwdyvg7v6mqci",
+        "bafybeig5c7xbxiu6ai4bk7t3x7cmdfojzjej5mcn2j4dikx5svrbabvuoa",
+        "bafybeihmdyoggwp3hsciftp223t5mgaqurwm33nvvuqwlzn5gplqe4jsye",
+        "bafybeiedev3w7vhwbxo55naqsembfdcewrsreyb7iuj7qxxu3daolip7oa"
+      ],
+      "gold": [
+        "bafybeie4knistnac2d3ewlxa56j2bqumdbkpdr7ebxv3p3fpxaharb5tjq",
+        "bafybeiavz6wegptkb7vci3p5eeyweqmgcdp4dlhwnunkzhxxsnnoxwvvji",
+        "bafybeidgc7lsiouv4tiuh3nj3mp6yzt2ngaup6dtv3byryhxgpyzrboara",
+        "bafybeif7mnapa3qp6kkd2yzuulfxv7gso2oc56ztdgmt5muydtrlff4sou",
+        "bafybeife73kdqwj437q4dbpeasz4c7ifezuzzbmjrill6gtujarnnmbubu"
+      ],
+      "phantom": [
+        "bafybeibebfulv45waudtg322l2s2uy6hwycrfy2kr7nt634ejuhdsk3ytu",
+        "bafybeicaypvnx7sddkouic3jfsbc2hxc5r66futjcacjhyqgf3cofkpt4m",
+        "bafybeibk4sn7rdcvt5o3w7jp33ane6ijxeb77bprikfsnzg4qvu3hafpwq",
+        "bafybeifcgr3oxc4otjrmfw4edwefhhzjhqqou2nkp2gpyskoluj33feiqe",
+        "bafybeidymdte72sonofjexqjrgxzktjja22wde6swadjnkoblon3jm2b6e"
+      ]
+    },
+    "snake": {
+      "brown": [
+        "bafybeiah7dz26tqtljcuq7yafvrner522truzt3b42r45zv6etfhcbkbqa",
+        "bafybeidhs3py4zueefjq7kizwp6n6cw267oh56pv5p6fst227wx3xm65oi",
+        "bafybeih5o5mkj2csqer4h7l6f4jh6yfbe6eqvdmdkqnpy6uvo3rdliaqyy",
+        "bafybeieoefsvlgf4pzehgvqi7e23l6l2moayog2te5agnv2nkdlf6z5x7a",
+        "bafybeidn5dympiv2cxhclwe47rdidtdaxnd3famt4ovppwiudelsm66y5i"
+      ],
+      "gray": [
+        "bafybeiduvcwkh2snn7blgrepxyby4jb6oko7akszshkyy5cgxizlizdlrq",
+        "bafybeiax6fdrw2kfwf4lmu2ocdqf2up4oy2oylt6bt2bhb4xd6nk7tmduu",
+        "bafybeibgq35wy4vbobdb7yhzwbivydqzhtnnaxbxjbxry7wyndzpkwj5ai",
+        "bafybeiggyatz7kwmjalljqy5kobqkgqztl757nvirseshuaaf626iidfca",
+        "bafybeibouhr6jluyqee5winhdlhyw7ynpmbmrw5rk4bcax4buk3l7dvkja"
+      ],
+      "white": [
+        "bafybeigydaycx6qcgn3xptarzqaxbo7xswotevf7p24dnau64xarbokv4y",
+        "bafybeiebnbgvvcvcfcgqxhyeqtx5fcreewb33rtb6nu25mbioperehozz4",
+        "bafybeiav4glbjy5zjwizukmkmi3n475iw6a5pqoth2ephksox4yj62wn2u",
+        "bafybeibe4l7dq6a5oyadnwkgj2jtr5crcukwydw6f4ouqm456ylml44wwq",
+        "bafybeic5ycdyib4nsdjwbf4afzli2href2lwcfnukaeh7per7f5r4bxbte"
+      ],
+      "tawny": [
+        "bafybeigj56od74zj2xqlgxtophbrworypubrtfrkzgucpcspgqinp62ntm",
+        "bafybeiesyivedgvvfjazgoonyxa72gk2csecqvvelcr5o4s6weubmftozq",
+        "bafybeihvfhpoqoi44q63p44aj26x73lgdtpbmtadjkktpiqnkprv6wgbke",
+        "bafybeihnlusuztplnxq5yvx223htbmeodchwagh5l3fcmpd5pf6mvmejge",
+        "bafybeib4ocgevqovuh76fvwwx36zihuhuzbt7bz6lajlm7zv7ubzynxtky"
+      ],
+      "slate": [
+        "bafybeif5zajomfhlel25yb37auibpiipwegrqwm5f62ksvrutc75q2auwe",
+        "bafybeigu7w7qhb3hdaftycbjb4fzlzxl4ivjzmxe3tdo6rqx5vaby5ewee",
+        "bafybeibeexwodezcre4cvic7zihvukufamfno2b7kuqd7lls6u2jyo6fdu",
+        "bafybeie75xnjpkarwzmxc2jxjvh6bq6dczh3evc544ksfmywkre5wphubu",
+        "bafybeiah2bztajdejgvwehjbpv5had6xzbncgjmcldopwz7zcqj23a3jzu"
+      ],
+      "copper": [
+        "bafybeib62gy242lcz6syrnqv3wavitthuchbqgmp67pnlikcjjjwdgfesq",
+        "bafybeidxbwft4eg4erd76pb6cnkheumnsbi3zub7wqgg7fsw3w7y6q2hgm",
+        "bafybeifba4bobwzvvgl4dnnlwh57awaussmqb3w6bgxjkuj2zsywdhpi6e",
+        "bafybeibqahvl6jtx5jxgbexlwjpcrrregur34vvbno4icfstk3hyvq3lme",
+        "bafybeicm23n4m4per5sqrzpsqu7ov2gnaar6thghjhpd23qskwu6anjh7q"
+      ],
+      "cream": [
+        "bafybeibjn7t6bqfviep3nqbmfjwgm5r5qbei24he5l436h75w7j4f3fnde",
+        "bafybeidzvp6637cvgyvx7zo26wehx24xlamfojnpsz4pft2ciubdmgg4t4",
+        "bafybeifcrxpmhxn7zwnom3cjbzxbfnfn22e7emony27lm2wslki34yv6ne",
+        "bafybeieq65petitxnztsm75n4gexrldwqm3pjcyqlcvjbnofcn7owzln2q",
+        "bafybeiermcowbzpxqywv67wdw365je3icpkr6rcm7c3awuwuvyaeijbcnu"
+      ],
+      "dappled": [
+        "bafybeidg7h45o46d4opp3wlplaqhorah44wy6avviry72gbxkzk2zz7ixi",
+        "bafybeie42qnu4o5qyj5cml24kypfhlswwf37qosgmj7shyumnj6r7due3m",
+        "bafybeigj574xcljy7u5ac2lutipts2lbqe2sjwi44eghltuqnn72jasaqm",
+        "bafybeibovcjnkfvrzqm4m2yjsubnaki35mebir7xxv43xemprukj2shcuu",
+        "bafybeifsa2cfhscarqt5ijanzlsmuzg5rqopqp5wxora7syi4xuawdzvea"
+      ],
+      "golden": [
+        "bafybeieae2jqxcvianfn5faimfixya67o6hvpvbipbdqvic6yis6lxtlei",
+        "bafybeigor7ctjjtvrizhk4empddqmou3sjvckrnmoioh2gzljxkvlvdji4",
+        "bafybeiht6aizlcj4ydanrn7m2pr3su4ggqcqnwnzq5utkfmvgoxtxsak5e",
+        "bafybeicpm25id4ie6oj3qhve3n42fxuediswvvsyskvnzeezqkajbsit6e",
+        "bafybeicbz7jjgdr5q42smjlajvq6qk2du7a6qatzbljigrspayzmljaelq"
+      ],
+      "purple": [
+        "bafybeid3k7qgtdd4s744m7usl5hmetibasceph6tpxajbbh46vx3li47om",
+        "bafybeifjg7ktahqjstkcbp5gcjvq3a346xzpmfhiitfndqi252gvo7qnpe",
+        "bafybeiekdrxb7d7bfoajrsqwpaeepkzzqgfhho7gdxishta4qovh3y5ghi",
+        "bafybeibhzthvckh6pzpwnkzwowx2bmbmyhbbzfitrhtdb2oaclscz3ccwy",
+        "bafybeifm2ke3blgkzxp4rfycxn33yblgqo5ltt5n5lnxzx5ucyuwjrd5ua"
+      ],
+      "charcoal": [
+        "bafybeie2qjsq6r2732nipuimg4proveykrolpyrhd7tjnxlkp5c6posyoa",
+        "bafybeibxeyn26rfxcev3aijqwda2v6mc63rl56bl4q7wdtzr7fcyru32em",
+        "bafybeiehi4mxpbgja3dcwc3pfoghm7p5iysicj7sc733yctk6shjobmdpm",
+        "bafybeidvwatraxynrowrchnomfivhowflsdv4x2cimox2twb4ybxuyjnmm",
+        "bafybeifeahtfjonwcad625gfd3zealyczct72ogbvvuqminbanxwqrkmbq"
+      ],
+      "emerald": [
+        "bafybeiguiqroigqzcesqvumztsdsgfstiiv75f5aidknyoxer5vmffiu3m",
+        "bafybeiavxig5terjndppxq45hqddmz2jol5wlrwygqkmwdo7pmrgs2rfyq",
+        "bafybeibfxcoppk2bghxahkhme4fhs3sqfwhnabghxtkkk22myljkyjv324",
+        "bafybeicdnqme2gu64y2k4u42jycvy5y5ameuhcojmrj3s446ekccw37hve",
+        "bafybeicvt5t34o56w6gfqjurskz5iljmocxq5ijaxvydxmzourisfo3u5q"
+      ],
+      "crimson": [
+        "bafybeibrjypbrvadnklikoqky7az2kqi4n3pn5gsfcwrsye7ztgosjtrwi",
+        "bafybeidupspuy2heh43vj3guxabusv3fm74g7mq3qux53t27ekbbqnygza",
+        "bafybeiahdc5lom3qdy5tgz6klxwjhqhmnbiukh5voomc6btmxfzzgkmimm",
+        "bafybeihybjiforw7dc35dtce2vwkj6om3godsdonwkyoo6u3sq2tmb5ntu",
+        "bafybeiful4nkn4vtva7x7xh5z7hzrosp7hm5vb6yaoai33h4awtcjn5l6q"
+      ],
+      "sapphire": [
+        "bafybeifih3dokw2ezxb7skd67r5wzp7wbf3ta5hsqy75l2zuif4yz6ftmi",
+        "bafybeig2lw3ei5upmjenk76j22xcktbxlh44azmaes5dzmorzb4xbn55qq",
+        "bafybeiggxuyppjsswoohrzdlp6z3uhr5holvelkqc62wisx5oa6xsprf7a",
+        "bafybeiawtdooxugfd5uy5y5qn67vn2oqlic7duqpfs3j5qyqt6zg6u76bq",
+        "bafybeigtcwmvcsytqrrurfalyc3c2yrykcdswzzh23grhml2lbclmver4a"
+      ],
+      "silver": [
+        "bafybeihoqgjxlt6vaqegszynqalsa7gh2ddi22mghkkjougnnuyobwednm",
+        "bafybeihzgjykxjiqs3phez3dbzq3bd2nqx6wzqjip2phui777saqnxhjka",
+        "bafybeidhbbxberekjp2ywqqnwz4cgc6upxz4vjewidxspf3nk7lncoh5cm",
+        "bafybeiaxmlxat65prl5ka7ujcefrvkgqrs4olr2vgqtus555brdbj4rtai",
+        "bafybeibi6k7xowdorfsvqougwkrx3jl5chcygmdlfcqybm7kxzl62fcm2a"
+      ],
+      "gold": [
+        "bafybeifz4q2llosggpbsc3s6sftv7lusqspdch6yk7jha4642nuasrgrji",
+        "bafybeifg5ey2kalpsrjm2v34iishxntkj42xwvtlbygvoag6bjl3u722ie",
+        "bafybeifw2bgm5zpvipp3ivxrotbrzr356sfvqetl7y3m7tchxw6k4v4fti",
+        "bafybeih5vsqwbi55ij64dfpzfvbl4yponmgvbfhnkkrjuynfraknjulciu",
+        "bafybeifp76hbtx5bzdrbmwdng5fj4aodrejtklvs4dg2vuxgiqpp2z6nuu"
+      ],
+      "emberwood": [
+        "bafybeiaymvqgge3pkwt6o55qrnzg5pcp7ppk5ofgdwb3g65q7wj7k7dir4",
+        "bafybeidxbepikx6ynoakhoxnvzfmv32jbvfyisizx66dwdfxw6pje3yyyi",
+        "bafybeifoqgtjx67ijc2xq3zcxbjpe6cerbrszdec4os3smprfqzdt56fre",
+        "bafybeigyptrhvfglczbeo5jdplyow6yrrr36mva4juvhwchkkxg3xus4wq",
+        "bafybeihx4pha4er7fhcqjes3pf5gz25tiv2t4o3onxowadkzhselj4fxx4"
+      ]
+    }
+  }
+}
