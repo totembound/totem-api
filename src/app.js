@@ -13,6 +13,7 @@ const express = require('express');
 const cors = require('cors');
 const { getSecret } = require('./common/ssm-loader');
 const { verifyAccessToken } = require('./common/cognito-client');
+const { requireCaptcha } = require('./common/captcha');
 
 // Import auth handlers
 const {
@@ -167,11 +168,11 @@ app.get('/health', (req, res) => {
 // ============================================
 // Auth Routes (public - no Cognito authorizer)
 // ============================================
-app.post('/v1/auth/signup', handleSignup);
+app.post('/v1/auth/signup', requireCaptcha, handleSignup);
 app.post('/v1/auth/login', handleLogin);
 app.post('/v1/auth/verify', handleVerify);
 app.post('/v1/auth/resend-verification', handleResendVerification);
-app.post('/v1/auth/forgot-password', handleForgotPassword);
+app.post('/v1/auth/forgot-password', requireCaptcha, handleForgotPassword);
 app.post('/v1/auth/reset-password', handleResetPassword);
 app.post('/v1/auth/logout', handleLogout);
 app.post('/v1/auth/refresh', handleRefresh);

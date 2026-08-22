@@ -16,5 +16,6 @@
     "TwitchClientIdParam": "/totemboundci/oauth/twitch/client-id",
     "TwitchClientSecretParam": "/totemboundci/oauth/twitch/client-secret",
     "DiscordClientIdParam": "/totemboundci/oauth/discord/client-id",
-    "DiscordClientSecretParam": "/totemboundci/oauth/discord/client-secret"
+    "DiscordClientSecretParam": "/totemboundci/oauth/discord/client-secret",
+    "TurnstileSecretParam": "/totemboundci/turnstile/secret-key"
 }
