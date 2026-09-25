@@ -29,6 +29,7 @@ const {
 } = require('../common/db-client');
 
 const { sendNewUserWelcomeEmail, sendPasswordChangedEmail } = require('../common/email');
+const { validateDisplayName, sanitizeInboundDisplayName } = require('../common/display-name');
 const { onLoginStreak, onPersistenceCheck } = require('../services/achievements-service');
 const { grantLootItem } = require('../services/loot-service');
 
@@ -74,7 +75,7 @@ function validatePassword(password) {
  */
 async function handleSignup(req, res) {
   try {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName: rawDisplayName } = req.body;
 
     // Validate input
     if (!email || !password) {
@@ -97,6 +98,23 @@ async function handleSignup(req, res) {
         success: false,
         error: passwordValidation.error,
       });
+    }
+
+    // Same rules as a rename (trimmed, 3-20 chars, allowed charset, profanity).
+    // Optional at signup — omitted names fall back to a sanitized email prefix.
+    let displayName;
+    if (typeof rawDisplayName === 'string' && rawDisplayName.trim()) {
+      const nameValidation = validateDisplayName(rawDisplayName);
+      if (!nameValidation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: nameValidation.message,
+        });
+      }
+      displayName = nameValidation.name;
+    }
+    else {
+      displayName = sanitizeInboundDisplayName(null, email.split('@')[0]);
     }
 
     // Create Cognito user
@@ -219,7 +237,7 @@ async function handleLogin(req, res) {
         userProfile = await createUser({
           id: result.userId,
           email: result.email,
-          displayName: result.displayName,
+          displayName: sanitizeInboundDisplayName(result.displayName, result.email.split('@')[0]),
           tier: 'free',
           role: 'user',
           currencies: { essence: 5000, gems: 500 },
