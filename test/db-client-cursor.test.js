@@ -19,7 +19,9 @@ jest.mock('@aws-sdk/lib-dynamodb', () => {
   };
 });
 
-const { encodeCursor, decodeCursor, listAllTransactions } = require('../src/common/db-client');
+const {
+  encodeCursor, decodeCursor, listAllTransactions, listUsers, createUser, updateUser,
+} = require('../src/common/db-client');
 
 describe('cursor encode/decode', () => {
   it('encodeCursor returns null for null input', () => {
@@ -129,5 +131,156 @@ describe('listAllTransactions filter-aware iteration', () => {
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(result.items).toHaveLength(2);
     expect(result.nextCursor).toBeNull();
+  });
+});
+
+describe('listUsers search', () => {
+  beforeEach(() => mockSend.mockReset());
+
+  const cmdName = (call) => call[0].constructor.name;
+
+  it('takes the fast path (one Scan, no search filter) when search is empty', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [{ id: 'u1' }], LastEvaluatedKey: { pk: 'k' } });
+
+    const result = await listUsers({ limit: 25, search: '   ' });
+
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].input.Limit).toBe(25);
+    expect(mockSend.mock.calls[0][0].input.FilterExpression).toBe('sk = :profile');
+    expect(result.nextCursor).not.toBeNull();
+  });
+
+  it('keeps scanning past empty pages until `limit` matches are found', async () => {
+    // Regression: a single Scan with Limit 25 read 25 rows, matched none, and
+    // the admin UI rendered "No users found".
+    mockSend
+      .mockResolvedValueOnce({ Items: [], ScannedCount: 100, LastEvaluatedKey: { pk: 'a' } })
+      .mockResolvedValueOnce({ Items: [], ScannedCount: 100, LastEvaluatedKey: { pk: 'b' } })
+      .mockResolvedValueOnce({ Items: [{ id: 'u9' }], ScannedCount: 40 });
+
+    const result = await listUsers({ limit: 25, search: 'dragon' });
+
+    expect(mockSend).toHaveBeenCalledTimes(3);
+    expect(result.items.map((u) => u.id)).toEqual(['u9']);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('matches case-insensitively via the lowercased shadow fields, and raw fields for un-backfilled rows', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [], ScannedCount: 3 });
+
+    await listUsers({ limit: 25, search: '  DragonMaster ' });
+
+    const { input } = mockSend.mock.calls[0][0];
+    expect(input.FilterExpression).toContain('contains(emailLower, :search)');
+    expect(input.FilterExpression).toContain('contains(displayNameLower, :search)');
+    expect(input.FilterExpression).toContain('contains(displayName, :raw)');
+    expect(input.ExpressionAttributeValues[':search']).toBe('dragonmaster');
+    expect(input.ExpressionAttributeValues[':raw']).toBe('DragonMaster');
+  });
+
+  it('honors the safety cap on rows scanned and surfaces a cursor to continue', async () => {
+    mockSend.mockResolvedValue({ Items: [], ScannedCount: 100, LastEvaluatedKey: { pk: 'more' } });
+
+    const result = await listUsers({ limit: 25, search: 'nobody' });
+
+    // 2000-row cap / 100 per iteration = 20 Scans, then bail.
+    expect(mockSend).toHaveBeenCalledTimes(20);
+    expect(mockSend.mock.calls[0][0].input.Limit).toBe(25); // first pass = page size
+    expect(mockSend.mock.calls[1][0].input.Limit).toBe(100); // then widens
+    expect(result.items).toHaveLength(0);
+    expect(result.nextCursor).not.toBeNull();
+  });
+
+  it('resolves a full email via the email-index GSI without scanning', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [{ id: 'u1', sk: 'PROFILE', email: 'Dave@Example.com' }] });
+
+    const result = await listUsers({ limit: 25, search: 'Dave@Example.com' });
+
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(cmdName(mockSend.mock.calls[0])).toBe('QueryCommand');
+    expect(mockSend.mock.calls[0][0].input.IndexName).toBe('email-index');
+    expect(result).toEqual({ items: [{ id: 'u1', sk: 'PROFILE', email: 'Dave@Example.com' }], nextCursor: null });
+  });
+
+  it('tries the lowercased email, then falls back to the scan when the GSI misses', async () => {
+    mockSend
+      .mockResolvedValueOnce({ Items: [] }) // exact case
+      .mockResolvedValueOnce({ Items: [] }) // lowercased
+      .mockResolvedValueOnce({ Items: [{ id: 'u2' }], ScannedCount: 10 });
+
+    const result = await listUsers({ limit: 25, search: 'Dave@Example.com' });
+
+    expect(mockSend.mock.calls.map(cmdName)).toEqual(['QueryCommand', 'QueryCommand', 'ScanCommand']);
+    expect(mockSend.mock.calls[1][0].input.ExpressionAttributeValues[':pk']).toBe('dave@example.com');
+    expect(result.items.map((u) => u.id)).toEqual(['u2']);
+  });
+
+  it.each(['dave@', '@example.com', 'dave@example', 'dave@example.', 'dave@.com', 'a@b@c.com', 'dave @example.com'])(
+    'does not treat %p as a full email (scans instead)',
+    async (term) => {
+      mockSend.mockResolvedValueOnce({ Items: [], ScannedCount: 10 });
+
+      await listUsers({ limit: 25, search: term });
+
+      expect(mockSend.mock.calls.map(cmdName)).toEqual(['ScanCommand']);
+    },
+  );
+
+  it('handles a pathological email-ish input quickly and caps its length', async () => {
+    // ReDoS regression (CodeQL js/polynomial-redos): '!@!.' + many '!.' with no valid end.
+    // After truncation to 254 chars the input is email-shaped, so the GSI
+    // lookups run (and miss) before the scan — mock every call as empty.
+    mockSend.mockResolvedValue({ Items: [], ScannedCount: 10 });
+    const evil = `!@!.${'!.'.repeat(50000)} x`;
+
+    const start = Date.now();
+    await listUsers({ limit: 25, search: evil });
+
+    expect(Date.now() - start).toBeLessThan(100);
+    const scan = mockSend.mock.calls.find((c) => cmdName(c) === 'ScanCommand');
+    expect(scan[0].input.ExpressionAttributeValues[':raw']).toHaveLength(254);
+  });
+
+  it('skips the email GSI when paging with a cursor', async () => {
+    mockSend.mockResolvedValueOnce({ Items: [], ScannedCount: 10 });
+
+    await listUsers({ limit: 25, search: 'a@b.co', cursor: encodeCursor({ pk: 'USER#x', sk: 'PROFILE' }) });
+
+    expect(mockSend.mock.calls.map(cmdName)).toEqual(['ScanCommand']);
+    expect(mockSend.mock.calls[0][0].input.ExclusiveStartKey).toEqual({ pk: 'USER#x', sk: 'PROFILE' });
+  });
+});
+
+describe('user search shadow fields', () => {
+  beforeEach(() => mockSend.mockReset());
+
+  it('createUser writes emailLower / displayNameLower', async () => {
+    mockSend.mockResolvedValueOnce({});
+
+    await createUser({ id: 'usr_1', email: 'Dave@Example.com', displayName: 'DragonMaster' });
+
+    const { Item } = mockSend.mock.calls[0][0].input;
+    expect(Item.emailLower).toBe('dave@example.com');
+    expect(Item.displayNameLower).toBe('dragonmaster');
+  });
+
+  it('updateUser refreshes displayNameLower on rename', async () => {
+    mockSend.mockResolvedValueOnce({ Attributes: {} });
+
+    await updateUser('usr_1', { displayName: 'NewName' });
+
+    const { input } = mockSend.mock.calls[0][0];
+    expect(Object.values(input.ExpressionAttributeNames)).toContain('displayNameLower');
+    expect(Object.values(input.ExpressionAttributeValues)).toContain('newname');
+  });
+
+  it('updateUser leaves search fields alone for unrelated updates', async () => {
+    mockSend.mockResolvedValueOnce({ Attributes: {} });
+
+    await updateUser('usr_1', { 'stats.loginStreak': 3 });
+
+    const names = Object.values(mockSend.mock.calls[0][0].input.ExpressionAttributeNames);
+    expect(names).not.toContain('displayNameLower');
+    expect(names).not.toContain('emailLower');
   });
 });

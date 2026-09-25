@@ -301,11 +301,25 @@ async function getUser(userId) {
   });
 }
 
+/**
+ * Lowercased shadow copies of the admin-searchable profile fields. DynamoDB's
+ * contains() is case-sensitive, so admin search (listUsers) filters on these
+ * instead of the display-cased originals. Only fields present in `fields` are
+ * returned, so this is safe to spread into partial updates.
+ */
+function userSearchFields(fields) {
+  const out = {};
+  if (typeof fields.email === 'string') out.emailLower = fields.email.toLowerCase();
+  if (typeof fields.displayName === 'string') out.displayNameLower = fields.displayName.toLowerCase();
+  return out;
+}
+
 async function createUser(userData) {
   const item = {
     pk: userPK(userData.id),
     sk: 'PROFILE',
     ...userData,
+    ...userSearchFields(userData),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -317,7 +331,7 @@ async function updateUser(userId, updates) {
   return updateItem(TABLES.USERS, {
     pk: userPK(userId),
     sk: 'PROFILE',
-  }, updates);
+  }, { ...updates, ...userSearchFields(updates) });
 }
 
 // ============================================
@@ -898,35 +912,100 @@ function decodeCursor(cursor) {
  *
  * Returns one page of profile records, filtered by optional search.
  *
- * NOTE: With a FilterExpression, DynamoDB scans up to `limit` rows then filters,
- * so a page may return fewer items than `limit` while still having a `nextCursor`.
- * Treat `nextCursor` (not item count) as the "more available" signal. A
- * `displayNameLower-index` GSI is a future improvement; scan is acceptable until
- * ~5K users.
+ * Search is case-insensitive and matches a substring of email or displayName:
+ *   - A full email address is resolved first via the email-index GSI (one
+ *     Query, no scan). Falls through to the scan when not found, since stored
+ *     emails aren't case-normalized.
+ *   - Otherwise the scan filters on the lowercased `emailLower` /
+ *     `displayNameLower` shadow fields (see userSearchFields), plus the raw
+ *     fields so rows not yet backfilled still match on exact case.
+ *
+ * A Scan's `Limit` caps rows READ, not matches returned — a single Scan with
+ * `Limit: 25` checks only 25 users and usually returns an empty page. So with a
+ * search we iterate, accumulating matches until we have `limit`, exhaust the
+ * table, or hit a safety cap on rows scanned (the cursor is returned so the
+ * caller can continue). A `displayNameLower-index` GSI is a future improvement;
+ * scan is acceptable until ~5K users.
  *
  * @param {object} options - { limit, cursor, search }
  * @returns {Promise<{ items: Array, nextCursor: string|null }>}
  */
+const USER_SEARCH_MAX_SCAN = 2000;
+const USER_SEARCH_MAX_LENGTH = 254; // longest valid email address
+
+/**
+ * Cheap "looks like a full email" check: exactly one '@', no whitespace, and a
+ * dot inside the domain. Plain string ops, not a regex — the obvious
+ * /^[^\s@]+@[^\s@]+\.[^\s@]+$/ backtracks polynomially on inputs like
+ * 'a@' + '.a'.repeat(n) + ' ' (CodeQL js/polynomial-redos).
+ */
+function looksLikeEmail(term) {
+  if (/\s/.test(term)) return false;
+  const at = term.indexOf('@');
+  if (at < 1 || at !== term.lastIndexOf('@')) return false;
+  const dot = term.indexOf('.', at + 2);
+  return dot !== -1 && dot < term.length - 1;
+}
+
 async function listUsers({ limit = 50, cursor, search } = {}) {
+  const term = typeof search === 'string' ? search.trim().slice(0, USER_SEARCH_MAX_LENGTH) : '';
+  const exclusiveStartKey = decodeCursor(cursor);
+
   const params = {
     TableName: TABLES.USERS,
     FilterExpression: 'sk = :profile',
     ExpressionAttributeValues: { ':profile': 'PROFILE' },
-    Limit: limit,
   };
 
-  if (search) {
-    params.FilterExpression += ' AND (contains(email, :search) OR contains(displayName, :search))';
-    params.ExpressionAttributeValues[':search'] = search.toLowerCase();
+  // Fast path: no search — one Scan, return the natural page.
+  if (!term) {
+    params.Limit = limit;
+    if (exclusiveStartKey) params.ExclusiveStartKey = exclusiveStartKey;
+    const response = await docClient.send(new ScanCommand(params));
+    return {
+      items: response.Items || [],
+      nextCursor: encodeCursor(response.LastEvaluatedKey),
+    };
   }
 
-  const exclusiveStartKey = decodeCursor(cursor);
-  if (exclusiveStartKey) params.ExclusiveStartKey = exclusiveStartKey;
+  // Exact email: direct GSI lookup (first page only — a cursor means the
+  // caller is paging through scan results).
+  if (!exclusiveStartKey && looksLikeEmail(term)) {
+    const candidates = [...new Set([term, term.toLowerCase()])];
+    for (const email of candidates) {
+      const user = await getUserByEmail(email);
+      if (user && user.sk === 'PROFILE') return { items: [user], nextCursor: null };
+    }
+  }
 
-  const response = await docClient.send(new ScanCommand(params));
+  const lower = term.toLowerCase();
+  params.FilterExpression += ' AND (contains(emailLower, :search) OR contains(displayNameLower, :search)'
+    + ' OR contains(email, :raw) OR contains(displayName, :raw))';
+  params.ExpressionAttributeValues[':search'] = lower;
+  params.ExpressionAttributeValues[':raw'] = term;
+
+  // First pass reads just `limit` rows so a broad search returns a normal page;
+  // later passes widen to cut round-trips when matches are sparse. Matches
+  // aren't trimmed to `limit` — the cursor resumes after the last row READ.
+  const PER_ITER = Math.max(limit, 100);
+  const collected = [];
+  let lastKey = exclusiveStartKey;
+  let scanned = 0;
+
+  do {
+    const perIter = scanned === 0 ? limit : PER_ITER;
+    const iterParams = { ...params, Limit: Math.min(perIter, USER_SEARCH_MAX_SCAN - scanned) };
+    if (lastKey) iterParams.ExclusiveStartKey = lastKey;
+
+    const response = await docClient.send(new ScanCommand(iterParams));
+    collected.push(...(response.Items || []));
+    scanned += response.ScannedCount || (response.Items || []).length;
+    lastKey = response.LastEvaluatedKey;
+  } while (collected.length < limit && lastKey && scanned < USER_SEARCH_MAX_SCAN);
+
   return {
-    items: response.Items || [],
-    nextCursor: encodeCursor(response.LastEvaluatedKey),
+    items: collected,
+    nextCursor: encodeCursor(lastKey),
   };
 }
 

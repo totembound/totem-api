@@ -3160,7 +3160,12 @@
  *         name: search
  *         schema:
  *           type: string
- *         description: Filter by email or display name (contains match)
+ *         description: >-
+ *           Case-insensitive substring match on email or display name. A full
+ *           email address is resolved directly via the email index. A page may
+ *           hold fewer than `limit` users (even zero) while `hasMore` is true —
+ *           the server caps rows scanned per request; pass `nextCursor` to keep
+ *           searching.
  *     responses:
  *       200:
  *         description: One page of users
