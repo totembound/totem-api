@@ -930,11 +930,25 @@ function decodeCursor(cursor) {
  * @param {object} options - { limit, cursor, search }
  * @returns {Promise<{ items: Array, nextCursor: string|null }>}
  */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USER_SEARCH_MAX_SCAN = 2000;
+const USER_SEARCH_MAX_LENGTH = 254; // longest valid email address
+
+/**
+ * Cheap "looks like a full email" check: exactly one '@', no whitespace, and a
+ * dot inside the domain. Plain string ops, not a regex — the obvious
+ * /^[^\s@]+@[^\s@]+\.[^\s@]+$/ backtracks polynomially on inputs like
+ * 'a@' + '.a'.repeat(n) + ' ' (CodeQL js/polynomial-redos).
+ */
+function looksLikeEmail(term) {
+  if (/\s/.test(term)) return false;
+  const at = term.indexOf('@');
+  if (at < 1 || at !== term.lastIndexOf('@')) return false;
+  const dot = term.indexOf('.', at + 2);
+  return dot !== -1 && dot < term.length - 1;
+}
 
 async function listUsers({ limit = 50, cursor, search } = {}) {
-  const term = typeof search === 'string' ? search.trim() : '';
+  const term = typeof search === 'string' ? search.trim().slice(0, USER_SEARCH_MAX_LENGTH) : '';
   const exclusiveStartKey = decodeCursor(cursor);
 
   const params = {
@@ -956,7 +970,7 @@ async function listUsers({ limit = 50, cursor, search } = {}) {
 
   // Exact email: direct GSI lookup (first page only — a cursor means the
   // caller is paging through scan results).
-  if (!exclusiveStartKey && EMAIL_PATTERN.test(term)) {
+  if (!exclusiveStartKey && looksLikeEmail(term)) {
     const candidates = [...new Set([term, term.toLowerCase()])];
     for (const email of candidates) {
       const user = await getUserByEmail(email);

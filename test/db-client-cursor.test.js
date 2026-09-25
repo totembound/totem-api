@@ -215,6 +215,32 @@ describe('listUsers search', () => {
     expect(result.items.map((u) => u.id)).toEqual(['u2']);
   });
 
+  it.each(['dave@', '@example.com', 'dave@example', 'dave@example.', 'dave@.com', 'a@b@c.com', 'dave @example.com'])(
+    'does not treat %p as a full email (scans instead)',
+    async (term) => {
+      mockSend.mockResolvedValueOnce({ Items: [], ScannedCount: 10 });
+
+      await listUsers({ limit: 25, search: term });
+
+      expect(mockSend.mock.calls.map(cmdName)).toEqual(['ScanCommand']);
+    },
+  );
+
+  it('handles a pathological email-ish input quickly and caps its length', async () => {
+    // ReDoS regression (CodeQL js/polynomial-redos): '!@!.' + many '!.' with no valid end.
+    // After truncation to 254 chars the input is email-shaped, so the GSI
+    // lookups run (and miss) before the scan — mock every call as empty.
+    mockSend.mockResolvedValue({ Items: [], ScannedCount: 10 });
+    const evil = `!@!.${'!.'.repeat(50000)} x`;
+
+    const start = Date.now();
+    await listUsers({ limit: 25, search: evil });
+
+    expect(Date.now() - start).toBeLessThan(100);
+    const scan = mockSend.mock.calls.find((c) => cmdName(c) === 'ScanCommand');
+    expect(scan[0].input.ExpressionAttributeValues[':raw']).toHaveLength(254);
+  });
+
   it('skips the email GSI when paging with a cursor', async () => {
     mockSend.mockResolvedValueOnce({ Items: [], ScannedCount: 10 });
 
