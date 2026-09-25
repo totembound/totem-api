@@ -401,6 +401,8 @@ async function main() {
         id: { S: TEST_USER_ID },
         email: { S: TEST_USER_EMAIL },
         displayName: { S: TEST_USER_NAME },
+        emailLower: { S: TEST_USER_EMAIL.toLowerCase() },
+        displayNameLower: { S: TEST_USER_NAME.toLowerCase() },
         tier: { S: 'free' },
         role: { S: 'user' },
         currencies: { M: {
@@ -501,6 +503,8 @@ async function main() {
         id: { S: ADMIN_USER_ID },
         email: { S: ADMIN_USER_EMAIL },
         displayName: { S: ADMIN_USER_NAME },
+        emailLower: { S: ADMIN_USER_EMAIL.toLowerCase() },
+        displayNameLower: { S: ADMIN_USER_NAME.toLowerCase() },
         tier: { S: 'free' },
         role: { S: 'admin' },
         currencies: { M: {

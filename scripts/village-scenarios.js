@@ -67,6 +67,8 @@ async function setUserCurrencies(essence, gems) {
       userId: USER_ID,
       email: 'testplayer1@example.com',
       displayName: 'TestPlayer1',
+      emailLower: 'testplayer1@example.com',
+      displayNameLower: 'testplayer1',
       tier: 'free',
       currencies: { essence, gems },
       createdAt: new Date().toISOString(),
